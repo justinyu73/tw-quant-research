@@ -94,7 +94,7 @@ def fetch_month(stock_no: str, month: str) -> tuple[dict[str, object], bytes]:
     # requested month explicit instead of silently falling back to current.
     query = f"?date={year}{month_number}01&stockNo={stock_no}&response=json"
     url = ENDPOINT + query
-    request = Request(url, headers={"User-Agent": "TQE human-run research capture/1.0"})
+    request = Request(url, headers={"User-Agent": "TQR human-run research capture/1.0"})
     with urlopen(request, timeout=20) as response:  # nosec B310 - explicit official endpoint
         raw = response.read()
         payload = json.loads(raw.decode("utf-8"))

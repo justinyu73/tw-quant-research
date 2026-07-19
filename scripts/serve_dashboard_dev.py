@@ -15,7 +15,7 @@ def main() -> int:
     build_preview(DEFAULT_OUTPUT)
     handler = partial(SimpleHTTPRequestHandler, directory=str(DEFAULT_OUTPUT))
     server = ThreadingHTTPServer(("127.0.0.1", args.port), handler)
-    print(f"TQE dashboard dev server listening on http://127.0.0.1:{args.port}", flush=True)
+    print(f"TQR dashboard dev server listening on http://127.0.0.1:{args.port}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

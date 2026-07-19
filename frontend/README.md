@@ -1,4 +1,4 @@
-# TQE desktop shell
+# TQR desktop shell
 
 This is the Tauri desktop shell for the local, read-only TW Quant Research
 application. From `frontend/`, install the local Tauri CLI dependencies and

@@ -34,7 +34,7 @@ def main() -> int:
     sidecar = create_server(catalog, host=host, port=args.sidecar_port)
     sidecar_url = f"http://{host}:{args.sidecar_port}"
     threading.Thread(target=sidecar.serve_forever, daemon=True).start()
-    print(f"TQE sidecar listening on {sidecar_url} instruments={len(catalog.instruments)}", flush=True)
+    print(f"TQR sidecar listening on {sidecar_url} instruments={len(catalog.instruments)}", flush=True)
 
     os.environ["TQE_SIDECAR_URL"] = sidecar_url
     from build_dashboard_preview import DEFAULT_OUTPUT, build_preview  # after env is set
@@ -42,7 +42,7 @@ def main() -> int:
     build_preview(DEFAULT_OUTPUT)
     handler = partial(SimpleHTTPRequestHandler, directory=str(DEFAULT_OUTPUT))
     server = ThreadingHTTPServer((host, args.port), handler)
-    print(f"TQE dashboard listening on http://{host}:{args.port}  (open this in your browser)", flush=True)
+    print(f"TQR dashboard listening on http://{host}:{args.port}  (open this in your browser)", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

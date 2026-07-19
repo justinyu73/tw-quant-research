@@ -36,7 +36,7 @@ def main(argv: list[str] | None = None) -> int:
     catalog = load_catalog(args.fixture_dir)
     server = create_server(catalog, host=host, port=args.port)
     print(
-        f"TQE sidecar listening on http://{host}:{args.port} "
+        f"TQR sidecar listening on http://{host}:{args.port} "
         f"instruments={len(catalog.instruments)} digest={catalog.digest}",
         flush=True,
     )

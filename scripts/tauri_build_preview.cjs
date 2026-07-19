@@ -20,5 +20,5 @@ for (const [command, prefix] of candidates) {
   process.exit(result.status || 1);
 }
 
-console.error("TQE requires Python 3 to build the dashboard preview.");
+console.error("TQR requires Python 3 to build the dashboard preview.");
 process.exit(1);
