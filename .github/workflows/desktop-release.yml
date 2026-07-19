@@ -99,6 +99,16 @@ jobs:
           pattern: tw-quant-research-*
           path: release-assets
           merge-multiple: false
+      - name: Flatten release assets with unique names
+        run: |
+          mkdir release-files
+          while IFS= read -r -d '' asset; do
+            relative="${asset#release-assets/}"
+            safe_name="${relative//\//__}"
+            cp "${asset}" "release-files/${safe_name}"
+          done < <(find release-assets -type f -print0)
+          mv release-assets release-assets-nested
+          mv release-files release-assets
       - name: Prepare draft release notes
         run: |
           cat > release-notes.md <<'EOF'
