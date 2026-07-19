@@ -8,15 +8,15 @@
   "use strict";
 
   var SECTIONS = Object.freeze([
-    { id: "overview", label: "研究駕駛艙" },
-    { id: "market", label: "個股分析" },
-    { id: "products", label: "市場資料" },
-    { id: "features", label: "技術因子" },
-    { id: "research", label: "市場篩選" },
-    { id: "fundamentals", label: "財報基本面" },
-    { id: "stories", label: "故事追蹤" },
-    { id: "backtest", label: "研究計算" },
-    { id: "evidence", label: "資料與證據" }
+    { id: "overview", label: "市場首頁" },
+    { id: "market", label: "行情分析" },
+    { id: "products", label: "我的自選" },
+    { id: "features", label: "技術指標" },
+    { id: "research", label: "選股中心" },
+    { id: "fundamentals", label: "財報" },
+    { id: "stories", label: "研究筆記" },
+    { id: "backtest", label: "回測報告" },
+    { id: "evidence", label: "資料來源" }
   ]);
 
   var WATCHLIST_SCHEMA = "tw-quant-engine-watchlist/v1";
@@ -70,7 +70,9 @@
         peLow: "",
         peHigh: "",
         safetyMargin: ""
-      }
+      },
+      notes: [],
+      noteDraft: { title: "", body: "", tags: "" }
     };
   }
 
@@ -198,6 +200,27 @@
         })
       });
     }
+    if (event.type === "SET_NOTE_DRAFT" && ["title", "body", "tags"].indexOf(event.field) >= 0) {
+      return Object.assign({}, current, {
+        noteDraft: Object.assign({}, current.noteDraft, { [event.field]: typeof event.value === "string" ? event.value : "" })
+      });
+    }
+    if (event.type === "SET_NOTES") {
+      return Object.assign({}, current, {
+        notes: Array.isArray(event.notes) ? clone(event.notes).slice(0, 200) : []
+      });
+    }
+    if (event.type === "ADD_NOTE" && event.note && typeof event.note === "object") {
+      return Object.assign({}, current, {
+        notes: [clone(event.note)].concat(Array.isArray(current.notes) ? current.notes : []).slice(0, 200),
+        noteDraft: { title: "", body: "", tags: "" }
+      });
+    }
+    if (event.type === "DELETE_NOTE" && typeof event.noteId === "string") {
+      return Object.assign({}, current, {
+        notes: (Array.isArray(current.notes) ? current.notes : []).filter(function (note) { return note.id !== event.noteId; })
+      });
+    }
     if (event.type === "SET_WATCHLIST") {
       return Object.assign({}, current, {
         watchlist: { items: normalizeWatchlist(event.items), status: "ready", dirty: false, message: "" },
@@ -302,6 +325,7 @@
       reset.watchlist = Object.assign({}, current.watchlist, { items: current.watchlist.items.slice() });
       reset.watchlistGroups = watchlistGroupsFor(current);
       reset.activeWatchlistGroupId = current.activeWatchlistGroupId;
+      reset.notes = Array.isArray(current.notes) ? current.notes.slice() : [];
       return reset;
     }
     if (event.type === "KLINE_LOADING") {

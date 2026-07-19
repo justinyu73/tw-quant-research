@@ -10,12 +10,12 @@ const ROOT = path.resolve(__dirname, "..");
 const PREVIEW_DIR = path.join(ROOT, "outputs", "dashboard-preview");
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
-  overview: "f0a9a38c2b4e21d4e17cf8e8658f73f831ad4b8f60ef0f807ee4f5b4dd6ce79a",
-  market_valid: "df5cf03d85b373484768eb2b497adbc763bec7800883bcde888636e5f4dc2fc8",
-  market_partial: "f1449a3eca7c35cf23f0baa1c7e6804dc6a6eb7b98dcbac239e86a5a73e800f1",
-  market_future: "56d98b46b4b0fe15f605ba2f842d77e9f7f6381228f15943ac0f5c21cd9ce662",
-  products: "5417174af5c98d424a6fe02b63fa24d3bf0894a90bde7579752aca5816707c8e",
-  detail_dialog: "44d10f53497858afdd99380d818cc3aad369090cfc9f0926a4bb7a2710951987",
+  overview: "ccdff96caf8061309af0a683f3184c162c249426dfc3042a3092f3fa1fc39a56",
+  market_valid: "b84a2b3806c6619accd0d1b466977687c74ab350ea321da0060b85dd8a7b3066",
+  market_partial: "d4ef725a23528ec687b87109333061a5d65612103722a44eb1197a4663b9a70e",
+  market_future: "8975648c050edcf10d3cee1fb0bb0d2a5cdf78cd1da77fc6c3c66db874426d31",
+  products: "e88c2dae9411b022e3ce0457a16aa3c7fb55b7efdae20c53ce4529fe4fa0444a",
+  detail_dialog: "f5ed390e8f0328360e663ef85a4a9d752f09dd05c66493b78ca790f337ff4c62",
 };
 
 function freePort() {
@@ -155,9 +155,9 @@ async function main() {
     assert.equal(await page.locator("#app .app-shell").count(), 1);
     assert.equal(await page.locator(".sidebar").count(), 1);
     assert.equal(await page.locator(".card").count() > 0, true);
-    assert.equal(await page.locator(".table").count() > 0, true);
-    assert.equal(await page.locator(".read-only-pill").innerText(), "資料唯讀");
-    assert.equal(await page.locator(".page-title").innerText(), "研究駕駛艙");
+    assert.equal(await page.locator('[data-testid="watchlist-toolbar"]').count(), 1);
+    assert.equal(await page.locator(".read-only-pill").innerText(), "研究唯讀");
+    assert.equal(await page.locator(".page-title").innerText(), "市場首頁");
     const overviewText = await page.locator("#app").innerText();
     assert.doesNotMatch(overviewText, /READ ONLY|Research modules|admitted rows|unadmitted|Instrument/);
     assert.equal(await page.evaluate(() => typeof window.LightweightCharts), "object");
@@ -169,13 +169,19 @@ async function main() {
       animations: "disabled",
     }));
 
+    const globalSearch = page.locator('[data-testid="global-search"]');
+    await globalSearch.fill("2330");
+    await page.locator('[data-testid="global-search-results"] .symbol-search-result').filter({ hasText: "2330" }).first().click();
+    assert.equal(await page.locator(".page-title").innerText(), "行情分析");
+
     await page.locator('[data-action="section"][data-section="market"]').first().click();
-    assert.equal(await page.locator(".page-title").innerText(), "個股分析");
+    assert.equal(await page.locator(".page-title").innerText(), "行情分析");
     await page.locator('[data-testid="kline-chart"]').waitFor();
     assert.equal(await page.locator('[data-testid="kline-period-label"]').innerText(), "1D");
     assert.equal(await page.locator('[data-testid="kline-chart"] canvas').count() > 0, true);
     assert.equal(await page.locator('[data-testid="kline-instrument"]').inputValue(), "TWSE:2330");
-    assert.equal(await page.locator('[data-testid="stock-quote"] .stock-quote-price strong').innerText(), "2,440");
+    assert.equal(await page.locator('[data-testid="quote-bar"] .terminal-quote-price strong').innerText(), "2,440");
+    assert.equal(await page.locator('[data-testid="terminal-watchlist"]').count(), 1);
     assert.match(await page.locator('[data-testid="kline-coverage"]').innerText(), /360 \/ 交易日 360/);
     assert.match(await page.locator('[data-testid="kline-coverage"]').innerText(), /EMA 可用/);
     assert.notEqual(await page.locator('[data-testid="technical-value-ema-20-"]').innerText(), "—");
@@ -185,6 +191,26 @@ async function main() {
       fullPage: true,
       animations: "disabled",
     }));
+
+    const terminalWatchlistPicker = page.locator('[data-testid="terminal-watchlist-picker"]');
+    await terminalWatchlistPicker.fill("2330");
+    const terminalWatchlistResult = page.locator('[data-testid="terminal-watchlist-results"] .symbol-search-result').filter({ hasText: "2330" }).first();
+    await terminalWatchlistResult.waitFor();
+    await terminalWatchlistResult.click();
+    assert.equal(await page.locator('[data-testid="terminal-watchlist-add"]').isDisabled(), false);
+    await page.locator('[data-testid="terminal-watchlist-add"]').click();
+    assert.equal(await page.locator('[data-testid="terminal-watchlist"] .terminal-watchlist-row').count(), 1);
+    assert.equal(await page.locator('[data-testid="kline-watchlist-toggle"]').innerText(), "移出自選");
+    await page.locator('[data-testid="kline-watchlist-toggle"]').click();
+    assert.equal(await page.locator('[data-testid="kline-watchlist-toggle"]').innerText(), "加入自選");
+
+    await page.locator('[data-action="section"][data-section="features"]').first().click();
+    await page.locator('[data-testid="feature-workbench"]').waitFor();
+    assert.equal(await page.locator('[data-testid="technical-snapshot"]').count(), 1);
+    assert.notEqual(await page.locator('[data-testid="technical-value-ema-20-"]').innerText(), "—");
+    assert.equal(await page.locator('[data-testid="feature-workbench"] .technical-reading').count(), 4);
+    await page.locator('[data-action="section"][data-section="market"]').first().click();
+    await page.locator('[data-testid="kline-chart"]').waitFor();
 
     await page.locator('[data-testid="kline-fit"]').click();
     await page.locator('[data-testid="kline-zoom-in"]').click();
@@ -249,6 +275,9 @@ async function main() {
     assert.notEqual(await page.locator('[data-testid="watchlist-group-select"]').inputValue(), "default");
     await page.locator('[data-action="section"][data-section="research"]').first().click();
     await page.locator('[data-testid="research-results"]').waitFor();
+    await page.locator('[data-testid="screen-builder"]').waitFor();
+    await page.locator('[data-testid="screen-builder"] .screen-condition').first().click();
+    assert.match(await page.locator('[data-testid="screen-builder"]').innerText(), /已選 1/);
     assert.equal(await page.locator('[data-testid="research-status"]').innerText(), "目前顯示 1 筆已納入資料");
     await page.locator('[data-action="research-add-group"]').first().click();
     assert.equal(await page.locator('[data-action="research-add-group"]').first().innerText(), "已在群組");
@@ -258,9 +287,17 @@ async function main() {
     assert.match(await page.locator('[data-testid="screen-spec"]').innerText(), /TWSE/);
     assert.match(await page.locator('[data-testid="strategy-spec"]').innerText(), /research_only/);
 
+    await page.locator('[data-action="section"][data-section="stories"]').first().click();
+    await page.locator('[data-testid="note-composer"]').waitFor();
+    await page.locator('[data-testid="note-title"]').fill("2330 研究觀察");
+    await page.locator('[data-testid="note-body"]').fill("價格與技術線先記錄，等待下一次財報核對。");
+    await page.locator('[data-testid="note-submit"]').click();
+    assert.equal(await page.locator('[data-testid="note-card"]').count(), 1, `note count=${await page.locator('[data-testid="note-count"]').innerText()} title=${await page.locator('[data-testid="note-title"]').inputValue()}`);
+    assert.match(await page.locator('[data-testid="note-card"]').innerText(), /2330 研究觀察/);
+
     await page.locator('[data-action="section"][data-section="products"]').first().click();
     await page.locator(".page-title").waitFor();
-    assert.equal(await page.locator(".page-title").innerText(), "市場資料");
+    assert.equal(await page.locator(".page-title").innerText(), "我的自選");
     await settle(page);
     screenshots.products = screenshotHash(await page.screenshot({
       path: path.join(SCREENSHOT_DIR, "products.png"),
@@ -288,7 +325,7 @@ async function main() {
     assert.notEqual(firstEquityDate, "—", "equity curve date must be rendered from the read model");
     page.once("dialog", (dialog) => dialog.accept());
     await page.locator('[data-action="reset"]').click();
-    assert.equal(await page.locator(".page-title").innerText(), "研究駕駛艙");
+    assert.equal(await page.locator(".page-title").innerText(), "市場首頁");
     const responsive = [];
     for (const size of [{ width: 1024, height: 768 }, { width: 820, height: 768 }]) {
       await page.setViewportSize(size);

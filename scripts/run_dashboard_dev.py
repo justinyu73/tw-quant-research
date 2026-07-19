@@ -31,7 +31,7 @@ from build_dashboard_preview import build_preview, build_view  # noqa: E402
 ASSETS = ("index.html", "dashboard-core.js", "app.js", "styles.css", "lightweight-charts.js", "tqr-logo.svg")
 REQUIRED_APP_MARKUP = (
     'class="sidebar"',
-    'class="topbar"',
+    'class="topbar system-topbar"',
     'class="page-wrapper"',
     'class="card',
     'class="table',
