@@ -1,0 +1,23 @@
+{
+  "schema": "tw-quant-engine-p5-work-unit-digest-evidence/v1",
+  "stage_id": "P5.3",
+  "status": "blocked_source_contract",
+  "work_unit_id": "tw-quant-engine-p5-twse-history-001",
+  "draft_path": "workflow/tqe-p5-twse-work-unit.draft.json",
+  "template_digest": "sha256:5bcd14023a0861f2d3b13d62e5b9a76716c78ed673bf251eb0d512f7dbf1d44c",
+  "digest_status": "template_only_waiting_p5_1",
+  "activation_ready": false,
+  "network": false,
+  "provider_calls": 0,
+  "verification": {
+    "argv": ["python3", "scripts/p5_work_unit_digest.py"],
+    "exit_code": 0,
+    "checks": "all_pass_but_source_contract_remains_blocked"
+  },
+  "cannot_claim": [
+    "exact provider endpoint frozen",
+    "host-egress admitted",
+    "P5.3 activation-ready digest",
+    "provider invoked"
+  ]
+}

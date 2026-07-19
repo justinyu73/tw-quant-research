@@ -1,0 +1,92 @@
+{
+  "schema": "tw-quant-engine-stage-acceptance/v1",
+  "stage_id": "S7",
+  "package_id": "tw-quant-engine-s5-s9-research-product-chain-001",
+  "status": "pass",
+  "capture_method": "offline synthetic price-bar and admitted-signal fixture plus subprocess verification",
+  "captured_at": "2026-07-15T14:20:20Z",
+  "approval": {
+    "approved": true,
+    "approved_by": "user",
+    "execution_boundary": "workflow/s5-s9-approval-package.json",
+    "network_enabled": false,
+    "network_requests": 0,
+    "finmind_used": false
+  },
+  "network_policy": {
+    "enabled": false,
+    "observed_network_calls": 0,
+    "fixture_only": true
+  },
+  "backtest_contract": {
+    "schema": "tw-quant-engine-backtest-result/v1",
+    "as_of": "2026-01-07T23:59:59Z",
+    "execution": "signal_date_t -> next visible bar open",
+    "price_basis": "raw_open_and_raw_close",
+    "cost_formula": "gross_notional * transaction_cost_bps / 10000",
+    "slippage_formula": "buy open*(1+bps/10000), sell open*(1-bps/10000)",
+    "result_digest": "sha256:7d117b7ddeb63d0703b59bf32bb80ebe5c19f9839b32290a4426fe434c8f831e"
+  },
+  "formula_checks": {
+    "schema": true,
+    "next_bar_open_buy": true,
+    "next_bar_open_sell": true,
+    "final_equity": true,
+    "cumulative_return": true,
+    "cost_and_slippage_ledger": true,
+    "deterministic_digest": true
+  },
+  "offline_probe": {
+    "status": "pass",
+    "network_requests": 0
+  },
+  "offline_verification": {
+    "tests": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:da987a171dffe58a33a2e246b00054fd05ca817d1843ef19c64583a102003341"
+    },
+    "preflight": {
+      "argv": [
+        "/usr/bin/python3",
+        "scripts/lh_preflight.py"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "parsed": {
+        "driver": "loop-hybrid",
+        "engine_id": "tw-quant-engine",
+        "errors": [],
+        "phase": "s1_qlib_integration",
+        "schema": "tw-quant-engine-preflight/v1",
+        "status": "pass",
+        "writes_repo": false
+      }
+    }
+  },
+  "changed_files": [
+    "src/tw_quant_engine/backtest.py",
+    "docs/s7-backtest.md",
+    "tests/fixtures/s7/backtest.json",
+    "tests/test_s7_backtest.py",
+    "workflow/lh-work-unit.s7.example.json",
+    "scripts/run_s7_acceptance.py",
+    "workflow/evidence/s7-backtest.acceptance.json"
+  ],
+  "acceptance_notes": [
+    "S7 is research-only and provider-neutral; it does not initialize Qlib or place orders.",
+    "A signal is admitted only when its status is admitted and it is visible at the backtest as_of cutoff.",
+    "Three consecutive failed acceptance attempts or an unplanned semantic fork stops the S5-S9 sequence."
+  ]
+}

@@ -1,0 +1,20 @@
+schema: tw-quant-engine-universe/v1
+as_of: "2026-07-15"
+groups:
+  power_infrastructure:
+    - "2308" # 台達
+    - "1519" # 華城
+    - "1514" # 亞力
+    - "1513" # 中興電
+    - "1503" # 士電
+  server_high_speed:
+    - "3533" # 嘉澤
+    - "4966" # 譜瑞-KY
+  passive_components:
+    - "2327" # 國巨
+    - "3357" # 臺慶科
+    - "3026" # 禾伸堂
+    - "2492" # 華新科（對照）
+  memory_edge_ai:
+    - "5289" # 宜鼎
+    - "3693" # 營邦（觀察）

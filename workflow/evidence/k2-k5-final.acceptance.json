@@ -1,0 +1,123 @@
+{
+  "schema": "tw-quant-engine-k2-k5-final-evidence/v1",
+  "package_id": "tw-quant-engine-k2-k5-kline-analysis-001",
+  "stage_id": "FINAL",
+  "goal_id": "k2-k5-final-acceptance",
+  "attempt": 2,
+  "status": "awaiting_human_review",
+  "captured_at": "2026-07-15T17:09:24Z",
+  "contract_checks": {
+    "declared_commands_pass": true,
+    "network_observed": false,
+    "write_observed": false
+  },
+  "commands": [
+    {
+      "id": "browser-smoke",
+      "argv": [
+        "npm",
+        "run",
+        "dashboard:browser-smoke"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:71242949f283afadb83ceb4dc8d4acb4815ac3f94f766647fa63b6f57bc81e7a",
+      "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "network_observed": false,
+      "write_observed": false
+    },
+    {
+      "id": "preview",
+      "argv": [
+        "/usr/bin/python3",
+        "scripts/run_dashboard_preview.py"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:49b19f63691daf75bbcb8305a363a6ab4fb8b1886fb8891c2c8bf3e31c9b96fa",
+      "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "network_observed": false,
+      "write_observed": false
+    },
+    {
+      "id": "full-tests",
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:4b9e6b40bb6ec6d02b10c1f271ec0b66fcd9abb4fa92cdc1a6688d08285e713e",
+      "network_observed": false,
+      "write_observed": false
+    },
+    {
+      "id": "preflight",
+      "argv": [
+        "/usr/bin/python3",
+        "scripts/lh_preflight.py"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "network_observed": false,
+      "write_observed": false
+    }
+  ],
+  "evidence_files": [
+    "workflow/evidence/k2-k5-final.acceptance.json"
+  ],
+  "changed_files": [
+    "docs/k2-k5-approval-package.md",
+    "docs/kline-analysis-requirements-review.md",
+    "docs/kline-analysis-slice-plan.md",
+    "package-lock.json",
+    "package.json",
+    "scripts/build_dashboard_preview.py",
+    "scripts/dashboard-browser-smoke.cjs",
+    "scripts/run_dashboard_dev.py",
+    "scripts/run_dashboard_preview.py",
+    "scripts/run_kline_acceptance.py",
+    "src/tw_quant_engine/kline_aggregation.py",
+    "src/tw_quant_engine/kline_contract.py",
+    "src/tw_quant_engine/kline_view.py",
+    "tests/fixtures/k1/",
+    "tests/test_k1_kline_contract.py",
+    "tests/test_k2_period_aggregation.py",
+    "tests/test_k3_kline_read_model.py",
+    "tests/test_k4_kline_ui_contract.py",
+    "ui/dashboard/app.js",
+    "ui/dashboard/dashboard-core.js",
+    "ui/dashboard/index.template.html",
+    "ui/dashboard/styles.css",
+    "ui/dashboard/vendor/",
+    "workflow/README.md",
+    "workflow/evidence/k2-k5-final.acceptance.json",
+    "workflow/evidence/k2-period-aggregation.acceptance.json",
+    "workflow/evidence/k3-kline-read-model.acceptance.json",
+    "workflow/evidence/k4-kline-ui.acceptance.json",
+    "workflow/evidence/k5-browser-design-validation.acceptance.json",
+    "workflow/k2-k5-approval-package.json"
+  ],
+  "failure_budget": {
+    "max_consecutive_failed_real_acceptance_attempts": 3,
+    "consecutive_failure_count": 0
+  },
+  "stage_gate": {
+    "mechanical_pass": true,
+    "evidence_complete": true,
+    "auto_advanced_to": null,
+    "stop_trigger": null
+  },
+  "final_review": {
+    "review_required_after_k5": true,
+    "reviewed_by": "JY",
+    "decision": "accepted_for_user_k6_review",
+    "reviewed_at": "2026-07-16T01:13:22Z",
+    "notes": "Human accepted after independent re-run of all four gates (gate 4 required loopback bind, run under loopback-permitted sandbox, external_requests empty). Mechanical/contract layer only, not a performance or realtime-readiness endorsement. K6 remains user-owned."
+  }
+}

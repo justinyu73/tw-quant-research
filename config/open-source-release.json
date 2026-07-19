@@ -1,0 +1,72 @@
+{
+  "schema": "tw-quant-engine-open-source-release/v1",
+  "status": "review_required",
+  "product": "TW Quant Research",
+  "public_intent": true,
+  "runtime_boundary": {
+    "free_first": true,
+    "offline_fixtures": true,
+    "loopback_only": true,
+    "provider_calls_from_app": false,
+    "order_routes": false,
+    "automatic_execution": false
+  },
+  "source_release": {
+    "license_status": "mit_approved",
+    "internal_files_excluded": [
+      {
+        "path": "AGENTS.md",
+        "reason": "repository-local agent instructions"
+      }
+    ],
+    "design_production_records_excluded": [
+      {
+        "path": "docs/dashboard-visualization-grill.md",
+        "reason": "visual design review record"
+      },
+      {
+        "path": "docs/kline-analysis-requirements-review.md",
+        "reason": "design requirements review record"
+      },
+      {
+        "path": "docs/kline-analysis-slice-plan.md",
+        "reason": "design implementation slice record"
+      },
+      {
+        "path": "docs/kline-analysis-k6a-slice-plan.md",
+        "reason": "design implementation slice record"
+      },
+      {
+        "path": "docs/kline-analysis-k6b-slice-plan.md",
+        "reason": "design implementation slice record"
+      },
+      {
+        "path": "docs/tqe-concept-platform-framework.md",
+        "reason": "product concept and design exploration record"
+      },
+      {
+        "path": "docs/tqe-desktop-app-slice-plan.md",
+        "reason": "desktop implementation planning record"
+      },
+      {
+        "path": "docs/tqe-v2-ia-uiux-plan.md",
+        "reason": "information architecture and UI/UX planning record"
+      }
+    ]
+  },
+  "desktop_release_targets": [
+    "x86_64-pc-windows-msvc",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin"
+  ],
+  "release_gate": [
+    "license_selected_and_added",
+    "open_source_audit_strict_pass",
+    "unit_tests_pass",
+    "lh_preflight_pass",
+    "dashboard_preview_pass",
+    "browser_functional_smoke_pass",
+    "human_windows_install_and_launch_check",
+    "human_macos_install_and_launch_check"
+  ]
+}

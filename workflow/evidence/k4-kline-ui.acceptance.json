@@ -1,0 +1,127 @@
+{
+  "schema": "tw-quant-engine-k2-k5-loop-evidence/v1",
+  "package_id": "tw-quant-engine-k2-k5-kline-analysis-001",
+  "stage_id": "K4",
+  "goal_id": "k4-bundled-kline-ui-block",
+  "attempt": 1,
+  "status": "pass",
+  "captured_at": "2026-07-15T17:03:42Z",
+  "contract_checks": {
+    "declared_commands_pass": true,
+    "network_observed": false,
+    "write_observed": false
+  },
+  "commands": [
+    {
+      "id": "k4-tests",
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "tests.test_k4_kline_ui_contract",
+        "-v"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_digest": "sha256:d1c3215538349037ff9a6432ff4c52be165b2a18ae50647f6a9a28c64b89ff9d",
+      "network_observed": false,
+      "write_observed": false
+    },
+    {
+      "id": "preview",
+      "argv": [
+        "/usr/bin/python3",
+        "scripts/run_dashboard_preview.py"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:bc5977a42e4df3e5c2bf9ca303a6f50bdd767e0d9578f4c902aa8e7521777535",
+      "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "network_observed": false,
+      "write_observed": false
+    },
+    {
+      "id": "dev-smoke",
+      "argv": [
+        "/usr/bin/python3",
+        "scripts/run_dashboard_dev.py"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:2970a11b1d2ac68ae78ee54c7420760974e1466e98118eec98b27d963af0cc1a",
+      "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "network_observed": false,
+      "write_observed": false
+    },
+    {
+      "id": "full-tests",
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:de2662356aa4c35d6d50af991943ab1c6851c89cca28203c14d064572d1e7729",
+      "network_observed": false,
+      "write_observed": false
+    },
+    {
+      "id": "preflight",
+      "argv": [
+        "/usr/bin/python3",
+        "scripts/lh_preflight.py"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "network_observed": false,
+      "write_observed": false
+    }
+  ],
+  "evidence_files": [
+    "workflow/evidence/k4-kline-ui.acceptance.json"
+  ],
+  "changed_files": [
+    "docs/k2-k5-approval-package.md",
+    "docs/kline-analysis-requirements-review.md",
+    "docs/kline-analysis-slice-plan.md",
+    "package-lock.json",
+    "package.json",
+    "scripts/build_dashboard_preview.py",
+    "scripts/run_dashboard_dev.py",
+    "scripts/run_dashboard_preview.py",
+    "scripts/run_kline_acceptance.py",
+    "src/tw_quant_engine/kline_aggregation.py",
+    "src/tw_quant_engine/kline_contract.py",
+    "src/tw_quant_engine/kline_view.py",
+    "tests/fixtures/k1/",
+    "tests/test_k1_kline_contract.py",
+    "tests/test_k2_period_aggregation.py",
+    "tests/test_k3_kline_read_model.py",
+    "tests/test_k4_kline_ui_contract.py",
+    "ui/dashboard/app.js",
+    "ui/dashboard/dashboard-core.js",
+    "ui/dashboard/index.template.html",
+    "ui/dashboard/styles.css",
+    "ui/dashboard/vendor/",
+    "workflow/README.md",
+    "workflow/evidence/k2-period-aggregation.acceptance.json",
+    "workflow/evidence/k3-kline-read-model.acceptance.json",
+    "workflow/k2-k5-approval-package.json"
+  ],
+  "failure_budget": {
+    "max_consecutive_failed_real_acceptance_attempts": 3,
+    "consecutive_failure_count": 0
+  },
+  "stage_gate": {
+    "mechanical_pass": true,
+    "evidence_complete": true,
+    "auto_advanced_to": "K5",
+    "stop_trigger": null
+  }
+}

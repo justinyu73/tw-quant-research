@@ -1,0 +1,28 @@
+{
+  "schema": "tw-quant-engine-manifest/v1",
+  "engine_id": "tw-quant-engine",
+  "display_name": "台股研究資料與人工評估工作台",
+  "mode": "research-only",
+  "product_boundary": {
+    "kind": "free_research_data_workbench",
+    "free_public_sources_only": true,
+    "paid_data_subscriptions": false,
+    "human_directed_calculation": true,
+    "real_time": false,
+    "order_placement": false,
+    "automatic_strategy_execution": false
+  },
+  "current_phase": "s1_qlib_integration",
+  "driver": "loop-hybrid",
+  "driver_role": "external_orchestration_platform",
+  "entrypoint": ["python3", "scripts/lh_preflight.py"],
+  "writes_repo": false,
+  "provider_calls": false,
+  "live_trading": false,
+  "dashboard": false,
+  "human_gate_required_for_promotion": true,
+  "next_phase_target": "p5_history_admission",
+  "next_phase_target_contract": "workflow/tqe-p5-history-admission.json",
+    "next_phase_target_status": "blocked_source_contract",
+  "next_phase_execution_requires_human_gate": true
+}

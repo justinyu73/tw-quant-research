@@ -1,0 +1,18 @@
+{
+  "schema": "loop-hybrid-work-unit/v1",
+  "work_unit_id": "tw-quant-engine-s9-release-hardening-001",
+  "target_repo": "/absolute/path/to/tw-quant-engine",
+  "goal": "Verify the complete S1-S8 research-only chain is reproducible, inspectable, and safe to hand off.",
+  "approval_package": "workflow/s5-s9-approval-package.json",
+  "stage_id": "S9",
+  "network": false,
+  "credentials": false,
+  "max_attempts": 1,
+  "verification": [
+    {"id":"s9-acceptance","argv":["python3","scripts/run_s9_acceptance.py"],"timeout_seconds":240,"read_only":false,"network":false},
+    {"id":"offline-tests","argv":["python3","-B","-m","unittest","discover","-s","tests","-v"],"timeout_seconds":240,"read_only":false,"network":false},
+    {"id":"qlib-synthetic-tests","argv":["/tmp/tw-quant-engine-s1-venv/bin/python","-B","-m","unittest","discover","-s","tests","-v"],"timeout_seconds":240,"read_only":false,"network":false},
+    {"id":"engine-preflight","argv":["python3","scripts/lh_preflight.py"],"timeout_seconds":60,"read_only":true,"network":false}
+  ],
+  "stop_on": ["three consecutive failed attempts", "missing or contradictory evidence", "network call", "forbidden artifact", "non-deterministic replay", "unplanned release fork"]
+}

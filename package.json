@@ -1,0 +1,14 @@
+{
+  "name": "tw-quant-engine-dashboard-dev",
+  "private": true,
+  "description": "Browser smoke tooling for the read-only dashboard preview",
+  "scripts": {
+    "dashboard:browser-smoke": "node scripts/dashboard-browser-smoke.cjs"
+  },
+  "devDependencies": {
+    "playwright-core": "1.60.0"
+  },
+  "dependencies": {
+    "lightweight-charts": "5.2.0"
+  }
+}

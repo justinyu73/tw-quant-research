@@ -1,0 +1,17 @@
+{
+  "schema": "loop-hybrid-work-unit/v1",
+  "work_unit_id": "tw-quant-engine-s6-feature-pipeline-001",
+  "target_repo": "/absolute/path/to/tw-quant-engine",
+  "goal": "Build and verify point-in-time deterministic raw-price features from admitted offline records.",
+  "approval_package": "workflow/s5-s9-approval-package.json",
+  "stage_id": "S6",
+  "network": false,
+  "credentials": false,
+  "max_attempts": 1,
+  "verification": [
+    {"id":"s6-acceptance","argv":["python3","scripts/run_s6_acceptance.py"],"timeout_seconds":180,"read_only":false,"network":false},
+    {"id":"offline-tests","argv":["python3","-B","-m","unittest","discover","-s","tests","-v"],"timeout_seconds":180,"read_only":false,"network":false},
+    {"id":"engine-preflight","argv":["python3","scripts/lh_preflight.py"],"timeout_seconds":60,"read_only":true,"network":false}
+  ],
+  "stop_on": ["three consecutive failed attempts", "look-ahead", "implicit fill", "unplanned feature semantic fork"]
+}

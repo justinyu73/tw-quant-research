@@ -1,0 +1,100 @@
+{
+  "schema": "tw-quant-engine-stage-acceptance/v1",
+  "stage_id": "S6",
+  "package_id": "tw-quant-engine-s5-s9-research-product-chain-001",
+  "status": "pass",
+  "capture_method": "offline point-in-time feature fixture plus subprocess verification",
+  "captured_at": "2026-07-15T14:14:31Z",
+  "approval": {
+    "approved": true,
+    "approved_by": "user",
+    "execution_boundary": "workflow/s5-s9-approval-package.json",
+    "network_enabled": false,
+    "network_requests": 0,
+    "finmind_used": false
+  },
+  "network_policy": {
+    "enabled": false,
+    "observed_network_calls": 0,
+    "fixture_only": true
+  },
+  "feature_contract": {
+    "version": "s6-v1",
+    "as_of": "2026-01-10T00:00:00Z",
+    "row_count": 6,
+    "feature_digest": "sha256:8e7cefb502634052b3dba352d2204543c398e40d241533de919b46387237a1f4",
+    "price_basis": "close_raw"
+  },
+  "formula_checks": {
+    "return_5d_2026-01-09": {
+      "value": 0.050000000000000044,
+      "unit": "ratio",
+      "window": 5,
+      "status": "admitted",
+      "reason": null,
+      "source_snapshot_ids": [
+        "s6-1",
+        "s6-2",
+        "s6-3",
+        "s6-4",
+        "s6-5",
+        "s6-6"
+      ]
+    },
+    "volume_mean_5d_2026-01-09": {
+      "value": 400.0,
+      "unit": "shares",
+      "window": 5,
+      "status": "admitted",
+      "reason": null,
+      "source_snapshot_ids": [
+        "s6-2",
+        "s6-3",
+        "s6-4",
+        "s6-5",
+        "s6-6"
+      ]
+    },
+    "future_date_absent": true
+  },
+  "offline_verification": {
+    "tests": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:2ca1b2c9015eb9ae9a6c7135805e81d88da7f9480b2289642c3455b5145773eb"
+    },
+    "preflight": {
+      "argv": [
+        "/usr/bin/python3",
+        "scripts/lh_preflight.py"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "parsed": {
+        "driver": "loop-hybrid",
+        "engine_id": "tw-quant-engine",
+        "errors": [],
+        "phase": "s1_qlib_integration",
+        "schema": "tw-quant-engine-preflight/v1",
+        "status": "pass",
+        "writes_repo": false
+      }
+    }
+  },
+  "acceptance_notes": [
+    "Features are computed only after S2 as_of visibility and trading-date cutoff.",
+    "Insufficient windows remain null with a reason; no forward-fill or partial window is used.",
+    "S6 does not approve S7, S8, S9, factors, backtests, dashboards, or trading."
+  ]
+}

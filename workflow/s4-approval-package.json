@@ -1,0 +1,134 @@
+{
+  "schema": "tw-quant-engine-approval-package/v1",
+  "package_id": "tw-quant-engine-s4-ingestion-product-alignment-001",
+  "goal_id": "tw-quant-engine-q1-s1-s9",
+  "stage_id": "S4",
+  "status": "approval_pending",
+  "objective": "Build a deterministic offline source-to-S2 mapper, provenance-preserving product read model, and versioned OHLCV/revenue formulas from S3 fixtures.",
+  "execution_authorized": false,
+  "inputs": [
+    "workflow/evidence/s3-public-data.acceptance.json",
+    "tests/fixtures/s3/source-admission.json",
+    "src/tw_quant_engine/data_contract.py",
+    "config/product-alignment.yaml"
+  ],
+  "network_policy": {
+    "enabled": false,
+    "max_total_requests": 0,
+    "credentials": false,
+    "tokens": false,
+    "full_history_backfill": false,
+    "offline_fixture_only": true
+  },
+  "product_fields": [
+    "instrument.security_id",
+    "instrument.market",
+    "bar.trading_date",
+    "bar.open",
+    "bar.high",
+    "bar.low",
+    "bar.close_raw",
+    "bar.volume_shares",
+    "bar.daily_return_1d",
+    "fundamental.monthly_revenue",
+    "fundamental.revenue_mom",
+    "fundamental.revenue_yoy",
+    "quality.admission_status",
+    "provenance.source_id",
+    "provenance.endpoint",
+    "provenance.snapshot_id",
+    "provenance.content_digest",
+    "provenance.available_at"
+  ],
+  "formula_version": "s4-v1",
+  "formula_contract": [
+    {
+      "id": "daily_return_1d",
+      "expression": "close_raw_t / close_raw_t_minus_1 - 1",
+      "guard": "prior_close_exists_and_nonzero_and_both_rows_admitted"
+    },
+    {
+      "id": "revenue_mom",
+      "expression": "revenue_period / revenue_previous_calendar_month - 1",
+      "guard": "exact_previous_calendar_month_exists_and_nonzero"
+    },
+    {
+      "id": "revenue_yoy",
+      "expression": "revenue_period / revenue_same_calendar_month_previous_year - 1",
+      "guard": "exact_same_calendar_month_previous_year_exists_and_nonzero"
+    },
+    {
+      "id": "admission_status",
+      "expression": "http_200_and_schema_valid_and_required_fields_present_and_explicit_available_at_and_provenance_valid",
+      "guard": "otherwise_unadmitted_or_invalid"
+    }
+  ],
+  "acceptance_requirements": [
+    "S3 fixture replays without network access",
+    "TWSE and TPEx daily fields map to one canonical OHLCV shape",
+    "TPEx volume uses TradingShares and never TransactionAmount",
+    "ROC dates convert deterministically to ISO dates",
+    "monthly period YYYMM converts to the last day of that calendar month",
+    "missing source publication timestamp remains unadmitted",
+    "retrieved_at is never substituted for available_at",
+    "source endpoint, snapshot, content digest, license, and formula version survive mapping",
+    "daily return, revenue MoM, and revenue YoY formula guards are tested",
+    "zero denominator, missing unit, malformed numeric, duplicate key, and source conflict fail closed",
+    "raw close remains unadjusted and corporate-action factors remain separate",
+    "repeated offline execution is deterministic",
+    "S1/S2 tests remain green and LH preflight remains pass"
+  ],
+  "allowed_files": [
+    "config/product-alignment.yaml",
+    "src/tw_quant_engine/ingestion.py",
+    "src/tw_quant_engine/product_alignment.py",
+    "src/tw_quant_engine/formulas.py",
+    "tests/fixtures/s4/*",
+    "tests/test_s4_ingestion.py",
+    "tests/test_product_alignment.py",
+    "scripts/run_s4_acceptance.py",
+    "docs/s4-ingestion-product-alignment.md",
+    "workflow/lh-work-unit.s4.example.json",
+    "workflow/evidence/s4-ingestion-product-alignment.acceptance.json"
+  ],
+  "forbidden": [
+    "new network requests",
+    "FinMind or any unadmitted provider",
+    "credentials, tokens, cookies, or private exports",
+    "Qlib provider initialization",
+    "silent adjusted-price transformation",
+    "forward-fill or look-ahead substitution",
+    "factor or valuation implementation",
+    "backtest",
+    "dashboard or API",
+    "live trading",
+    "commit",
+    "push",
+    "automatic promotion"
+  ],
+  "stop_rules": [
+    "fixture requires a network call",
+    "source field meaning or unit is ambiguous",
+    "publication availability cannot be proven",
+    "mapping would use retrieval_at as available_at",
+    "formula denominator is missing, zero, mismatched, or nearest-period substituted",
+    "provenance digest or license reference is lost",
+    "S1, S2, or preflight regression"
+  ],
+  "evidence_schema": "tw-quant-engine-stage-acceptance/v1",
+  "cannot_claim": [
+    "data completeness",
+    "data accuracy beyond captured response checks",
+    "adjusted-price correctness",
+    "factor validity",
+    "backtest validity",
+    "dashboard acceptance",
+    "investment performance",
+    "S5 approval"
+  ],
+  "approval": {
+    "decision": "pending",
+    "approved_by": null,
+    "approved_at": null
+  }
+}

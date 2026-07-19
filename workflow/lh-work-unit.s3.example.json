@@ -1,0 +1,48 @@
+{
+  "schema": "loop-hybrid-work-unit/v1",
+  "work_unit_id": "tw-quant-engine-s3-public-taiwan-data-001",
+  "target_repo": "/absolute/path/to/tw-quant-engine",
+  "goal": "Admit bounded public Taiwan data sources and map live samples to the S2 contract.",
+  "approval_package": "workflow/s3-approval-package.json",
+  "network": true,
+  "credentials": false,
+  "max_attempts": 1,
+  "max_total_requests": 12,
+  "verification": [
+    {
+      "id": "source-admission",
+      "argv": ["python3", "scripts/run_s3_source_admission.py"],
+      "timeout_seconds": 180,
+      "read_only": false,
+      "network": true,
+      "host_allowlist": [
+        "openapi.twse.com.tw",
+        "www.tpex.org.tw",
+        "mops.twse.com.tw",
+        "mopsov.twse.com.tw"
+      ]
+    },
+    {
+      "id": "offline-tests",
+      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
+      "timeout_seconds": 180,
+      "read_only": false,
+      "network": false
+    },
+    {
+      "id": "engine-preflight",
+      "argv": ["python3", "scripts/lh_preflight.py"],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    }
+  ],
+  "cannot_claim": [
+    "data completeness",
+    "data accuracy beyond source response checks",
+    "S4 implementation approval",
+    "backtest validity",
+    "investment performance",
+    "product acceptance"
+  ]
+}

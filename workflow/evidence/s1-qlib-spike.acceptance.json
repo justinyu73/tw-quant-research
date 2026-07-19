@@ -1,0 +1,79 @@
+{
+  "schema": "tw-quant-engine-stage-acceptance/v1",
+  "goal_id": "tw-quant-engine-q1-s1-s9",
+  "stage_id": "S1",
+  "status": "pass",
+  "captured_at": "2026-07-15T21:05:23+08:00",
+  "capture_method": "live subprocess capture",
+  "environment": {
+    "python": "3.12",
+    "qlib_package": "pyqlib",
+    "qlib_version": "0.9.7",
+    "venv": "/tmp/tw-quant-engine-s1-venv"
+  },
+  "commands": [
+    {
+      "id": "s1-qlib-spike",
+      "argv": ["/tmp/tw-quant-engine-s1-venv/bin/python", "scripts/run_qlib_spike.py"],
+      "exit_code": 0,
+      "stdout_digest": "sha256:954403135fc7515042999cbef047d5679327fe54c39ca37e3c0a8dc08b72f76d",
+      "stderr_digest": "sha256:a06a4edc7d3a9aa873d3adf53d8df56e9e7524b617f6828aade2c59c21d78363",
+      "stdout_bytes": 491,
+      "stderr_bytes": 689,
+      "result": {
+        "schema": "tw-quant-engine-s1-qlib-spike/v1",
+        "stage": "S1",
+        "status": "pass",
+        "qlib_package": "pyqlib",
+        "qlib_version": "0.9.7",
+        "provider_initialized": false,
+        "network_used": false,
+        "fixture_rows": 8,
+        "fixture_digest": "sha256:d581f39822db2d4beb924e0c47559963f37a9e048c64a14b0f07da9ef1accf74",
+        "risk_metrics": {
+          "annualized_return": 1.7150254164151,
+          "information_ratio": 7.81597855204605,
+          "max_drawdown": -0.0050000000000000044,
+          "mean": 0.003971362323976324,
+          "std": 0.008065966664626261
+        }
+      }
+    },
+    {
+      "id": "s1-qlib-tests",
+      "argv": ["/tmp/tw-quant-engine-s1-venv/bin/python", "-B", "-m", "unittest", "-v", "tests/test_qlib_spike.py"],
+      "exit_code": 0,
+      "stdout_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_digest_normalized": "sha256:7ff84b9825331e2ed91b3d9f1aee5bb5cceff382b7efe65e35e8bf12565cd6f1",
+      "stderr_normalization": "replace 'Ran <N> tests in <seconds>s' with 'Ran N tests in <duration>s'",
+      "stdout_bytes": 0,
+      "stderr_bytes": 2038
+    },
+    {
+      "id": "engine-preflight",
+      "argv": ["/usr/bin/python3", "scripts/lh_preflight.py"],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 186,
+      "stderr_bytes": 0,
+      "result": {
+        "schema": "tw-quant-engine-preflight/v1",
+        "status": "pass",
+        "engine_id": "tw-quant-engine",
+        "phase": "s1_qlib_integration",
+        "writes_repo": false,
+        "driver": "loop-hybrid",
+        "errors": []
+      }
+    }
+  ],
+  "constraints_verified": [
+    "synthetic fixture only",
+    "no provider initialization",
+    "no network data fetch",
+    "S1 digest corrected from live command output",
+    "S2-S9 not executed"
+  ],
+  "next_route": "human_stage_review"
+}

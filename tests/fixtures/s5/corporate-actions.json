@@ -1,0 +1,73 @@
+{
+  "schema": "tw-quant-engine-s5-quality-fixture/v1",
+  "factor_convention": "price_multiplier_after_ex_date",
+  "provenance": [
+    {
+      "source_id": "synthetic-twse",
+      "snapshot_id": "s5-action-snapshot",
+      "retrieved_at": "2025-12-20T10:00:00Z",
+      "content_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "schema_version": "s5-fixture/v1",
+      "license_ref": "https://data.gov.tw/license"
+    },
+    {
+      "source_id": "synthetic-twse",
+      "snapshot_id": "s5-price-before",
+      "retrieved_at": "2026-01-02T10:00:00Z",
+      "content_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "schema_version": "s5-fixture/v1",
+      "license_ref": "https://data.gov.tw/license"
+    },
+    {
+      "source_id": "synthetic-twse",
+      "snapshot_id": "s5-price-ex",
+      "retrieved_at": "2026-01-05T10:00:00Z",
+      "content_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "schema_version": "s5-fixture/v1",
+      "license_ref": "https://data.gov.tw/license"
+    }
+  ],
+  "records": [
+    {
+      "record_type": "corporate_action",
+      "security_id": "2330",
+      "action_type": "split",
+      "ex_date": "2026-01-05",
+      "announced_at": "2025-12-20T09:00:00+08:00",
+      "available_at": "2025-12-20T10:00:00+08:00",
+      "factor": 0.5,
+      "cash_amount": 0,
+      "currency": "TWD",
+      "source_ref": "synthetic://s5/corporate-action",
+      "snapshot_id": "s5-action-snapshot"
+    },
+    {
+      "record_type": "price_bar",
+      "security_id": "2330",
+      "trading_date": "2026-01-02",
+      "open": 100,
+      "high": 101,
+      "low": 99,
+      "close": 100,
+      "volume": 1000,
+      "currency": "TWD",
+      "available_at": "2026-01-02T14:00:00+08:00",
+      "source_ref": "synthetic://s5/price",
+      "snapshot_id": "s5-price-before"
+    },
+    {
+      "record_type": "price_bar",
+      "security_id": "2330",
+      "trading_date": "2026-01-05",
+      "open": 50,
+      "high": 51,
+      "low": 49,
+      "close": 50,
+      "volume": 2200,
+      "currency": "TWD",
+      "available_at": "2026-01-05T14:00:00+08:00",
+      "source_ref": "synthetic://s5/price",
+      "snapshot_id": "s5-price-ex"
+    }
+  ]
+}

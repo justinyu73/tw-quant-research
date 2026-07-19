@@ -1,0 +1,61 @@
+{
+  "schema": "tw-quant-engine-p5-corporate-action-evidence/v1",
+  "stage_id": "P5.2",
+  "status": "pass",
+  "approval": {
+    "approved_by": "user",
+    "execution_boundary": "workflow/tqe-p5-corporate-action-admission.json",
+    "network_enabled": false,
+    "provider_calls": 0
+  },
+  "fixture": {
+    "path": "tests/fixtures/s5/corporate-actions.json",
+    "raw_file_digest": "sha256:33be0287d129183a908386dd9afd6844ed93fb52829982e96a5cceb942c44e54",
+    "pit_digest": "sha256:8019df3a210f770780fc63e8fd5de443d2de1d6b7ead6950c108d3c1d1f4eb7b",
+    "record_count": 3,
+    "corporate_action_count": 1
+  },
+  "adjusted_ohlcv_volume_policy": {
+    "policy": "tqe-adjusted-ohlcv-volume/v1",
+    "price_factor_for_pre_ex_date_split": 0.5,
+    "volume_factor_for_pre_ex_date_split": 2.0,
+    "raw_ohlcv_unchanged": true,
+    "unknown_action_policy": "unadmitted"
+  },
+  "corporate_action_contract": {
+    "security_id": "2330",
+    "action_type": "split",
+    "ex_date": "2026-01-05",
+    "available_at": "2025-12-20T10:00:00+08:00",
+    "factor": 0.5,
+    "factor_convention": "price_multiplier_after_ex_date",
+    "raw_close": 100.0,
+    "pre_ex_date_adjusted_close": 50.0,
+    "on_ex_date_factor": 1.0,
+    "raw_ohlcv_unchanged": true
+  },
+  "offline_verification": {
+    "validator": {
+      "argv": ["python3", "scripts/p5_corporate_action_validation.py"],
+      "exit_code": 0,
+      "network": false,
+      "provider_calls": 0
+    },
+    "full_tests": {
+      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
+      "exit_code": 0,
+      "result": "129 tests passed, 1 skipped"
+    },
+    "lh_preflight": {
+      "argv": ["python3", "scripts/lh_preflight.py"],
+      "exit_code": 0,
+      "status": "pass"
+    }
+  },
+  "acceptance_notes": [
+    "Corporate-action input remains separate from raw OHLCV.",
+    "The factor direction, ex-date, availability, source reference, and digest are explicit.",
+    "P5.2 does not admit the blocked TWSE bulk source or activate P5.3.",
+    "The full adjusted OHLCV and volume policy is now defined; P5.4 must apply it after source admission."
+  ]
+}

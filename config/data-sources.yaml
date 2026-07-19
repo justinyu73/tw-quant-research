@@ -1,0 +1,39 @@
+schema: tw-quant-engine-data-sources/v1
+license:
+  id: government-data-open-license-v1
+  url: https://data.gov.tw/license
+  attribution_required: true
+  attribution_text: "資料來源：臺灣證券交易所、財團法人中華民國證券櫃檯買賣中心"
+sources:
+  - id: twse_openapi
+    role: primary_listed_market
+    base_url: https://openapi.twse.com.tw/v1
+    terms_url: https://openapi.twse.com.tw/
+    license_ref: https://data.gov.tw/license
+    endpoints:
+      daily_close: /exchangeReport/STOCK_DAY_ALL
+      monthly_revenue: /opendata/t187ap05_L
+  - id: tpex_openapi
+    role: primary_otc_market
+    base_url: https://www.tpex.org.tw/openapi
+    terms_url: https://www.tpex.org.tw/openapi/
+    license_ref: https://data.gov.tw/license
+    endpoints:
+      daily_close: /tpex_mainboard_daily_close_quotes
+      monthly_revenue: /mopsfin_t187ap05_O
+  - id: mops_disclosure
+    role: public_disclosure_context
+    base_url: https://mops.twse.com.tw/mops/
+    terms_url: https://mops.twse.com.tw/mops/
+    license_ref: https://data.gov.tw/license
+    endpoints:
+      landing: /mops/
+      search: /mops/web/ezsearch
+      filing: /mops/web/t147sb01
+  - id: finmind
+    role: secondary_research_only
+    base_url: https://api.finmindtrade.com/api/v4/data
+    terms_url: https://finmind.github.io/en/quickstart/
+    license_ref: research-only-not-admitted
+    endpoints: {}
+    allowed: false

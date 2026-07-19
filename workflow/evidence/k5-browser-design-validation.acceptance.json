@@ -1,0 +1,115 @@
+{
+  "schema": "tw-quant-engine-k2-k5-loop-evidence/v1",
+  "package_id": "tw-quant-engine-k2-k5-kline-analysis-001",
+  "stage_id": "K5",
+  "goal_id": "k5-real-chromium-design-validation",
+  "attempt": 1,
+  "status": "pass",
+  "captured_at": "2026-07-15T17:08:24Z",
+  "contract_checks": {
+    "declared_commands_pass": true,
+    "network_observed": false,
+    "write_observed": false
+  },
+  "commands": [
+    {
+      "id": "browser-smoke",
+      "argv": [
+        "npm",
+        "run",
+        "dashboard:browser-smoke"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:043c26a641086a86ff87b892d69f533a639ad12678850cf353bab915ac043689",
+      "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "network_observed": false,
+      "write_observed": false
+    },
+    {
+      "id": "preview",
+      "argv": [
+        "/usr/bin/python3",
+        "scripts/run_dashboard_preview.py"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:e820643b89446b7b0ca8353078f2bbdad7bd546c9b015cf176f256d2a00fc68b",
+      "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "network_observed": false,
+      "write_observed": false
+    },
+    {
+      "id": "full-tests",
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:5c67e69bb3c95ff605bbee809169efc279a33cd3f0682543b14bf14a47b48070",
+      "network_observed": false,
+      "write_observed": false
+    },
+    {
+      "id": "preflight",
+      "argv": [
+        "/usr/bin/python3",
+        "scripts/lh_preflight.py"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "network_observed": false,
+      "write_observed": false
+    }
+  ],
+  "evidence_files": [
+    "workflow/evidence/k5-browser-design-validation.acceptance.json"
+  ],
+  "changed_files": [
+    "docs/k2-k5-approval-package.md",
+    "docs/kline-analysis-requirements-review.md",
+    "docs/kline-analysis-slice-plan.md",
+    "package-lock.json",
+    "package.json",
+    "scripts/build_dashboard_preview.py",
+    "scripts/dashboard-browser-smoke.cjs",
+    "scripts/run_dashboard_dev.py",
+    "scripts/run_dashboard_preview.py",
+    "scripts/run_kline_acceptance.py",
+    "src/tw_quant_engine/kline_aggregation.py",
+    "src/tw_quant_engine/kline_contract.py",
+    "src/tw_quant_engine/kline_view.py",
+    "tests/fixtures/k1/",
+    "tests/test_k1_kline_contract.py",
+    "tests/test_k2_period_aggregation.py",
+    "tests/test_k3_kline_read_model.py",
+    "tests/test_k4_kline_ui_contract.py",
+    "ui/dashboard/app.js",
+    "ui/dashboard/dashboard-core.js",
+    "ui/dashboard/index.template.html",
+    "ui/dashboard/styles.css",
+    "ui/dashboard/vendor/",
+    "workflow/README.md",
+    "workflow/evidence/k2-period-aggregation.acceptance.json",
+    "workflow/evidence/k3-kline-read-model.acceptance.json",
+    "workflow/evidence/k4-kline-ui.acceptance.json",
+    "workflow/evidence/k5-browser-design-validation.acceptance.json",
+    "workflow/k2-k5-approval-package.json"
+  ],
+  "failure_budget": {
+    "max_consecutive_failed_real_acceptance_attempts": 3,
+    "consecutive_failure_count": 0
+  },
+  "stage_gate": {
+    "mechanical_pass": true,
+    "evidence_complete": true,
+    "auto_advanced_to": null,
+    "stop_trigger": null
+  }
+}

@@ -1,0 +1,11 @@
+schema: tw-quant-engine-valuation/v1
+fair_value:
+  formula: "forward_eps * fair_pe"
+  conservative_formula: "forward_eps * conservative_pe"
+  margin_of_safety_formula: "fair_value * 0.85"
+required_data_controls:
+  - split_adjustment
+  - dividend_adjustment
+  - share_count_change
+  - eps_definition_consistency
+  - one_off_earnings_review

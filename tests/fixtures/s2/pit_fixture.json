@@ -1,0 +1,76 @@
+{
+  "schema": "tw-quant-engine-s2-pit-fixture/v1",
+  "provenance": [
+    {
+      "source_id": "synthetic-source",
+      "snapshot_id": "snapshot-v1",
+      "retrieved_at": "2024-02-01T00:00:00Z",
+      "content_digest": "sha256:synthetic-v1",
+      "schema_version": "synthetic-source/v1",
+      "license_ref": "synthetic-fixture"
+    },
+    {
+      "source_id": "synthetic-source",
+      "snapshot_id": "snapshot-v2",
+      "retrieved_at": "2024-03-01T00:00:00Z",
+      "content_digest": "sha256:synthetic-v2",
+      "schema_version": "synthetic-source/v1",
+      "license_ref": "synthetic-fixture"
+    }
+  ],
+  "records": [
+    {
+      "record_type": "price_bar",
+      "security_id": "TW-SYNTH",
+      "trading_date": "2024-01-05",
+      "open": 100.0,
+      "high": 102.0,
+      "low": 99.0,
+      "close": 101.0,
+      "volume": 1000,
+      "currency": "TWD",
+      "available_at": "2024-01-05T06:30:00Z",
+      "source_ref": "synthetic-source",
+      "snapshot_id": "snapshot-v1"
+    },
+    {
+      "record_type": "corporate_action",
+      "security_id": "TW-SYNTH",
+      "action_type": "split",
+      "ex_date": "2024-01-15",
+      "announced_at": "2024-01-10T06:00:00Z",
+      "available_at": "2024-01-10T06:00:00Z",
+      "factor": 0.5,
+      "cash_amount": 0.0,
+      "currency": "TWD",
+      "source_ref": "synthetic-source",
+      "snapshot_id": "snapshot-v1"
+    },
+    {
+      "record_type": "fundamental_observation",
+      "security_id": "TW-SYNTH",
+      "metric": "eps",
+      "period_end": "2023-12-31",
+      "reported_at": "2024-02-10T06:00:00Z",
+      "available_at": "2024-02-10T06:00:00Z",
+      "value": 1.0,
+      "unit": "TWD/share",
+      "currency": "TWD",
+      "source_ref": "synthetic-source",
+      "snapshot_id": "snapshot-v1"
+    },
+    {
+      "record_type": "fundamental_observation",
+      "security_id": "TW-SYNTH",
+      "metric": "eps",
+      "period_end": "2023-12-31",
+      "reported_at": "2024-02-20T06:00:00Z",
+      "available_at": "2024-03-01T06:00:00Z",
+      "value": 1.2,
+      "unit": "TWD/share",
+      "currency": "TWD",
+      "source_ref": "synthetic-source",
+      "snapshot_id": "snapshot-v2"
+    }
+  ]
+}

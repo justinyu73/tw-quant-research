@@ -1,0 +1,128 @@
+{
+  "schema": "tw-quant-engine-approval-package/v1",
+  "package_id": "tw-quant-engine-s3-public-taiwan-data-001",
+  "goal_id": "tw-quant-engine-q1-s1-s9",
+  "stage_id": "S3",
+  "status": "approved",
+  "objective": "Admit bounded public Taiwan data sources and map a small live sample into the S2 point-in-time contract with provenance.",
+  "execution_authorized": true,
+  "primary_sources": [
+    {
+      "source_id": "twse_openapi",
+      "hosts": ["openapi.twse.com.tw"],
+      "base_url": "https://openapi.twse.com.tw/v1",
+      "swagger_url": "https://openapi.twse.com.tw/v1/swagger.json",
+      "allowed_paths": [
+        "/v1/exchangeReport/STOCK_DAY_ALL",
+        "/v1/opendata/t187ap05_L",
+        "/v1/exchangeReport/TWT48U_ALL",
+        "/v1/holidaySchedule/holidaySchedule"
+      ]
+    },
+    {
+      "source_id": "tpex_openapi",
+      "hosts": ["www.tpex.org.tw"],
+      "base_url": "https://www.tpex.org.tw/openapi/v1",
+      "swagger_url": "https://www.tpex.org.tw/openapi/swagger.json",
+      "allowed_paths": [
+        "/openapi/v1/tpex_mainboard_daily_close_quotes",
+        "/openapi/v1/mopsfin_t187ap05_O",
+        "/openapi/v1/tpex_exright_prepost",
+        "/openapi/v1/tpex_cmode"
+      ]
+    },
+    {
+      "source_id": "mops_disclosure",
+      "hosts": ["mops.twse.com.tw", "mopsov.twse.com.tw"],
+      "base_urls": [
+        "https://mops.twse.com.tw/mops/",
+        "https://mopsov.twse.com.tw/mops/web/ezsearch",
+        "https://mops.twse.com.tw/mops/web/t147sb01"
+      ],
+      "allowed_paths": [
+        "/mops/",
+        "/mops/web/ezsearch",
+        "/mops/web/t147sb01"
+      ]
+    }
+  ],
+  "secondary_source": {
+    "source_id": "finmind",
+    "status": "research_only",
+    "hosts": ["api.finmindtrade.com", "finmind.github.io"],
+    "allowed": false,
+    "reason": "Third-party mirror; data licensing and source lineage must be separately admitted."
+  },
+  "network_policy": {
+    "enabled_only_after_human_approval": true,
+    "method": "GET only",
+    "max_total_requests": 12,
+    "max_attempts": 1,
+    "timeout_seconds": 20,
+    "credentials": false,
+    "tokens": false,
+    "full_history_backfill": false,
+    "unlisted_hosts": false
+  },
+  "allowed_files": [
+    "config/data-sources.yaml",
+    "src/tw_quant_engine/source_registry.py",
+    "src/tw_quant_engine/adapters/twse_openapi.py",
+    "src/tw_quant_engine/adapters/tpex_openapi.py",
+    "src/tw_quant_engine/adapters/mops_disclosure.py",
+    "tests/test_source_adapters.py",
+    "tests/fixtures/s3/*",
+    "docs/s3-data-source-research.md",
+    "workflow/lh-work-unit.s3.example.json",
+    "workflow/evidence/s3-public-data.acceptance.json"
+  ],
+  "forbidden": [
+    "FinMind connection",
+    "credentials or tokens",
+    "POST or login requests",
+    "full-history download",
+    "raw private data",
+    "silent adjusted-price transformation",
+    "retrieval_at used as available_at without source evidence",
+    "Qlib provider initialization",
+    "factor or valuation implementation",
+    "backtest",
+    "dashboard",
+    "live trading",
+    "commit",
+    "push",
+    "automatic promotion"
+  ],
+  "stop_rules": [
+    "non-200 response",
+    "schema mismatch or ambiguous field meaning",
+    "missing reliable availability semantics",
+    "license or attribution ambiguity",
+    "rate-limit or anti-automation response",
+    "source disagreement that cannot be explained",
+    "any request outside the host/path allowlist"
+  ],
+  "acceptance_schema": "tw-quant-engine-stage-acceptance/v1",
+  "acceptance_requirements": [
+    "source registry records source, endpoint, terms, attribution, and retrieval metadata",
+    "bounded live responses have HTTP status and content digests",
+    "public samples map to S2 records or are explicitly marked unadmitted",
+    "available_at semantics are preserved or fail closed",
+    "fixtures replay offline with no network",
+    "S1 and S2 tests remain green",
+    "LH preflight remains green"
+  ],
+  "cannot_claim": [
+    "data completeness",
+    "data accuracy beyond source response checks",
+    "S4 implementation approval",
+    "backtest validity",
+    "investment performance",
+    "product acceptance"
+  ],
+  "approval": {
+    "decision": "approved",
+    "approved_by": "user",
+    "approved_at": "2026-07-15T21:28:00+08:00"
+  }
+}

@@ -1,0 +1,126 @@
+{
+  "schema": "tw-quant-engine-p5-history-admission/v3",
+  "phase_role": "next_phase_execution_target",
+  "status": "source_contract_blocked",
+  "preparation_status": "blocked_pending_source_contract_resolution",
+  "current_preparation_step": "p5_2_validate_preapproved_corporate_action_fixture",
+  "execution_ready": false,
+  "work_unit_draft": "workflow/tqe-p5-twse-work-unit.draft.json",
+  "source_contract_research": "docs/tqe-p5-source-contract-research.md",
+  "source_contract": "workflow/tqe-p5-twse-source-contract.json",
+  "corporate_action_admission": "workflow/tqe-p5-corporate-action-admission.json",
+  "adjusted_ohlcv_volume_policy": "workflow/tqe-p5-adjusted-ohlcv-volume-policy.json",
+  "work_unit_digest_evidence": "workflow/evidence/p5.3-work-unit-digest.acceptance.json",
+  "preparation_results": {
+    "p5_0_read_only_contract_preflight": "pass",
+    "p5_1_exact_bulk_source_contract": "source_contract_blocked",
+    "p5_2_validate_preapproved_corporate_action_fixture": "pass",
+    "p5_3_exact_human_run_work_unit_digest": "template_digest_blocked_by_p5_1"
+  },
+  "goal": "admit a bounded three-year point-in-time TWSE/TPEx EOD history and explicit session calendar",
+  "network": false,
+  "provider_calls": false,
+  "live_trading": false,
+  "write_routes": false,
+  "human_selection": {
+    "phase_driver_contract": "amend_before_p5",
+    "source_market_scope": {
+      "in_scope": ["TWSE", "TPEx"],
+      "active_slice": "TWSE",
+      "next_slice": "TPEx_after_twse_acceptance",
+      "source_strategy": "official_bulk_history_source",
+      "source_families": ["twse_daily_close", "tpex_daily_close"],
+      "deferred_scope": ["US_equity", "new_provider", "general_provider_runtime"]
+    },
+    "history_window": {
+      "kind": "three_calendar_years",
+      "start": "2023-07-20",
+      "end": "2026-07-19",
+      "as_of": "2026-07-19T23:59:59+08:00"
+    },
+    "calendar": {
+      "kind": "official_exchange_snapshot",
+      "version_required": true,
+      "content_digest_required": true,
+      "same_work_unit_as_eod": true
+    },
+    "adjustment_policy": {
+      "selected": "adjusted_ohlcv",
+      "policy": "tqe-adjusted-ohlcv-volume/v1",
+      "admission_condition": "separate_preapproved_corporate_action_fixture_with_explicit_factor_provenance",
+      "missing_evidence_status": "unadmitted"
+    },
+    "fixture_retention": {
+      "raw_response": "caller_owned_external_evidence",
+      "normalized_fixture": true,
+      "manifest": true,
+      "sha256_digest": true,
+      "private_or_large_snapshot": false
+    },
+    "execution": {
+      "mode": "human_run_exact_work_unit",
+      "host_egress": true,
+      "request_budget": {
+        "minimum_gets": 2,
+        "named_gets": ["bulk_history", "official_calendar"],
+        "corporate_action_fetch": "separate_preapproved_fixture_not_fetched_by_this_work_unit"
+      },
+      "automatic_provider_expansion": false
+    }
+  },
+  "scope": {
+    "in_scope": [
+      "TWSE_daily_eod",
+      "TPEx_daily_eod_after_twse_acceptance",
+      "three_year_history",
+      "official_calendar_snapshot",
+      "adjusted_ohlcv_with_explicit_provenance",
+      "bounded_raw_plus_normalized_fixture",
+      "offline_p1_to_p4_replay"
+    ],
+    "out_of_scope": [
+      "US_equity",
+      "new_provider",
+      "general_provider_runtime",
+      "realtime_or_delayed_feed",
+      "alerts",
+      "cloud_sync",
+      "paper_trading",
+      "broker_access",
+      "order_placement",
+      "automatic_execution"
+    ]
+  },
+  "required_decisions": [
+    "exact_twse_bulk_history_endpoint_and_terms",
+    "exact_twse_calendar_endpoint_version_and_digest",
+    "preapproved_corporate_action_fixture_and_factor_provenance",
+    "fixture_retention_license_size_and_digest_policy",
+    "exact_human_run_work_unit_digest"
+  ],
+  "hard_stops": [
+    "phase_driver_amendment_not_approved",
+    "look_ahead_or_post_as_of_data",
+    "calendar_inferred_from_observed_bars",
+    "adjustment_provenance_missing_or_ambiguous",
+    "credential_or_cookie_material",
+    "large_raw_snapshot_or_private_export",
+    "provider_expansion_without_new_approval",
+    "request_budget_exceeded_or_purpose_not_bound",
+    "calendar_and_bulk_history_not_bound_to_same_work_unit",
+    "source_contract_not_proven_for_selected_range",
+    "live_feed_or_order_capability"
+  ],
+  "execution_order": [
+    "p5_0_read_only_contract_preflight",
+    "p5_1_freeze_twse_bulk_source_and_calendar_contract",
+    "p5_2_validate_preapproved_corporate_action_fixture",
+    "p5_3_freeze_exact_source_slice_and_as_of",
+    "approve_exact_work_unit_digest",
+    "host_egress_admit_bulk_history_and_calendar_gets",
+    "retain_raw_normalized_calendar_and_adjustment_evidence",
+    "build_range_coverage_read_model",
+    "replay_p1_to_p4_gates",
+    "human_review"
+  ]
+}

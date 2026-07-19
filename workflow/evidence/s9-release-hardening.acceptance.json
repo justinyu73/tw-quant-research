@@ -1,0 +1,209 @@
+{
+  "schema": "tw-quant-engine-stage-acceptance/v1",
+  "stage_id": "S9",
+  "package_id": "tw-quant-engine-s5-s9-research-product-chain-001",
+  "status": "pass",
+  "capture_method": "offline evidence-chain audit, fixture replay, dependency matrices, and subprocess verification",
+  "captured_at": "2026-07-15T14:29:15Z",
+  "approval": {
+    "approved": true,
+    "approved_by": "user",
+    "execution_boundary": "workflow/s5-s9-approval-package.json",
+    "network_enabled": false,
+    "network_requests": 0,
+    "finmind_used": false
+  },
+  "network_policy": {
+    "enabled": false,
+    "observed_network_calls": 0,
+    "fixture_only": true
+  },
+  "evidence_chain": {
+    "S1": {
+      "path": "/home/jy/repos/tw-quant-engine/workflow/evidence/s1-qlib-spike.acceptance.json",
+      "stage_id": "S1",
+      "status": "pass",
+      "errors": [],
+      "normalized_digest": "sha256:4c42e864dad8e05dce5893179b675346d6b316316a05fb978a6a6494df7aed4f"
+    },
+    "S2": {
+      "path": "/home/jy/repos/tw-quant-engine/workflow/evidence/s2-data-contract.acceptance.json",
+      "stage_id": "S2",
+      "status": "pass",
+      "errors": [],
+      "normalized_digest": "sha256:dd4c8a476ed2743eadbbd1cb096f5b85cf3846017c736dab4f194d9794a5ccd4"
+    },
+    "S3": {
+      "path": "/home/jy/repos/tw-quant-engine/workflow/evidence/s3-public-data.acceptance.json",
+      "stage_id": "S3",
+      "status": "pass",
+      "errors": [],
+      "normalized_digest": "sha256:6d9674a1be144d917f31943e72713fe1c581dcf11af99085fc9248d2d6df5b3c"
+    },
+    "S4": {
+      "path": "/home/jy/repos/tw-quant-engine/workflow/evidence/s4-ingestion-product-alignment.acceptance.json",
+      "stage_id": "S4",
+      "status": "pass",
+      "errors": [],
+      "normalized_digest": "sha256:b646e366c0400a01dd6fdabb19adcac0039b1dda9a1d7cd2fbf92d63f449f682"
+    },
+    "S5": {
+      "path": "/home/jy/repos/tw-quant-engine/workflow/evidence/s5-quality-corporate-actions.acceptance.json",
+      "stage_id": "S5",
+      "status": "pass",
+      "errors": [],
+      "normalized_digest": "sha256:6dd3d261b13f5678055fc2aa35eee700180ab828c8e7b2cfe2680217fac4eab2"
+    },
+    "S6": {
+      "path": "/home/jy/repos/tw-quant-engine/workflow/evidence/s6-feature-pipeline.acceptance.json",
+      "stage_id": "S6",
+      "status": "pass",
+      "errors": [],
+      "normalized_digest": "sha256:5ecdd7dc236478a40701973c6634c86d20398f61173bc4bbcbf455c5b7cbdb90"
+    },
+    "S7": {
+      "path": "/home/jy/repos/tw-quant-engine/workflow/evidence/s7-backtest.acceptance.json",
+      "stage_id": "S7",
+      "status": "pass",
+      "errors": [],
+      "normalized_digest": "sha256:9b18332f9843d39fbd935bc6239942c6df6cf43e076bbfd639280711b9d53801"
+    },
+    "S8": {
+      "path": "/home/jy/repos/tw-quant-engine/workflow/evidence/s8-read-only-product-view.acceptance.json",
+      "stage_id": "S8",
+      "status": "pass",
+      "errors": [],
+      "normalized_digest": "sha256:b063472b0acac7d57ceadc3feb145f9ecc4b3080bd61caef293854cf64cae80f"
+    }
+  },
+  "forbidden_artifact_audit": {
+    "status": "pass",
+    "forbidden": []
+  },
+  "replay": {
+    "checks": {
+      "fixture_digests_match": true,
+      "evidence_digests_match": true,
+      "backtest_digest_match": true,
+      "product_view_digest_match": true
+    },
+    "fixture_digests": {
+      "tests/fixtures/s2/pit_fixture.json": "sha256:4c662e241983247ef75f71dbed744b8166407eabbcf20313c80bf35331a49a7b",
+      "tests/fixtures/s3/source-admission.json": "sha256:3113c28e181186e6bc9490250887b98839df15b9a0dfda9f50cb6f97d432a676",
+      "tests/fixtures/s4/synthetic-mapping.json": "sha256:a12f6505ac449c8eb0cac369a6de28d1f4a5c51b5af3e09fe36d57b25a0c0163",
+      "tests/fixtures/s5/corporate-actions.json": "sha256:33be0287d129183a908386dd9afd6844ed93fb52829982e96a5cceb942c44e54",
+      "tests/fixtures/s6/features.json": "sha256:0ccb0e7f02355335a9e9910b6bd0af261842e115a509c9fc5a1362d0583da5c0",
+      "tests/fixtures/s7/backtest.json": "sha256:70a252d5b57324dbfe821214e68a3de1b8fe636f4dc1b5fd90ce700b93d040f5",
+      "tests/fixtures/s8/product-view.json": "sha256:ab0a3508d25d6d09a38b90046446a5c7ff923bef399abd99b731960a996dbdc8"
+    },
+    "evidence_normalized_digests": {
+      "S1": "sha256:4c42e864dad8e05dce5893179b675346d6b316316a05fb978a6a6494df7aed4f",
+      "S2": "sha256:dd4c8a476ed2743eadbbd1cb096f5b85cf3846017c736dab4f194d9794a5ccd4",
+      "S3": "sha256:6d9674a1be144d917f31943e72713fe1c581dcf11af99085fc9248d2d6df5b3c",
+      "S4": "sha256:b646e366c0400a01dd6fdabb19adcac0039b1dda9a1d7cd2fbf92d63f449f682",
+      "S5": "sha256:6dd3d261b13f5678055fc2aa35eee700180ab828c8e7b2cfe2680217fac4eab2",
+      "S6": "sha256:5ecdd7dc236478a40701973c6634c86d20398f61173bc4bbcbf455c5b7cbdb90",
+      "S7": "sha256:9b18332f9843d39fbd935bc6239942c6df6cf43e076bbfd639280711b9d53801",
+      "S8": "sha256:b063472b0acac7d57ceadc3feb145f9ecc4b3080bd61caef293854cf64cae80f"
+    },
+    "network_probe": {
+      "status": "pass",
+      "network_requests": 0
+    }
+  },
+  "hardening_checks": {
+    "evidence_chain_pass": true,
+    "forbidden_audit_pass": true,
+    "replay_pass": true,
+    "documentation_pass": true,
+    "network_guard_pass": true,
+    "default_tests_pass": true,
+    "qlib_matrix_pass": true,
+    "preflight_pass": true
+  },
+  "documentation_checks": {
+    "readme_current_state": true,
+    "workflow_sequential_gate": true,
+    "s9_cannot_claim": true,
+    "manifest_research_only": true
+  },
+  "offline_verification": {
+    "default_tests": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:2c46e99d007a19a7f98e7c38740d610299d99bc3444c810ac5a1a22995a7691c"
+    },
+    "qlib_matrix": {
+      "available": true,
+      "version": {
+        "argv": [
+          "/tmp/tw-quant-engine-s1-venv/bin/python",
+          "-c",
+          "import qlib; print(qlib.__version__)"
+        ],
+        "exit_code": 0,
+        "stdout_digest": "sha256:6c38d2d8c19dec053f658ac7e8963ce25e98f2ab00fe058e62c07010c1988c6c",
+        "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tests": {
+        "argv": [
+          "/tmp/tw-quant-engine-s1-venv/bin/python",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "tests",
+          "-v"
+        ],
+        "exit_code": 0,
+        "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+        "stderr_digest": "sha256:3a80601411087cc307a4f5bf9f05b5bf07fd614c63430bad0fe0aef15cd96ffd"
+      },
+      "status": "pass"
+    },
+    "preflight": {
+      "argv": [
+        "/usr/bin/python3",
+        "scripts/lh_preflight.py"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "parsed": {
+        "driver": "loop-hybrid",
+        "engine_id": "tw-quant-engine",
+        "errors": [],
+        "phase": "s1_qlib_integration",
+        "schema": "tw-quant-engine-preflight/v1",
+        "status": "pass",
+        "writes_repo": false
+      }
+    }
+  },
+  "changed_files": [
+    "README.md",
+    "workflow/README.md",
+    "scripts/release_hardening.py",
+    "docs/s9-release-hardening.md",
+    "tests/test_s9_release_hardening.py",
+    "workflow/lh-work-unit.s9.example.json",
+    "scripts/run_s9_acceptance.py",
+    "workflow/evidence/s9-release-hardening.acceptance.json"
+  ],
+  "acceptance_notes": [
+    "S9 verifies S1-S8 evidence and reproducibility; it adds no product or trading scope.",
+    "Normalized evidence digests exclude only captured_at and subprocess output digest fields documented in docs/s9-release-hardening.md.",
+    "A pass does not claim investment performance, live trading readiness, data completeness, or production deployment acceptance."
+  ]
+}

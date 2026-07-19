@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>台股研究工作台 — TQE</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div id="app" aria-live="polite"></div>
+    <script>
+      window.__TW_QUANT_VIEW__ = __VIEW_JSON__;
+      window.__TW_QUANT_SIDECAR_URL__ = __SIDECAR_URL__;
+    </script>
+    <script src="./lightweight-charts.js"></script>
+    <script src="./dashboard-core.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

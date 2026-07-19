@@ -1,0 +1,86 @@
+{
+  "schema": "tw-quant-engine-stage-acceptance/v1",
+  "stage_id": "S4",
+  "package_id": "tw-quant-engine-s4-ingestion-product-alignment-001",
+  "status": "pass",
+  "capture_method": "offline S3 fixture replay plus synthetic timestamped fixture and subprocess verification",
+  "captured_at": "2026-07-15T13:55:48Z",
+  "approval": {
+    "approved": true,
+    "approved_by": "user",
+    "execution_boundary": "workflow/s4-approval-package.json",
+    "network_enabled": false,
+    "network_requests": 0,
+    "finmind_used": false
+  },
+  "formula_version": "s4-v1",
+  "network_policy": {
+    "enabled": false,
+    "observed_network_calls": 0,
+    "fixture_only": true,
+    "credentials": false,
+    "tokens": false
+  },
+  "mapping_summary": {
+    "s3_live_fixture": {
+      "rows": 5,
+      "admitted": 0,
+      "unadmitted": 5,
+      "reason_counts": {
+        "disclosure_context_only": 1,
+        "missing_source_available_at": 4,
+        "missing_source_currency": 2,
+        "missing_source_reported_at": 2,
+        "missing_source_unit": 2
+      },
+      "product_digest": "sha256:f757cd30245e54c858be830589ef2a29cf97ced33725018902a1c1dab168111d"
+    },
+    "synthetic_timestamped_fixture": {
+      "rows": 6,
+      "admitted": 6,
+      "unadmitted": 0,
+      "product_digest": "sha256:b3c4ca644ab1f49bcc7ecf9da6acc81d2c955679143af5ab2e4e3c8fb00c637e"
+    }
+  },
+  "offline_verification": {
+    "tests": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:a8738a1dc6d5a5cf41fdff57ad003c1441e1bf1bf9120f49e0c530066cddafb0"
+    },
+    "preflight": {
+      "argv": [
+        "/usr/bin/python3",
+        "scripts/lh_preflight.py"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "parsed": {
+        "driver": "loop-hybrid",
+        "engine_id": "tw-quant-engine",
+        "errors": [],
+        "phase": "s1_qlib_integration",
+        "schema": "tw-quant-engine-preflight/v1",
+        "status": "pass",
+        "writes_repo": false
+      }
+    }
+  },
+  "acceptance_notes": [
+    "S3 live rows without source-published timestamps remain unadmitted; retrieval_at is not substituted.",
+    "Synthetic timestamped rows prove admitted S2 records, ROC date conversion, provenance retention, and formula guards offline.",
+    "Raw close remains unadjusted; corporate-action transformation is outside S4.",
+    "S4 does not approve S5, factors, backtests, dashboards, trading, or investment performance."
+  ]
+}

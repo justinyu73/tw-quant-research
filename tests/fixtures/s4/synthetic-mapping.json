@@ -1,0 +1,123 @@
+{
+  "schema": "tw-quant-engine-s4-mapping-fixture/v1",
+  "items": [
+    {
+      "metadata": {
+        "source_id": "twse_daily_close",
+        "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL?response=json",
+        "retrieved_at": "2026-07-15T13:45:00Z",
+        "content_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "license_ref": "https://data.gov.tw/license",
+        "http_status": 200
+      },
+      "sample_row": {
+        "Code": "2330",
+        "Date": "1150715",
+        "OpeningPrice": "100",
+        "HighestPrice": "102",
+        "LowestPrice": "99",
+        "ClosingPrice": "100",
+        "TradeVolume": "1000",
+        "currency": "TWD",
+        "available_at": "2026-07-15T08:30:00+08:00"
+      }
+    },
+    {
+      "metadata": {
+        "source_id": "twse_daily_close",
+        "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL?response=json",
+        "retrieved_at": "2026-07-16T13:45:00Z",
+        "content_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "license_ref": "https://data.gov.tw/license",
+        "http_status": 200
+      },
+      "sample_row": {
+        "Code": "2330",
+        "Date": "1150716",
+        "OpeningPrice": "109",
+        "HighestPrice": "112",
+        "LowestPrice": "108",
+        "ClosingPrice": "110",
+        "TradeVolume": "1200",
+        "currency": "TWD",
+        "available_at": "2026-07-16T08:30:00+08:00"
+      }
+    },
+    {
+      "metadata": {
+        "source_id": "twse_monthly_revenue",
+        "endpoint": "https://openapi.twse.com.tw/v1/opendata/t187ap05_L?response=json",
+        "retrieved_at": "2026-06-10T13:45:00Z",
+        "content_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "license_ref": "https://data.gov.tw/license",
+        "http_status": 200
+      },
+      "sample_row": {
+        "公司代號": "2330",
+        "資料年月": "11406",
+        "營業收入-當月營收": "100",
+        "unit": "TWD_thousand",
+        "currency": "TWD",
+        "reported_at": "2025-07-10T08:00:00+08:00",
+        "available_at": "2025-07-10T08:00:00+08:00"
+      }
+    },
+    {
+      "metadata": {
+        "source_id": "twse_monthly_revenue",
+        "endpoint": "https://openapi.twse.com.tw/v1/opendata/t187ap05_L?response=json",
+        "retrieved_at": "2026-06-10T13:45:00Z",
+        "content_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "license_ref": "https://data.gov.tw/license",
+        "http_status": 200
+      },
+      "sample_row": {
+        "公司代號": "2330",
+        "資料年月": "11504",
+        "營業收入-當月營收": "110",
+        "unit": "TWD_thousand",
+        "currency": "TWD",
+        "reported_at": "2026-05-10T08:00:00+08:00",
+        "available_at": "2026-05-10T08:00:00+08:00"
+      }
+    },
+    {
+      "metadata": {
+        "source_id": "twse_monthly_revenue",
+        "endpoint": "https://openapi.twse.com.tw/v1/opendata/t187ap05_L?response=json",
+        "retrieved_at": "2026-06-10T13:45:00Z",
+        "content_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "license_ref": "https://data.gov.tw/license",
+        "http_status": 200
+      },
+      "sample_row": {
+        "公司代號": "2330",
+        "資料年月": "11505",
+        "營業收入-當月營收": "120",
+        "unit": "TWD_thousand",
+        "currency": "TWD",
+        "reported_at": "2026-06-10T08:00:00+08:00",
+        "available_at": "2026-06-10T08:00:00+08:00"
+      }
+    },
+    {
+      "metadata": {
+        "source_id": "twse_monthly_revenue",
+        "endpoint": "https://openapi.twse.com.tw/v1/opendata/t187ap05_L?response=json",
+        "retrieved_at": "2026-07-10T13:45:00Z",
+        "content_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "license_ref": "https://data.gov.tw/license",
+        "http_status": 200
+      },
+      "sample_row": {
+        "公司代號": "2330",
+        "資料年月": "11506",
+        "營業收入-當月營收": "150",
+        "unit": "TWD_thousand",
+        "currency": "TWD",
+        "reported_at": "2026-07-10T08:00:00+08:00",
+        "available_at": "2026-07-10T08:00:00+08:00"
+      }
+    }
+  ]
+}

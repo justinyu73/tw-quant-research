@@ -1,0 +1,21 @@
+{
+  "schema": "loop-hybrid-work-unit/v1",
+  "work_unit_id": "tw-quant-engine-preflight-001",
+  "target_repo": "/absolute/path/to/tw-quant-engine",
+  "goal": "Run the approved read-only preflight for the independent Taiwan stock quantitative strategy engine.",
+  "verification": [
+    {
+      "id": "engine-preflight",
+      "argv": ["python3", "scripts/lh_preflight.py"],
+      "timeout_seconds": 60,
+      "read_only": true
+    }
+  ],
+  "max_attempts": 1,
+  "cannot_claim": [
+    "target repository modified by loop-hybrid",
+    "automatic promotion authority",
+    "provider invocation authority",
+    "product acceptance"
+  ]
+}

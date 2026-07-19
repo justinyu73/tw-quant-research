@@ -1,0 +1,27 @@
+{
+  "schema": "tw-quant-engine-p5-adjusted-ohlcv-volume-policy/v1",
+  "policy_id": "tqe-adjusted-ohlcv-volume/v1",
+  "status": "defined_for_p5_4",
+  "raw_ohlcv_unchanged": true,
+  "apply_before_ex_date_only": true,
+  "visibility_rule": "available_at <= as_of",
+  "composition_order": ["ex_date", "snapshot_id"],
+  "action_classes": {
+    "split": {"price": "multiply_by_factor", "volume": "divide_by_factor"},
+    "reverse_split": {"price": "multiply_by_factor", "volume": "divide_by_factor"},
+    "bonus_issue": {"price": "multiply_by_factor", "volume": "divide_by_factor"},
+    "cash_dividend": {"price": "multiply_by_factor", "volume": "unchanged"}
+  },
+  "unknown_action_policy": "unadmitted",
+  "invalid_factor_policy": "unadmitted",
+  "derived_output": [
+    "raw_ohlcv",
+    "adjusted_ohlcv",
+    "price_adjustment_factor",
+    "volume_adjustment_factor",
+    "adjustment_policy",
+    "action_snapshot_ids"
+  ],
+  "p5_1_unlocked_by_this_policy": false,
+  "p5_4_application_required": true
+}

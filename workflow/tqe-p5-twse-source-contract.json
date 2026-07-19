@@ -1,0 +1,142 @@
+{
+  "schema": "tw-quant-engine-p5-twse-source-contract/v1",
+  "status": "source_contract_blocked",
+  "market": "TWSE",
+  "purpose": "free_reference_data_capture_for_human_research",
+  "requested_window": {
+    "start": "2023-07-20",
+    "end": "2026-07-19",
+    "as_of": "2026-07-19T23:59:59+08:00"
+  },
+  "selected_strategy": "free_official_public_capture",
+  "selected_source": null,
+  "access_policy": {
+    "free_public_sources_only": true,
+    "paid_subscriptions": false,
+    "credentials_or_cookies": false,
+    "human_initiated_capture": true,
+    "local_raw_and_normalized_retention": true,
+    "human_evaluation_required": true,
+    "automatic_quantitative_execution": false
+  },
+  "candidate_assessments": [
+    {
+      "candidate_id": "twse_openapi_stock_day_all",
+      "method": "GET",
+      "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
+      "official_reference": "https://openapi.twse.com.tw/",
+      "role": "latest_full_market_daily_transaction_snapshot",
+      "required_fields": ["date", "security_code", "security_name", "volume_shares", "amount", "open", "high", "low", "close", "price_change", "transaction_count"],
+      "decision": "rejected_for_p5_bulk",
+      "reason": "The public contract evidence identifies a daily dataset but does not prove one bounded response can cover the requested three-year range. Existing repository evidence treats this endpoint as a latest-day snapshot."
+    },
+    {
+      "candidate_id": "twse_openapi_stock_day_avg_all",
+      "method": "GET",
+      "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_AVG_ALL",
+      "official_reference": "https://openapi.twse.com.tw/",
+      "role": "daily_close_and_monthly_average_snapshot",
+      "required_fields": ["date", "security_code", "security_name", "close", "monthly_average"],
+      "decision": "rejected_for_p5_bulk",
+      "reason": "The official catalogue describes close and monthly average fields, not daily OHLCV."
+    },
+    {
+      "candidate_id": "twse_historical_stock_day",
+      "method": "GET",
+      "endpoint": "https://wwwc.twse.com.tw/zh/trading/historical/stock-day.html",
+      "official_reference": "https://wwwc.twse.com.tw/zh/trading/historical/stock-day.html",
+      "role": "interactive_historical_query",
+      "decision": "rejected_for_p5_bulk",
+      "reason": "The official page requires a date and security code query and does not expose a bounded three-year all-market response contract."
+    },
+    {
+      "candidate_id": "twse_data_eshop_historical_product",
+      "method": "GET",
+      "endpoint": "https://www.twse.com.tw/zh/products/dataeshop.html",
+      "official_reference": "https://www.twse.com.tw/zh/products/dataeshop.html",
+      "role": "subscription_or_ordered_historical_data_service",
+      "decision": "not_admitted",
+      "reason": "The official service describes ordered historical transaction products, but no public unauthenticated endpoint, exact daily OHLCV schema, license terms for repository fixtures, or work-unit download contract has been approved."
+    },
+    {
+      "candidate_id": "twse_data_eshop_trade_file",
+      "method": "ordered_file_delivery",
+      "endpoint": "https://eshop.twse.com.tw/zh/product/detail/0000000063ce6ab00163d860b694000a",
+      "official_reference": "https://eshop.twse.com.tw/zh/product/detail/0000000063ce6ab00163d860b694000a",
+      "role": "all_stock_monthly_raw_trade_file",
+      "decision": "rejected_for_p5_bulk",
+      "reason": "The official product is raw transaction data rather than daily OHLCV, is custom-produced, excludes the most recent year, and restricts purchased data to internal use; it cannot prove the selected range through an approved public work-unit download."
+    },
+    {
+      "candidate_id": "twse_data_eshop_daily_quotes",
+      "method": "ordered_file_subscription",
+      "endpoint": "https://eshop.twse.com.tw/en/product/detail/ef7b7785e2cb4793baca3644c8a74d4e",
+      "official_reference": "https://eshop.twse.com.tw/en/product/detail/ef7b7785e2cb4793baca3644c8a74d4e",
+      "role": "official_daily_full_market_ohlcv_file",
+      "product_files": ["TWT62U", "TWT69U", "TWTA5U"],
+      "required_fields": ["security_code", "open", "high", "low", "close", "volume_shares", "transactions", "trading_value"],
+      "coverage_evidence": {
+        "official_start_date": "1992-01-04",
+        "period": "daily",
+        "maximum_single_order_subscription_months": 60,
+        "requested_range_is_within_catalogue_start": true
+      },
+      "decision": "rejected_for_free_only",
+      "reason": "The official product is a paid Data E-Shop subscription. Its schema and coverage are technically suitable, but paid products are outside the free research-data workbench boundary and cannot be activated."
+    }
+  ],
+  "calendar_candidate": {
+    "method": "GET",
+    "endpoint": "https://openapi.twse.com.tw/v1/holidaySchedule/holidaySchedule",
+    "official_reference": "https://openapi.twse.com.tw/",
+    "observed_shape": ["Name", "Date", "Weekday", "Description"],
+    "decision": "candidate_pending_digest",
+    "required_before_activation": ["retrieval_timestamp", "response_bytes", "sha256", "version_or_coverage_label", "same_work_unit_binding"]
+  },
+  "license_and_retention": {
+    "catalog_reference": "https://data.gov.tw/dataset/11549",
+    "license_reference": "https://data.gov.tw/license",
+    "attribution": "資料來源：臺灣證券交易所",
+    "raw_evidence": "caller_owned_external_evidence",
+    "normalized_fixture": "repo_allowed_only_after_exact_source_and_terms_review",
+    "private_or_large_snapshot": false
+  },
+  "resolution_required": [
+    "provide_a_free_public_official_source_contract_for_the_requested_range",
+    "reject_paid_subscription_products_even_when_schema_and_coverage_fit",
+    "capture_exact_method_query_redirect_terms_license_content_type_and_schema",
+    "bind_calendar_version_and_digest_to_the_same_work_unit",
+    "approve_fixture_size_retention_and_sha256_policy",
+    "approve_exact_human_run_work_unit_digest"
+  ],
+  "resolution_audit": {
+    "audited_at": "2026-07-19",
+    "result": "no_official_bounded_bulk_artifact_found",
+    "official_evidence": [
+      {
+        "url": "https://eshop.twse.com.tw/en/product/detail/ef7b7785e2cb4793baca3644c8a74d4e",
+        "finding": "The official Daily Quotes product lists daily OHLCV fields and permits up to 60 months in one subscription order, but it is a paid Data E-Shop subscription and is rejected by the free-only product boundary."
+      },
+      {
+        "url": "https://data.gov.tw/suggests/136936",
+        "finding": "The official catalogue suggestion records that the public dataset only exposes the post-update single quote and requests historical date-and-security-code access."
+      },
+      {
+        "url": "https://wwwc.twse.com.tw/zh/trading/historical/stock-day.html",
+        "finding": "The official historical surface exposes date and security-code inputs, not a bounded three-year all-market response contract."
+      },
+      {
+        "url": "https://www.twse.com.tw/zh/products/dataeshop.html",
+        "finding": "The official Data E-Shop describes ordered historical transaction products; no public unauthenticated bulk download contract was found."
+      },
+      {
+        "url": "https://eshop.twse.com.tw/zh/product/detail/0000000063ce6ab00163d860b694000a",
+        "finding": "The official trade-file product covers all stocks by month but is raw transaction data, custom-produced, excludes the most recent year, and restricts purchased data to internal use."
+      }
+    ],
+    "repository_market_data_requests": 0,
+    "repository_fixtures_created": 0
+  },
+  "hard_stop": "Do not activate P5 with a paid subscription, substitute the latest-day endpoint, or create an implicit unbounded loop until a free public source contract is proven and approved.",
+  "provider_calls_made_by_repository": 0
+}

@@ -1,0 +1,261 @@
+{
+  "schema": "tw-quant-engine-k2-k5-approval-package/v1",
+  "package_id": "tw-quant-engine-k2-k5-kline-analysis-001",
+  "status": "approved_for_execution",
+  "goal": {
+    "goal_id": "k2-k5-eod-kline-analysis-path",
+    "statement": "建立一條可重播、可追溯、不可寫入的 EOD/as-of K 線分析路徑，從 K1 OHLCV fixture 經 period aggregation、read model、K 線 UI，到真實 Chromium/Playwright 設計驗證。",
+    "success_definition": "K2、K3、K4、K5 各自產生可檢查的 contract/test/evidence，所有必要 gate 通過，且沒有 provider、即時 feed、auth、CRUD、下單或 K6 promotion。",
+    "product_positioning": "量化分析儀表板，不是即時看盤或交易終端。",
+    "data_mode": "offline EOD + as_of snapshot",
+    "markets": ["TWSE", "TPEx", "US", "TAIFEX"],
+    "periods": ["1D", "1W", "M", "Q"]
+  },
+  "authority": {
+    "target_repo": "/home/jy/repos/tw-quant-engine",
+    "human_approval_required": true,
+    "human_approval_timing": "before K2 starts",
+    "agent_self_approval": false,
+    "agent_self_acceptance": false,
+    "human_review_between_stages": false,
+    "human_final_acceptance_required": true,
+    "evidence_owner": "target_repo plus caller-owned review record",
+    "commit_push": "not implied by this package; require separate user instruction",
+    "external_lh_boundary": "current LH driver remains report-only; this package does not authorize LH to patch, commit, push, promote, or invoke providers",
+    "k6_owner": "user",
+    "k6_authorized_by_this_package": false
+  },
+  "execution_order": ["K2", "K3", "K4", "K5"],
+  "loop_policy": {
+    "mode": "bounded_stage_loop",
+    "copyable_from": "K2",
+    "copy_to": ["K3", "K4", "K5"],
+    "stage_isolation": true,
+    "automatic_cross_stage_promotion": true,
+    "stage_transition": "after a stage's declared checks pass and its evidence is written, automatically start the next stage; do not wait for a human review between K2 and K5",
+    "automatic_transition_is_not_acceptance": true,
+    "per_stage_sequence": [
+      "intake_contract",
+      "implement_only_declared_scope",
+      "run_real_acceptance_checks",
+      "capture_append_only_evidence",
+      "advance_next_stage_if_mechanical_gate_passes"
+    ],
+    "failure_budget": {
+      "scope": "per stage",
+      "max_consecutive_failed_real_acceptance_attempts": 3,
+    "after_limit": "stop the loop and ask the user; do not retry through an alternate route or continue to the next stage",
+      "counter_reset": "only after a passing acceptance attempt or explicit user direction"
+    },
+    "ambiguity_policy": {
+      "trigger": "market calendar, period boundary, adjustment policy, contract meaning, UI behavior, evidence meaning, or any other required semantic is unclear",
+      "action": "stop immediately and ask the user",
+      "no_workaround": true,
+      "no_silent_assumption": true
+    },
+    "hard_stop_policy": {
+      "trigger": "network call, provider invocation, look-ahead, non-determinism, forbidden write surface, missing provenance, contradictory evidence, unplanned scope fork, or three consecutive failed attempts",
+      "action": "stop current stage, preserve evidence, report the blocking condition, and wait for user direction"
+    }
+  },
+  "stages": [
+    {
+      "stage_id": "K2",
+      "goal_id": "k2-deterministic-period-aggregation",
+      "goal": "從 K1 EOD bars deterministic 產生 1D、1W、M、Q，保留市場日曆、時區、完整性與不可用語意。",
+      "inputs": ["tests/fixtures/k1/ohlcv.json", "src/tw_quant_engine/kline_contract.py"],
+      "outputs": {
+        "contract": "tw-quant-engine-kline-aggregation/v1",
+        "implementation_boundary": "period aggregation and its tests only",
+        "expected_evidence": "workflow/evidence/k2-period-aggregation.acceptance.json"
+      },
+      "contract": {
+        "periods": {
+          "1D": "one bar per market session",
+          "1W": "one complete trading week using the market calendar",
+          "M": "one complete market month; incomplete input is partial or unavailable",
+          "Q": "one complete market quarter; incomplete input cannot become accepted"
+        },
+        "ohlcv": "open:first, high:max, low:min, close:last, volume:sum",
+        "required_context": ["trading_date", "bar_time", "timezone", "session", "available_at", "ingested_at", "as_of", "source", "adjustment_policy"],
+        "fail_closed": ["missing period boundary", "incomplete M/Q", "duplicate trading date", "invalid OHLCV", "bar unavailable after as_of"],
+        "look_ahead": "only rows available at or before as_of may enter an aggregated bar"
+      },
+      "acceptance": {
+        "required": [
+          "1D/1W/M/Q outputs are deterministic and digestable",
+          "Taiwan, US, and TAIFEX session/timezone boundaries are not mixed",
+          "M/Q incomplete data is explicitly partial or unavailable",
+          "OHLCV aggregation invariants hold",
+          "as_of boundary and post-cutoff row tests pass",
+          "no provider, network, browser, or write route is introduced"
+        ],
+        "commands": [
+          {"id": "k2-tests", "argv": ["python3", "-B", "-m", "unittest", "tests.test_k2_period_aggregation", "-v"], "network": false},
+          {"id": "full-tests", "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests", "-v"], "network": false},
+          {"id": "preflight", "argv": ["python3", "scripts/lh_preflight.py"], "network": false}
+        ]
+      },
+      "hard_stops": ["calendar or M/Q completeness semantics unclear", "look-ahead detected", "silent fill or period substitution", "provider/data download required"],
+      "forbidden": ["K-line UI", "external market data", "continuous futures roll", "adjusted price policy not approved", "commit or push"]
+    },
+    {
+      "stage_id": "K3",
+      "goal_id": "k3-read-only-kline-view-model",
+      "goal": "把 K2 結果封裝成帶 instrument、period、as_of、provenance、quality 與 indicator metadata 的 read-only view model。",
+      "inputs": ["K2 accepted aggregation output", "K1 instrument/provenance contract"],
+      "outputs": {
+        "contract": "tw-quant-engine-kline-read-model/v1",
+        "implementation_boundary": "read model and read-only route/tests only",
+        "expected_evidence": "workflow/evidence/k3-kline-read-model.acceptance.json"
+      },
+      "contract": {
+        "required_fields": ["instrument", "period", "as_of", "timezone", "session", "available_at", "ingested_at", "source", "adjustment_policy", "bars", "indicators", "quality"],
+        "quality_states": ["valid", "partial", "invalid", "unavailable", "unsupported_period"],
+        "indicator_boundary": "metadata and deterministic values are produced from the accepted snapshot; browser does not derive financial values",
+        "read_only_boundary": "GET only; POST/PUT/PATCH/DELETE fail closed; no auth, CRUD, order, or broker route",
+        "provenance": "source, snapshot digest, as_of, available_at, reason codes remain inspectable"
+      },
+      "acceptance": {
+        "required": [
+          "view model validates against its schema",
+          "valid, partial, empty, unsupported, and invalid states remain distinct",
+          "future rows are hidden or rejected by as_of rules",
+          "digest is deterministic",
+          "read-only routes return expected GET/405/404 behavior",
+          "network patch and browser-side financial derivation tests pass"
+        ],
+        "commands": [
+          {"id": "k3-tests", "argv": ["python3", "-B", "-m", "unittest", "tests.test_k3_kline_read_model", "-v"], "network": false},
+          {"id": "full-tests", "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests", "-v"], "network": false},
+          {"id": "preflight", "argv": ["python3", "scripts/lh_preflight.py"], "network": false}
+        ]
+      },
+      "hard_stops": ["read model loses provenance", "browser must calculate financial values", "look-ahead", "write-capable route", "schema meaning fork"],
+      "forbidden": ["provider calls", "auth implementation", "CRUD persistence", "orders", "desktop packaging"]
+    },
+    {
+      "stage_id": "K4",
+      "goal_id": "k4-bundled-kline-ui-block",
+      "goal": "以 K3 read model 建立可讀取的 K 線 UI block，包含價格/成交量、period selector、MA/EMA、quality/empty/unsupported states。",
+      "inputs": ["K3 accepted read model", "existing dashboard preview shell", "existing browser gate"],
+      "outputs": {
+        "contract": "tw-quant-engine-dashboard-kline-block/v1",
+        "implementation_boundary": "dashboard presentation and interaction only",
+        "expected_evidence": "workflow/evidence/k4-kline-ui.acceptance.json"
+      },
+      "contract": {
+        "library": "Lightweight Charts bundled through npm; no CDN or runtime external script",
+        "blocks": ["instrument context", "as_of/available_at/quality", "1D/1W/M/Q selector", "OHLCV candlestick", "volume", "MA/EMA toggle", "provenance/evidence", "empty/partial/unsupported/invalid state"],
+        "interaction": ["period switch", "market/instrument switch", "indicator toggle", "hover/crosshair read-only tooltip", "detail dialog", "Escape", "reset"],
+        "network": "browser request audit permits loopback only; no provider fetch",
+        "write_boundary": "no write/order/auth/CRUD control exists"
+      },
+      "acceptance": {
+        "required": [
+          "all declared blocks render from K3 data without hidden recalculation",
+          "period and indicator controls have stable DOM selectors",
+          "empty, partial, unsupported, and invalid states are visible and do not fall back silently",
+          "bundled assets build and preview offline",
+          "static/reducer and DEV read-only route checks pass",
+          "console and network instrumentation is ready for K5"
+        ],
+        "commands": [
+          {"id": "k4-tests", "argv": ["python3", "-B", "-m", "unittest", "tests.test_k4_kline_ui_contract", "-v"], "network": false},
+          {"id": "preview", "argv": ["python3", "scripts/run_dashboard_preview.py"], "network": false},
+          {"id": "dev-smoke", "argv": ["python3", "scripts/run_dashboard_dev.py"], "network": false},
+          {"id": "full-tests", "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests", "-v"], "network": false},
+          {"id": "preflight", "argv": ["python3", "scripts/lh_preflight.py"], "network": false}
+        ]
+      },
+      "hard_stops": ["CDN or external runtime dependency", "browser-side financial derivation", "missing state coverage", "write/order UI", "design behavior ambiguous"],
+      "forbidden": ["live/delayed feed", "auth", "CRUD persistence", "broker integration", "installer or signing"]
+    },
+    {
+      "stage_id": "K5",
+      "goal_id": "k5-real-chromium-design-validation",
+      "goal": "用真實 Chromium/Playwright 驗證 K 線 UI 的資料、互動、畫面、runtime boundary 與 responsive 行為。",
+      "inputs": ["K4 accepted UI block", "K1-K3 deterministic fixtures and evidence", "pinned Chromium runtime"],
+      "outputs": {
+        "contract": "tw-quant-engine-dashboard-kline-browser-evidence/v1",
+        "implementation_boundary": "browser test/evidence only; no product scope expansion",
+        "expected_evidence": "workflow/evidence/k5-browser-design-validation.acceptance.json"
+      },
+      "contract": {
+        "browser": {"engine": "Chromium", "viewport": "1440x900", "device_scale_factor": 1, "runtime_must_be_pinned": true},
+        "required_cases": ["overview", "valid 1D/1W/M/Q", "TWSE/US/TAIFEX instrument switch", "unsupported M/Q", "empty/partial", "detail/Escape/reset", "1024x768 and narrow responsive smoke"],
+        "required_proof": ["DOM assertions", "interaction assertions", "console error capture", "external request audit", "PNG captures", "SHA-256 pixel baseline", "horizontal overflow check"],
+        "pass_conditions": ["browser_errors=[]", "external_requests=[]", "all expected screenshot hashes match", "all required controls operate", "no write/order/provider request"],
+        "baseline_policy": "only human-reviewed Chromium/runtime changes may update pixel baselines"
+      },
+      "acceptance": {
+        "required": [
+          "all V1-V7 cases in the design validation matrix have evidence",
+          "pixel hashes are stable under the pinned runtime",
+          "no uncaught console error",
+          "no external request",
+          "responsive smoke has no horizontal overflow",
+          "full Python tests, LH preflight, preview, and browser gate pass"
+        ],
+        "commands": [
+          {"id": "browser-smoke", "argv": ["npm", "run", "dashboard:browser-smoke"], "network": false, "loopback_only": true},
+          {"id": "full-tests", "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests", "-v"], "network": false},
+          {"id": "preflight", "argv": ["python3", "scripts/lh_preflight.py"], "network": false},
+          {"id": "preview", "argv": ["python3", "scripts/run_dashboard_preview.py"], "network": false}
+        ]
+      },
+      "hard_stops": ["three consecutive real acceptance failures", "pixel drift without human review", "external request", "console error", "control failure", "responsive overflow", "browser/provider/write boundary violation"],
+      "forbidden": ["provider activation", "delayed/realtime decision", "K6 promotion", "release packaging", "self-acceptance"]
+    }
+  ],
+  "evidence_contract": {
+    "schema": "tw-quant-engine-k2-k5-loop-evidence/v1",
+    "one_artifact_per_stage": true,
+    "expected_fields": [
+      "schema", "package_id", "stage_id", "goal_id", "attempt", "status", "captured_at", "contract_checks", "commands", "evidence_files", "changed_files", "failure_budget", "stage_gate"
+    ],
+    "status_values": ["pass", "fail", "stopped", "awaiting_human_review"],
+    "status_rule": "stage pass is only a mechanical result that may unlock the next stage; it is not product acceptance, and only the user or an explicitly named human reviewer may mark final acceptance",
+    "command_record": ["argv", "exit_code", "stdout_digest", "stderr_digest", "network_observed", "write_observed"],
+    "failure_record": ["attempt", "failure_class", "reproduction", "consecutive_failure_count", "stop_trigger"],
+    "stage_gate_record": ["mechanical_pass", "evidence_complete", "auto_advanced_to", "stop_trigger"],
+    "final_review_record": ["review_required_after_k5", "reviewed_by", "decision", "reviewed_at", "notes"],
+    "append_only": true,
+    "missing_or_contradictory_evidence": "hard stop",
+    "final_acceptance_artifact": "workflow/evidence/k2-k5-final.acceptance.json"
+  },
+  "final_acceptance": {
+    "after_stage": "K5",
+    "required": true,
+    "automatic": false,
+    "purpose": "perform one consolidated acceptance of K2-K5 evidence after K5 finishes",
+    "required_conditions": [
+      "K2, K3, K4, and K5 evidence artifacts exist and pass their declared mechanical contracts",
+      "no stage stop condition was triggered",
+      "final full tests, LH preflight, preview, and Chromium gate pass",
+      "no provider, network, credential, write, order, or K6 promotion was introduced"
+    ],
+    "evidence": "workflow/evidence/k2-k5-final.acceptance.json",
+    "decision_owner": "user",
+    "agent_may_mark_final_acceptance": false,
+    "possible_decisions": ["accepted_for_user_k6_review", "rejected", "needs_changes"],
+    "k6_transition": "only the user may decide whether to begin K6 after this final acceptance"
+  },
+  "global_acceptance": {
+    "required": [
+      "K2, K3, K4, and K5 evidence artifacts exist and pass their declared mechanical contract",
+      "all evidence includes changed files, command results, digests, and stage-gate state",
+      "no network/provider/credential/order/write capability is added",
+      "one final consolidated acceptance is performed after K5",
+      "K6 remains user-owned and unstarted"
+    ],
+    "cannot_claim": ["real-time readiness", "investment performance", "data completeness", "production deployment acceptance", "broker/order readiness", "K6 approval"],
+    "handoff_to_k6": "only after K5 evidence is human-reviewed; this package never performs that promotion"
+  },
+  "approval": {
+    "decision": "approved_for_execution",
+    "approved_by": "user",
+    "approved_at": "2026-07-15T16:49:36Z",
+    "review_note": "User approved execution of the K2-K5 mechanical gates and the final human acceptance. Stage transitions remain evidence-gated; final acceptance is not self-marked by the agent."
+  }
+}

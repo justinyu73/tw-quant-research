@@ -1,0 +1,76 @@
+{
+  "schema": "tw-quant-engine-multi-stage-approval-package/v1",
+  "package_id": "tw-quant-engine-s5-s9-research-product-chain-001",
+  "goal_id": "tw-quant-engine-q1-s1-s9",
+  "stages": [
+    {
+      "stage_id": "S5",
+      "goal_id": "quality_checks_and_explicit_corporate_actions",
+      "goal_intake": "Validate S4 rows and preserve corporate actions explicitly with fail-closed factor semantics.",
+      "network": false,
+      "evidence": "workflow/evidence/s5-quality-corporate-actions.acceptance.json",
+      "failure_budget": {"consecutive_failures": 3},
+      "hard_stops": ["ambiguous corporate-action factor convention", "missing provenance", "silent adjustment required"]
+    },
+    {
+      "stage_id": "S6",
+      "goal_id": "deterministic_feature_pipeline",
+      "goal_intake": "Compute versioned point-in-time features from admitted S5 rows with exact windows and missingness rules.",
+      "network": false,
+      "evidence": "workflow/evidence/s6-feature-pipeline.acceptance.json",
+      "failure_budget": {"consecutive_failures": 3},
+      "hard_stops": ["look-ahead detected", "implicit fill", "feature meaning or unit ambiguous"]
+    },
+    {
+      "stage_id": "S7",
+      "goal_id": "provider_neutral_backtest_engine",
+      "goal_intake": "Run a deterministic research-only backtest with explicit timing, costs, slippage, ledger, and metrics.",
+      "network": false,
+      "evidence": "workflow/evidence/s7-backtest.acceptance.json",
+      "failure_budget": {"consecutive_failures": 3},
+      "hard_stops": ["look-ahead", "unadmitted data traded", "hidden cost/slippage assumption", "metric definition fork"]
+    },
+    {
+      "stage_id": "S8",
+      "goal_id": "read_only_local_product_view",
+      "goal_intake": "Expose aligned read-only product data, quality state, formulas, as-of state, and provenance locally.",
+      "network": false,
+      "evidence": "workflow/evidence/s8-read-only-product-view.acceptance.json",
+      "failure_budget": {"consecutive_failures": 3},
+      "hard_stops": ["write endpoint", "external network dependency", "dashboard-only financial formula", "security/design fork"]
+    },
+    {
+      "stage_id": "S9",
+      "goal_id": "release_hardening_and_final_acceptance",
+      "goal_intake": "Verify the complete S1–S8 research-only chain is reproducible, inspectable, and safe to hand off.",
+      "network": false,
+      "evidence": "workflow/evidence/s9-release-hardening.acceptance.json",
+      "failure_budget": {"consecutive_failures": 3},
+      "hard_stops": ["missing or contradictory evidence", "network call", "forbidden artifact", "non-deterministic replay"]
+    }
+  ],
+  "execution_order": ["S5", "S6", "S7", "S8", "S9"],
+  "global_rules": [
+    "Human approval is required before S5 starts.",
+    "A stage may advance only after generated evidence status is pass.",
+    "Three consecutive failed acceptance attempts stop the sequence and request review.",
+    "Any hard stop or unplanned design fork stops immediately and asks for direction.",
+    "Every stage keeps a summary, command results, digests, changed-file list, and evidence artifact.",
+    "LH remains an external driver and does not own this repository.",
+    "No credentials, private data, FinMind, live trading, commit, push, or automatic promotion."
+  ],
+  "final_acceptance": {
+    "required": "S5, S6, S7, S8, and S9 evidence all pass",
+    "cannot_claim": [
+      "investment performance",
+      "live trading readiness",
+      "data completeness beyond captured sources",
+      "production deployment acceptance"
+    ]
+  },
+  "approval": {
+    "decision": "approved",
+    "approved_by": "user",
+    "approved_at": "2026-07-15T00:00:00Z"
+  }
+}

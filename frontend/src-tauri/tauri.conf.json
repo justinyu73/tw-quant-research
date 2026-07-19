@@ -1,0 +1,38 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "TW Quant Research",
+  "version": "0.1.0",
+  "identifier": "io.github.justinyu73.twquantengine",
+  "build": {
+    "frontendDist": "../../outputs/dashboard-preview",
+    "devUrl": "http://127.0.0.1:5173",
+    "beforeDevCommand": "python3 ../scripts/serve_dashboard_dev.py --port 5173",
+    "beforeBuildCommand": "node ../scripts/tauri_build_preview.cjs"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "TW Quant Research",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 980,
+        "minHeight": 680,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:*; font-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/icon.png"],
+    "externalBin": ["binaries/tqe-sidecar"],
+    "category": "DeveloperTool",
+    "shortDescription": "Read-only Taiwan quantitative research viewer",
+    "longDescription": "Local read-only EOD K-line research viewer backed by committed K6 fixtures."
+  }
+}

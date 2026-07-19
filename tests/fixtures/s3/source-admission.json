@@ -1,0 +1,280 @@
+{
+  "schema": "tw-quant-engine-s3-source-admission-fixture/v1",
+  "captured_at": "2026-07-15T13:41:09Z",
+  "network_requests": 7,
+  "finmind_used": false,
+  "fetches": [
+    {
+      "metadata": {
+        "source_id": "tpex_daily_close",
+        "endpoint": "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes?d=115%2F07%2F15&l=zh-tw&s=0%2Casc%2C0",
+        "terms_url": "https://www.tpex.org.tw/openapi/",
+        "license_ref": "https://data.gov.tw/license",
+        "attribution": "資料來源：財團法人中華民國證券櫃檯買賣中心",
+        "retrieved_at": "2026-07-15T13:29:36Z",
+        "http_status": 200,
+        "content_type": "application/json",
+        "response_bytes": 3932714,
+        "content_digest": "sha256:e9dc5bc59526a134fd7586866f78f5489b60cdb5d374e933e07bc7fcce521103"
+      },
+      "row_count": 10064,
+      "sample_row": {
+        "Date": "1150715",
+        "SecuritiesCompanyCode": "006201",
+        "CompanyName": "元大富櫃50",
+        "Close": "45.98",
+        "Change": "+1.47",
+        "Open": "44.50",
+        "High": "46.00",
+        "Low": "44.50",
+        "Average": "45.54",
+        "TradingShares": "126283",
+        "TransactionAmount": "5750535",
+        "TransactionNumber": "154",
+        "LatestBidPrice": "45.78",
+        "LatesAskPrice": "45.98",
+        "Capitals": "20446000",
+        "NextReferencePrice": "45.98",
+        "NextLimitUp": "50.55",
+        "NextLimitDown": "41.39"
+      },
+      "sample_keys": [
+        "Average",
+        "Capitals",
+        "Change",
+        "Close",
+        "CompanyName",
+        "Date",
+        "High",
+        "LatesAskPrice",
+        "LatestBidPrice",
+        "Low",
+        "NextLimitDown",
+        "NextLimitUp",
+        "NextReferencePrice",
+        "Open",
+        "SecuritiesCompanyCode",
+        "TradingShares",
+        "TransactionAmount",
+        "TransactionNumber"
+      ],
+      "mapping": {
+        "status": "unadmitted",
+        "reason": "response has no reliable publication timestamp; retrieval_at cannot substitute",
+        "candidate_record_type": "price_bar",
+        "candidate_fields": {
+          "security_id": "006201",
+          "trading_date": "1150715",
+          "open": "44.50",
+          "high": "46.00",
+          "low": "44.50",
+          "close": "45.98",
+          "volume": null
+        }
+      }
+    },
+    {
+      "metadata": {
+        "source_id": "tpex_monthly_revenue",
+        "endpoint": "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap05_O",
+        "terms_url": "https://www.tpex.org.tw/openapi/",
+        "license_ref": "https://data.gov.tw/license",
+        "attribution": "資料來源：財團法人中華民國證券櫃檯買賣中心",
+        "retrieved_at": "2026-07-15T13:29:37Z",
+        "http_status": 200,
+        "content_type": "application/json",
+        "response_bytes": 494168,
+        "content_digest": "sha256:46c8301f30391d1d500b61d9afb9b085949fb34b3514cfb4ef6b1193df871f45"
+      },
+      "row_count": 891,
+      "sample_row": {
+        "出表日期": "1150715",
+        "資料年月": "11506",
+        "公司代號": "1240",
+        "公司名稱": "茂生農經",
+        "產業別": "農業科技",
+        "營業收入-當月營收": "270176",
+        "營業收入-上月營收": "244093",
+        "營業收入-去年當月營收": "217592",
+        "營業收入-上月比較增減(%)": "10.685681277218109",
+        "營業收入-去年同月增減(%)": "24.166329644472224",
+        "累計營業收入-當月累計營收": "1440672",
+        "累計營業收入-去年累計營收": "1350363",
+        "累計營業收入-前期比較增減(%)": "6.68775729192817",
+        "備註": "-"
+      },
+      "sample_keys": [
+        "備註",
+        "公司代號",
+        "公司名稱",
+        "出表日期",
+        "營業收入-上月比較增減(%)",
+        "營業收入-上月營收",
+        "營業收入-去年同月增減(%)",
+        "營業收入-去年當月營收",
+        "營業收入-當月營收",
+        "產業別",
+        "累計營業收入-前期比較增減(%)",
+        "累計營業收入-去年累計營收",
+        "累計營業收入-當月累計營收",
+        "資料年月"
+      ],
+      "mapping": {
+        "status": "unadmitted",
+        "reason": "response has no reliable publication timestamp; retrieval_at cannot substitute",
+        "candidate_record_type": "fundamental_observation",
+        "candidate_fields": {
+          "security_id": "1240",
+          "period_end": "11506",
+          "metric": "monthly_revenue",
+          "value": null,
+          "unit": "TWD"
+        }
+      }
+    },
+    {
+      "metadata": {
+        "source_id": "mops_landing",
+        "endpoint": "https://mops.twse.com.tw/mops/",
+        "terms_url": "https://mops.twse.com.tw/mops/",
+        "license_ref": "https://data.gov.tw/license",
+        "attribution": "資料來源：公開資訊觀測站（證交所／櫃買中心）",
+        "retrieved_at": "2026-07-15T13:29:37Z",
+        "http_status": 200,
+        "content_type": "text/html;charset=UTF-8",
+        "response_bytes": 942,
+        "content_digest": "sha256:32d5547a1840e13f3718a2b7c5475be4a7289a547ac1e37920e43b53fd4f0dbc"
+      },
+      "html_title": "公開資訊觀測站",
+      "has_html": true,
+      "mapping": {
+        "status": "unadmitted",
+        "reason": "landing page has no source-published observation timestamp; retrieval_at cannot substitute",
+        "candidate_record_type": "disclosure_context"
+      }
+    },
+    {
+      "metadata": {
+        "source_id": "twse_daily_close",
+        "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL?response=json",
+        "terms_url": "https://openapi.twse.com.tw/",
+        "license_ref": "https://data.gov.tw/license",
+        "attribution": "資料來源：臺灣證券交易所",
+        "retrieved_at": "2026-07-15T13:41:09Z",
+        "http_status": 200,
+        "content_type": "application/json",
+        "response_bytes": 318404,
+        "content_digest": "sha256:6d5621afe84045bc4d9dd2e301ce497fba512d9c2286e392ad56b37ee69fcee6"
+      },
+      "row_count": 1369,
+      "sample_row": {
+        "Date": "1150714",
+        "Code": "00400A",
+        "Name": "主動國泰動能高息",
+        "TradeVolume": "88839154",
+        "TradeValue": "1206432267",
+        "OpeningPrice": "14.03",
+        "HighestPrice": "14.10",
+        "LowestPrice": "13.21",
+        "ClosingPrice": "13.71",
+        "Change": "-0.3900",
+        "Transaction": "26292"
+      },
+      "sample_keys": [
+        "Change",
+        "ClosingPrice",
+        "Code",
+        "Date",
+        "HighestPrice",
+        "LowestPrice",
+        "Name",
+        "OpeningPrice",
+        "TradeValue",
+        "TradeVolume",
+        "Transaction"
+      ],
+      "mapping": {
+        "status": "unadmitted",
+        "reason": "response has no reliable publication timestamp; retrieval_at cannot substitute",
+        "candidate_record_type": "price_bar",
+        "candidate_fields": {
+          "security_id": "00400A",
+          "trading_date": "1150714",
+          "open": "14.03",
+          "high": "14.10",
+          "low": "13.21",
+          "close": "13.71",
+          "volume": "88839154"
+        }
+      }
+    },
+    {
+      "metadata": {
+        "source_id": "twse_monthly_revenue",
+        "endpoint": "https://openapi.twse.com.tw/v1/opendata/t187ap05_L?response=json",
+        "terms_url": "https://openapi.twse.com.tw/",
+        "license_ref": "https://data.gov.tw/license",
+        "attribution": "資料來源：臺灣證券交易所",
+        "retrieved_at": "2026-07-15T13:41:09Z",
+        "http_status": 200,
+        "content_type": "application/json",
+        "response_bytes": 592778,
+        "content_digest": "sha256:32f35c07356327999dfea02acc20dae1a519c84c10944e059c4cc0ee0528a3a2"
+      },
+      "row_count": 1065,
+      "sample_row": {
+        "出表日期": "1150714",
+        "資料年月": "11506",
+        "公司代號": "1101",
+        "公司名稱": "台泥",
+        "產業別": "水泥工業",
+        "營業收入-當月營收": "13382706",
+        "營業收入-上月營收": "12612013",
+        "營業收入-去年當月營收": "10107877",
+        "營業收入-上月比較增減(%)": "6.110785011084273",
+        "營業收入-去年同月增減(%)": "32.39878166305348",
+        "累計營業收入-當月累計營收": "71467332",
+        "累計營業收入-去年累計營收": "70380916",
+        "累計營業收入-前期比較增減(%)": "1.5436229900730476",
+        "備註": "-"
+      },
+      "sample_keys": [
+        "備註",
+        "公司代號",
+        "公司名稱",
+        "出表日期",
+        "營業收入-上月比較增減(%)",
+        "營業收入-上月營收",
+        "營業收入-去年同月增減(%)",
+        "營業收入-去年當月營收",
+        "營業收入-當月營收",
+        "產業別",
+        "累計營業收入-前期比較增減(%)",
+        "累計營業收入-去年累計營收",
+        "累計營業收入-當月累計營收",
+        "資料年月"
+      ],
+      "mapping": {
+        "status": "unadmitted",
+        "reason": "response has no reliable publication timestamp; retrieval_at cannot substitute",
+        "candidate_record_type": "fundamental_observation",
+        "candidate_fields": {
+          "security_id": "1101",
+          "period_end": "11506",
+          "metric": "monthly_revenue",
+          "value": null,
+          "unit": "TWD"
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "continuation": {
+    "approved_requests": 2,
+    "endpoints": [
+      "/v1/exchangeReport/STOCK_DAY_ALL?response=json",
+      "/v1/opendata/t187ap05_L?response=json"
+    ],
+    "reran_other_sources": false
+  }
+}

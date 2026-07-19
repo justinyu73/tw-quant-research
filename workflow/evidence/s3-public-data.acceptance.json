@@ -1,0 +1,258 @@
+{
+  "schema": "tw-quant-engine-stage-acceptance/v1",
+  "stage_id": "S3",
+  "package_id": "tw-quant-engine-s3-public-taiwan-data-001",
+  "status": "pass",
+  "capture_method": "corrected TWSE continuation: two live GETs plus offline subprocess verification",
+  "captured_at": "2026-07-15T13:41:09Z",
+  "approval": {
+    "approved": true,
+    "approved_by": "user",
+    "execution_boundary": "workflow/s3-approval-package.json",
+    "finmind_used": false,
+    "additional_approved_requests": 2
+  },
+  "network_policy": {
+    "method": "GET",
+    "fixture_requests": 7,
+    "known_session_requests": 14,
+    "max_total_requests": 12,
+    "additional_approved_requests": 2,
+    "effective_max_total_requests": 14,
+    "credentials": false,
+    "tokens": false,
+    "full_history_backfill": false
+  },
+  "source_captures": [
+    {
+      "source_id": "tpex_daily_close",
+      "endpoint": "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes?d=115%2F07%2F15&l=zh-tw&s=0%2Casc%2C0",
+      "terms_url": "https://www.tpex.org.tw/openapi/",
+      "license_ref": "https://data.gov.tw/license",
+      "attribution": "資料來源：財團法人中華民國證券櫃檯買賣中心",
+      "retrieved_at": "2026-07-15T13:29:36Z",
+      "http_status": 200,
+      "content_type": "application/json",
+      "response_bytes": 3932714,
+      "content_digest": "sha256:e9dc5bc59526a134fd7586866f78f5489b60cdb5d374e933e07bc7fcce521103",
+      "row_count": 10064,
+      "sample_keys": [
+        "Average",
+        "Capitals",
+        "Change",
+        "Close",
+        "CompanyName",
+        "Date",
+        "High",
+        "LatesAskPrice",
+        "LatestBidPrice",
+        "Low",
+        "NextLimitDown",
+        "NextLimitUp",
+        "NextReferencePrice",
+        "Open",
+        "SecuritiesCompanyCode",
+        "TradingShares",
+        "TransactionAmount",
+        "TransactionNumber"
+      ],
+      "mapping": {
+        "status": "unadmitted",
+        "reason": "response has no reliable publication timestamp; retrieval_at cannot substitute",
+        "candidate_record_type": "price_bar",
+        "candidate_fields": {
+          "security_id": "006201",
+          "trading_date": "1150715",
+          "open": "44.50",
+          "high": "46.00",
+          "low": "44.50",
+          "close": "45.98",
+          "volume": null
+        }
+      }
+    },
+    {
+      "source_id": "tpex_monthly_revenue",
+      "endpoint": "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap05_O",
+      "terms_url": "https://www.tpex.org.tw/openapi/",
+      "license_ref": "https://data.gov.tw/license",
+      "attribution": "資料來源：財團法人中華民國證券櫃檯買賣中心",
+      "retrieved_at": "2026-07-15T13:29:37Z",
+      "http_status": 200,
+      "content_type": "application/json",
+      "response_bytes": 494168,
+      "content_digest": "sha256:46c8301f30391d1d500b61d9afb9b085949fb34b3514cfb4ef6b1193df871f45",
+      "row_count": 891,
+      "sample_keys": [
+        "備註",
+        "公司代號",
+        "公司名稱",
+        "出表日期",
+        "營業收入-上月比較增減(%)",
+        "營業收入-上月營收",
+        "營業收入-去年同月增減(%)",
+        "營業收入-去年當月營收",
+        "營業收入-當月營收",
+        "產業別",
+        "累計營業收入-前期比較增減(%)",
+        "累計營業收入-去年累計營收",
+        "累計營業收入-當月累計營收",
+        "資料年月"
+      ],
+      "mapping": {
+        "status": "unadmitted",
+        "reason": "response has no reliable publication timestamp; retrieval_at cannot substitute",
+        "candidate_record_type": "fundamental_observation",
+        "candidate_fields": {
+          "security_id": "1240",
+          "period_end": "11506",
+          "metric": "monthly_revenue",
+          "value": null,
+          "unit": "TWD"
+        }
+      }
+    },
+    {
+      "source_id": "mops_landing",
+      "endpoint": "https://mops.twse.com.tw/mops/",
+      "terms_url": "https://mops.twse.com.tw/mops/",
+      "license_ref": "https://data.gov.tw/license",
+      "attribution": "資料來源：公開資訊觀測站（證交所／櫃買中心）",
+      "retrieved_at": "2026-07-15T13:29:37Z",
+      "http_status": 200,
+      "content_type": "text/html;charset=UTF-8",
+      "response_bytes": 942,
+      "content_digest": "sha256:32d5547a1840e13f3718a2b7c5475be4a7289a547ac1e37920e43b53fd4f0dbc",
+      "row_count": null,
+      "sample_keys": [],
+      "mapping": {
+        "status": "unadmitted",
+        "reason": "landing page has no source-published observation timestamp; retrieval_at cannot substitute",
+        "candidate_record_type": "disclosure_context"
+      }
+    },
+    {
+      "source_id": "twse_daily_close",
+      "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL?response=json",
+      "terms_url": "https://openapi.twse.com.tw/",
+      "license_ref": "https://data.gov.tw/license",
+      "attribution": "資料來源：臺灣證券交易所",
+      "retrieved_at": "2026-07-15T13:41:09Z",
+      "http_status": 200,
+      "content_type": "application/json",
+      "response_bytes": 318404,
+      "content_digest": "sha256:6d5621afe84045bc4d9dd2e301ce497fba512d9c2286e392ad56b37ee69fcee6",
+      "row_count": 1369,
+      "sample_keys": [
+        "Change",
+        "ClosingPrice",
+        "Code",
+        "Date",
+        "HighestPrice",
+        "LowestPrice",
+        "Name",
+        "OpeningPrice",
+        "TradeValue",
+        "TradeVolume",
+        "Transaction"
+      ],
+      "mapping": {
+        "status": "unadmitted",
+        "reason": "response has no reliable publication timestamp; retrieval_at cannot substitute",
+        "candidate_record_type": "price_bar",
+        "candidate_fields": {
+          "security_id": "00400A",
+          "trading_date": "1150714",
+          "open": "14.03",
+          "high": "14.10",
+          "low": "13.21",
+          "close": "13.71",
+          "volume": "88839154"
+        }
+      }
+    },
+    {
+      "source_id": "twse_monthly_revenue",
+      "endpoint": "https://openapi.twse.com.tw/v1/opendata/t187ap05_L?response=json",
+      "terms_url": "https://openapi.twse.com.tw/",
+      "license_ref": "https://data.gov.tw/license",
+      "attribution": "資料來源：臺灣證券交易所",
+      "retrieved_at": "2026-07-15T13:41:09Z",
+      "http_status": 200,
+      "content_type": "application/json",
+      "response_bytes": 592778,
+      "content_digest": "sha256:32f35c07356327999dfea02acc20dae1a519c84c10944e059c4cc0ee0528a3a2",
+      "row_count": 1065,
+      "sample_keys": [
+        "備註",
+        "公司代號",
+        "公司名稱",
+        "出表日期",
+        "營業收入-上月比較增減(%)",
+        "營業收入-上月營收",
+        "營業收入-去年同月增減(%)",
+        "營業收入-去年當月營收",
+        "營業收入-當月營收",
+        "產業別",
+        "累計營業收入-前期比較增減(%)",
+        "累計營業收入-去年累計營收",
+        "累計營業收入-當月累計營收",
+        "資料年月"
+      ],
+      "mapping": {
+        "status": "unadmitted",
+        "reason": "response has no reliable publication timestamp; retrieval_at cannot substitute",
+        "candidate_record_type": "fundamental_observation",
+        "candidate_fields": {
+          "security_id": "1101",
+          "period_end": "11506",
+          "metric": "monthly_revenue",
+          "value": null,
+          "unit": "TWD"
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "offline_verification": {
+    "tests": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:95f7effaa336390fd83646cfa8ac25f26a5a842e1eec00e4e239d784aa5f8eb3"
+    },
+    "preflight": {
+      "argv": [
+        "/usr/bin/python3",
+        "scripts/lh_preflight.py"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "parsed": {
+        "driver": "loop-hybrid",
+        "engine_id": "tw-quant-engine",
+        "errors": [],
+        "phase": "s1_qlib_integration",
+        "schema": "tw-quant-engine-preflight/v1",
+        "status": "pass",
+        "writes_repo": false
+      }
+    }
+  },
+  "acceptance_notes": [
+    "All live responses are retained by digest and bounded sample metadata; no full-history snapshot is stored.",
+    "Samples without a reliable source-published timestamp are explicitly unadmitted; retrieval_at is not used as available_at.",
+    "The corrected TWSE continuation captured only the two approved TWSE GET endpoints; TPEx/MOPS were not re-requested.",
+    "S3 does not approve factors, backtests, dashboards, trading, or S4."
+  ]
+}

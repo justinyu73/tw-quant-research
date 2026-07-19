@@ -1,0 +1,74 @@
+{
+  "schema": "loop-hybrid-work-unit/v2",
+  "status": "draft_not_runnable",
+  "blocked_reason": "source_contract_blocked_for_selected_three_year_range",
+  "work_unit_id": "tw-quant-engine-p5-twse-history-001",
+  "target_repo": "/absolute/path/to/tw-quant-engine",
+  "goal": "Admit the approved three-year TWSE EOD history with an official calendar and separate corporate-action evidence.",
+  "approval_package": "workflow/tqe-p5-history-admission.json",
+  "source_contract": "workflow/tqe-p5-twse-source-contract.json",
+  "corporate_action_admission": "workflow/tqe-p5-corporate-action-admission.json",
+  "network": false,
+  "provider_calls": false,
+  "credentials": false,
+  "host_egress": "required_before_activation",
+  "request_budget": {
+    "minimum_gets": 2,
+    "named_gets": ["bulk_history", "official_calendar"],
+    "corporate_action_fixture": "separate_preapproved_input"
+  },
+  "activation_requirements": [
+    "exact_twse_bulk_history_endpoint_and_terms",
+    "exact_twse_calendar_endpoint_version_and_digest",
+    "preapproved_corporate_action_fixture_and_factor_provenance",
+    "fixture_retention_license_size_and_digest_policy",
+    "exact_human_run_work_unit_digest",
+    "host_egress_admission"
+  ],
+  "verification": [
+    {
+      "id": "p5-2-corporate-action-validation",
+      "argv": ["python3", "scripts/p5_corporate_action_validation.py"],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "p5-target-preflight",
+      "argv": ["python3", "scripts/p5_execution_target.py"],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "offline-tests",
+      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
+      "timeout_seconds": 180,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "engine-preflight",
+      "argv": ["python3", "scripts/lh_preflight.py"],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "p4-closure",
+      "argv": ["python3", "scripts/p4_research_closure.py"],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    }
+  ],
+  "cannot_claim": [
+    "provider invoked",
+    "data completeness",
+    "adjusted-price correctness before corporate-action evidence",
+    "TPEx admitted",
+    "general provider runtime enabled",
+    "product acceptance",
+    "automatic promotion"
+  ]
+}

@@ -1,0 +1,17 @@
+schema: tw-quant-engine-strategy/v1
+mode: research-only
+current_phase: framework-selection
+forecast_horizons_trading_days: [20, 60, 120, 250]
+price_windows_days: [20, 60, 120]
+required_signal_conditions:
+  - fundamentals_not_deteriorating
+  - valuation_in_reasonable_zone
+  - price_distribution_supportive
+  - market_regime_allows_entry
+  - price_stabilization_or_absorption
+  - position_limits_pass
+forbidden_shortcuts:
+  - single_indicator_buy_signal
+  - index_drop_equals_buy
+  - moving_average_touch_equals_buy
+  - z_score_alone_triggers_buy

@@ -1,0 +1,53 @@
+{
+  "schema": "tw-quant-engine-p5-corporate-action-admission/v1",
+  "stage_id": "P5.2",
+  "status": "pass",
+  "fixture": "tests/fixtures/s5/corporate-actions.json",
+  "source_evidence": "workflow/evidence/s5-quality-corporate-actions.acceptance.json",
+  "adjusted_ohlcv_volume_policy": "workflow/tqe-p5-adjusted-ohlcv-volume-policy.json",
+  "fixture_schema": "tw-quant-engine-s5-quality-fixture/v1",
+  "fixture_raw_digest": "sha256:33be0287d129183a908386dd9afd6844ed93fb52829982e96a5cceb942c44e54",
+  "fixture_pit_digest": "sha256:8019df3a210f770780fc63e8fd5de443d2de1d6b7ead6950c108d3c1d1f4eb7b",
+  "source_evidence_digest": "sha256:e8b09e76e63bb68c52488d70d518ab13ad5683f2a21b5a3f0a7489cdd4d9f111",
+  "network": false,
+  "provider_calls": 0,
+  "approval_basis": {
+    "source_kind": "preapproved_offline_synthetic_fixture",
+    "source_id": "synthetic-twse",
+    "source_ref": "synthetic://s5/corporate-action",
+    "snapshot_id": "s5-action-snapshot",
+    "content_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "license_ref": "https://data.gov.tw/license",
+    "factor_convention": "price_multiplier_after_ex_date",
+    "security_id": "2330",
+    "action_type": "split",
+    "ex_date": "2026-01-05",
+    "available_at": "2025-12-20T10:00:00+08:00",
+    "factor": 0.5,
+    "cash_amount": 0,
+    "currency": "TWD"
+  },
+  "point_in_time_contract": {
+    "p5_as_of": "2026-07-19T23:59:59+08:00",
+    "action_visible_at_p5_as_of": true,
+    "action_hidden_before_available_at": true,
+    "pre_ex_date_factor": 0.5,
+    "on_ex_date_factor": 1.0
+  },
+  "adjustment_boundary": {
+    "raw_ohlcv_unchanged": true,
+    "derived_adjusted_values_are_separate": true,
+    "p5_2_validates_fixture_input_only": true,
+    "full_ohlcv_and_volume_policy_defined": true,
+    "p5_4_must_apply_defined_policy": true
+  },
+  "validator": "scripts/p5_corporate_action_validation.py",
+  "cannot_claim": [
+    "TWSE bulk source admitted",
+    "P5 execution unblocked",
+    "full adjusted OHLCV implementation complete",
+    "volume adjustment policy approved",
+    "provider invoked",
+    "P5.3 work-unit digest approved"
+  ]
+}

@@ -1,0 +1,169 @@
+{
+  "schema": "tw-quant-engine-stage-acceptance/v1",
+  "stage_id": "K6b",
+  "package_id": "tw-quant-engine-k6b-taifex-tx-202608-001",
+  "status": "pass",
+  "capture_method": "one allowlisted live TAIFEX EOD GET with in-memory record-replay plus offline pipeline gates",
+  "captured_at": "2026-07-16T10:37:49Z",
+  "approval": {
+    "approved": true,
+    "approved_by": "JY",
+    "execution_boundary": "docs/kline-analysis-k6b-slice-plan.md",
+    "network_enabled_for_ingestion_only": true,
+    "provider_calls": false,
+    "external_hosts": ["openapi.taifex.com.tw"]
+  },
+  "admission_policy": {
+    "source_id": "taifex_daily_fut",
+    "endpoint": "https://openapi.taifex.com.tw/v1/DailyMarketReportFut",
+    "expected_date_assertion": "--trading-date YYYY-MM-DD must equal response Date; no historical backfill",
+    "contract": "TX",
+    "contract_month": "202608",
+    "excluded_contracts": ["non-TX", "spread", "other outright months", "weekly", "options"],
+    "session": "TradingSession 一般 only; 盤後 excluded",
+    "settlement_zero": "fail-close with settlement_zero",
+    "available_at": "trading_date T at 15:00:00 Asia/Taipei",
+    "retrieved_at_substitution": false,
+    "expiry": null,
+    "expiry_reason": "expiry_not_in_source",
+    "asset_class": "future"
+  },
+  "ingestion_gate": {
+    "network": true,
+    "writes_repo": true,
+    "network_requests": 1,
+    "source": {
+      "source_id": "taifex_daily_fut",
+      "trading_date": "2026-07-15",
+      "contract": "TX",
+      "contract_month": "202608",
+      "endpoint": "https://openapi.taifex.com.tw/v1/DailyMarketReportFut",
+      "host_allowlist": {
+        "expected_host": "openapi.taifex.com.tw",
+        "observed_host": "openapi.taifex.com.tw",
+        "https": true,
+        "host": true,
+        "path": true,
+        "redirects": true,
+        "pass": true
+      },
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "response_bytes": 875537,
+      "content_digest": "sha256:690732ae6ef676d7a6ec6a2b77c5fd03a63ae3dec6911489721bd5873108487c",
+      "snapshot": {
+        "path": "tests/fixtures/k6b/taifex_daily_fut-TX-202608-2026-07-15.json.gz",
+        "file_digest": "sha256:02b2b2a53c89b472adc04f6d56659e7e2e3021c1a19c7b7054e2d4511d71eaa0",
+        "snapshot_digest": "sha256:4482b91a94d30ce5e6389beace4fd6c4d03f4008217ced5fec02b09c2cd93c5b",
+        "bars_digest": "sha256:9564b6a3fb4bfdf9dc34bfbbfcbaf081ab0b011e56f9aedf7514795fd51dcf95"
+      },
+      "row_counts": {
+        "raw": 2309,
+        "admitted": 1,
+        "unadmitted": 2308,
+        "excluded_by_reason": {
+          "excluded_other_contract": 2291,
+          "excluded_other_contract_month": 10,
+          "excluded_after_hours": 1,
+          "excluded_spread": 6
+        },
+        "category_counts": {
+          "tx_rows": 18,
+          "target_contract_month_rows": 2,
+          "tx_regular_rows": 11,
+          "tx_after_hours_rows": 7,
+          "target_regular_rows": 1,
+          "target_after_hours_rows": 1,
+          "spread_rows": 6,
+          "other_contract_month_rows": 10,
+          "other_contract_rows": 2291,
+          "settlement_zero_rows": 1,
+          "settlement_zero_target_contract_month_rows": 0,
+          "admitted_regular_rows": 1
+        }
+      },
+      "contract_metadata": {
+        "asset_class": "future",
+        "contract_month": "202608",
+        "expiry": null,
+        "reason_codes": ["expiry_not_in_source"],
+        "session": "regular",
+        "settlement_price": 46066
+      },
+      "record_replay": {
+        "same_raw_response": true,
+        "same_bars": true,
+        "raw_content_digest_first": "sha256:690732ae6ef676d7a6ec6a2b77c5fd03a63ae3dec6911489721bd5873108487c",
+        "raw_content_digest_replay": "sha256:690732ae6ef676d7a6ec6a2b77c5fd03a63ae3dec6911489721bd5873108487c",
+        "bars_digest_first": "sha256:2d40fe0dcbab3ef9bcb2d65b6a8b3b148b8483f4b98d61b1a8fded5d1aea77ca",
+        "bars_digest_replay": "sha256:2d40fe0dcbab3ef9bcb2d65b6a8b3b148b8483f4b98d61b1a8fded5d1aea77ca"
+      }
+    }
+  },
+  "pipeline_gate": {
+    "network": false,
+    "writes_repo": false,
+    "external_requests": [],
+    "commands": [
+      {
+        "id": "full-tests",
+        "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
+        "exit_code": 0,
+        "tests_run": 109,
+        "skipped": 1,
+        "status": "pass"
+      },
+      {
+        "id": "preflight",
+        "argv": ["python3", "scripts/lh_preflight.py"],
+        "exit_code": 0,
+        "status": "pass",
+        "writes_repo": false,
+        "external_requests": []
+      },
+      {
+        "id": "dashboard-preview",
+        "argv": ["python3", "scripts/run_dashboard_preview.py"],
+        "exit_code": 0,
+        "status": "pass",
+        "writes_repo": false,
+        "external_requests": [],
+        "view_digest": "sha256:8ddd07b6ffb37ef3c713150a6d8d6d17c49ea98b3da22ced40045f95a91932ad"
+      },
+      {
+        "id": "browser-smoke",
+        "argv": ["npm", "run", "dashboard:browser-smoke"],
+        "exit_code": 0,
+        "status": "pass",
+        "browser_errors": [],
+        "external_requests": [],
+        "screenshots_match_expected": true,
+        "screenshots": {
+          "overview": "0fc465a82f39230a1622dfbf3b682958272f55285c85453e9dfdb194cc5905e5",
+          "market_valid": "ee33871a441d14a8f2137a594ced3bb59496dbdff56d2102bedf635c86842e17",
+          "market_partial": "35ad0b0b5dc948351516cf05d76966a84a6c522699090113d02b75791c80d83c",
+          "market_unsupported": "f47fa1f5e4b2e1a95f6a4195bc62aaddd2b00442a363756d3be5a5e1d6d9efb0",
+          "market_empty": "ce989a5d0377e53fdaf2962d96effc970c5ea8b2bb136579caf81818870e6c88",
+          "products": "dc56e3076eb935351637e2ba15f5b72bd9093115c8159c1f45627f2bf74d3d30",
+          "detail_dialog": "b3bb501735400c6c893a3915121ca2e84bbf671f4c694edc71216724256291db"
+        },
+        "expected_screenshots": {
+          "overview": "0fc465a82f39230a1622dfbf3b682958272f55285c85453e9dfdb194cc5905e5",
+          "market_valid": "ee33871a441d14a8f2137a594ced3bb59496dbdff56d2102bedf635c86842e17",
+          "market_partial": "35ad0b0b5dc948351516cf05d76966a84a6c522699090113d02b75791c80d83c",
+          "market_unsupported": "f47fa1f5e4b2e1a95f6a4195bc62aaddd2b00442a363756d3be5a5e1d6d9efb0",
+          "market_empty": "ce989a5d0377e53fdaf2962d96effc970c5ea8b2bb136579caf81818870e6c88",
+          "products": "dc56e3076eb935351637e2ba15f5b72bd9093115c8159c1f45627f2bf74d3d30",
+          "detail_dialog": "b3bb501735400c6c893a3915121ca2e84bbf671f4c694edc71216724256291db"
+        }
+      }
+    ]
+  },
+  "acceptance_notes": [
+    "Only TX:202608 outright regular-session data is admitted; no continuous contract or roll logic exists.",
+    "Expiry remains null with expiry_not_in_source; no second expiry source or third-Wednesday inference is used.",
+    "SettlementPrice 0, NULL, -, and invalid OHLCV/settlement values fail closed.",
+    "K6b snapshot is gzip and committed under tests/fixtures/k6b for network=false replay.",
+    "K6b does not authorize other TAIFEX products, options, US equities, financial reports, realtime, trading, dashboard routes, or packaging."
+  ]
+}

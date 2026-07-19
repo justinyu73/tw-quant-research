@@ -1,0 +1,16 @@
+[project]
+name = "tw-quant-engine"
+version = "0.1.0"
+description = "Research and backtesting engine for Taiwan stock quantitative strategies"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+qlib = [
+    "pyqlib==0.9.7",
+]
+
+[tool.tw-quant-engine]
+phase = "s1-qlib-integration"
+mode = "research-only"
+driver = "loop-hybrid"

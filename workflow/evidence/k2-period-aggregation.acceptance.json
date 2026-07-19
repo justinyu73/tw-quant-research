@@ -1,0 +1,88 @@
+{
+  "schema": "tw-quant-engine-k2-k5-loop-evidence/v1",
+  "package_id": "tw-quant-engine-k2-k5-kline-analysis-001",
+  "stage_id": "K2",
+  "goal_id": "k2-deterministic-period-aggregation",
+  "attempt": 1,
+  "status": "pass",
+  "captured_at": "2026-07-15T16:54:28Z",
+  "contract_checks": {
+    "declared_commands_pass": true,
+    "network_observed": false,
+    "write_observed": false
+  },
+  "commands": [
+    {
+      "id": "k2-tests",
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "tests.test_k2_period_aggregation",
+        "-v"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_digest": "sha256:50f734ae5b898d912c9220ab7e362c8863641c1a3b573ef853ad96dde0f30b4a",
+      "network_observed": false,
+      "write_observed": false
+    },
+    {
+      "id": "full-tests",
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:ef208447a0c7cf9833d8533a96826d916af7952e64dfbdef95da173dee1932b9",
+      "network_observed": false,
+      "write_observed": false
+    },
+    {
+      "id": "preflight",
+      "argv": [
+        "/usr/bin/python3",
+        "scripts/lh_preflight.py"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "network_observed": false,
+      "write_observed": false
+    }
+  ],
+  "evidence_files": [
+    "workflow/evidence/k2-period-aggregation.acceptance.json"
+  ],
+  "changed_files": [
+    "docs/k2-k5-approval-package.md",
+    "docs/kline-analysis-requirements-review.md",
+    "docs/kline-analysis-slice-plan.md",
+    "scripts/run_kline_acceptance.py",
+    "src/tw_quant_engine/kline_aggregation.py",
+    "src/tw_quant_engine/kline_contract.py",
+    "tests/fixtures/k1/",
+    "tests/test_k1_kline_contract.py",
+    "tests/test_k2_period_aggregation.py",
+    "workflow/README.md",
+    "workflow/k2-k5-approval-package.json"
+  ],
+  "failure_budget": {
+    "max_consecutive_failed_real_acceptance_attempts": 3,
+    "consecutive_failure_count": 0
+  },
+  "stage_gate": {
+    "mechanical_pass": true,
+    "evidence_complete": true,
+    "auto_advanced_to": "K3",
+    "stop_trigger": null
+  }
+}

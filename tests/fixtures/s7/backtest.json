@@ -1,0 +1,21 @@
+{
+  "schema": "tw-quant-engine-s7-backtest-fixture/v1",
+  "as_of": "2026-01-07T23:59:59Z",
+  "provenance": [
+    {"source_id":"synthetic-s7","snapshot_id":"s7-bar-1","retrieved_at":"2026-01-02T15:00:00Z","content_digest":"sha256:1111111111111111111111111111111111111111111111111111111111111111","schema_version":"s7-fixture/v1","license_ref":"https://data.gov.tw/license"},
+    {"source_id":"synthetic-s7","snapshot_id":"s7-bar-2","retrieved_at":"2026-01-05T15:00:00Z","content_digest":"sha256:2222222222222222222222222222222222222222222222222222222222222222","schema_version":"s7-fixture/v1","license_ref":"https://data.gov.tw/license"},
+    {"source_id":"synthetic-s7","snapshot_id":"s7-bar-3","retrieved_at":"2026-01-06T15:00:00Z","content_digest":"sha256:3333333333333333333333333333333333333333333333333333333333333333","schema_version":"s7-fixture/v1","license_ref":"https://data.gov.tw/license"},
+    {"source_id":"synthetic-s7","snapshot_id":"s7-bar-4","retrieved_at":"2026-01-07T15:00:00Z","content_digest":"sha256:4444444444444444444444444444444444444444444444444444444444444444","schema_version":"s7-fixture/v1","license_ref":"https://data.gov.tw/license"}
+  ],
+  "records": [
+    {"record_type":"price_bar","security_id":"2330","trading_date":"2026-01-02","open":100,"high":101,"low":99,"close":100,"volume":1000,"currency":"TWD","available_at":"2026-01-02T14:00:00+08:00","source_ref":"synthetic://s7/price","snapshot_id":"s7-bar-1"},
+    {"record_type":"price_bar","security_id":"2330","trading_date":"2026-01-05","open":100,"high":111,"low":99,"close":110,"volume":1100,"currency":"TWD","available_at":"2026-01-05T14:00:00+08:00","source_ref":"synthetic://s7/price","snapshot_id":"s7-bar-2"},
+    {"record_type":"price_bar","security_id":"2330","trading_date":"2026-01-06","open":120,"high":121,"low":119,"close":120,"volume":1200,"currency":"TWD","available_at":"2026-01-06T14:00:00+08:00","source_ref":"synthetic://s7/price","snapshot_id":"s7-bar-3"},
+    {"record_type":"price_bar","security_id":"2330","trading_date":"2026-01-07","open":120,"high":121,"low":119,"close":120,"volume":1200,"currency":"TWD","available_at":"2026-01-07T14:00:00+08:00","source_ref":"synthetic://s7/price","snapshot_id":"s7-bar-4"}
+  ],
+  "signals": [
+    {"signal_date":"2026-01-02","target_position":1,"available_at":"2026-01-02T14:30:00+08:00","status":"admitted","snapshot_id":"s7-signal-1"},
+    {"signal_date":"2026-01-05","target_position":0,"available_at":"2026-01-05T14:30:00+08:00","status":"admitted","snapshot_id":"s7-signal-2"}
+  ],
+  "config": {"initial_cash":1000,"transaction_cost_bps":0,"slippage_bps":0,"calendar_days_per_year":365}
+}

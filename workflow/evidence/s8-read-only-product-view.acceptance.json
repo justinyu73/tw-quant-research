@@ -1,0 +1,116 @@
+{
+  "schema": "tw-quant-engine-stage-acceptance/v1",
+  "stage_id": "S8",
+  "package_id": "tw-quant-engine-s5-s9-research-product-chain-001",
+  "status": "pass",
+  "capture_method": "offline generated S4-S7 read-model fixture plus subprocess verification",
+  "captured_at": "2026-07-15T14:24:19Z",
+  "approval": {
+    "approved": true,
+    "approved_by": "user",
+    "execution_boundary": "workflow/s5-s9-approval-package.json",
+    "network_enabled": false,
+    "network_requests": 0,
+    "finmind_used": false
+  },
+  "network_policy": {
+    "enabled": false,
+    "observed_network_calls": 0,
+    "fixture_only": true
+  },
+  "view_contract": {
+    "schema": "tw-quant-engine-read-only-product-view/v1",
+    "as_of": "2026-01-07T23:59:59Z",
+    "read_only": true,
+    "view_digest": "sha256:8ddd07b6ffb37ef3c713150a6d8d6d17c49ea98b3da22ced40045f95a91932ad",
+    "numeric_field_registry": {
+      "products": [
+        "bar.open",
+        "bar.high",
+        "bar.low",
+        "bar.close_raw",
+        "bar.volume_shares",
+        "bar.daily_return_1d",
+        "fundamental.monthly_revenue",
+        "fundamental.revenue_mom",
+        "fundamental.revenue_yoy"
+      ],
+      "features": [
+        "features.<name>.value"
+      ],
+      "backtest": [
+        "equity_curve.equity",
+        "metrics.cumulative_return",
+        "metrics.annualized_return",
+        "metrics.max_drawdown",
+        "metrics.turnover",
+        "metrics.trade_count"
+      ]
+    }
+  },
+  "formula_checks": {
+    "read_only_flag": true,
+    "future_product_hidden": true,
+    "future_feature_hidden": true,
+    "quality_states_visible": true,
+    "conflict_reason_visible": true,
+    "formula_versions_visible": true,
+    "provenance_and_evidence_visible": true,
+    "backtest_result_preserved": true,
+    "route_boundary": true,
+    "empty_state_deterministic": true
+  },
+  "offline_probe": {
+    "status": "pass",
+    "network_requests": 0
+  },
+  "offline_verification": {
+    "tests": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:07d2b0f72f937455262032889bf909f07220ace0ceee33e46dcca9ff6e1ccf1e"
+    },
+    "preflight": {
+      "argv": [
+        "/usr/bin/python3",
+        "scripts/lh_preflight.py"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "parsed": {
+        "driver": "loop-hybrid",
+        "engine_id": "tw-quant-engine",
+        "errors": [],
+        "phase": "s1_qlib_integration",
+        "schema": "tw-quant-engine-preflight/v1",
+        "status": "pass",
+        "writes_repo": false
+      }
+    }
+  },
+  "changed_files": [
+    "src/tw_quant_engine/product_view.py",
+    "docs/s8-read-only-product-view.md",
+    "tests/fixtures/s8/product-view.json",
+    "tests/test_s8_product_view.py",
+    "workflow/lh-work-unit.s8.example.json",
+    "scripts/run_s8_acceptance.py",
+    "workflow/evidence/s8-read-only-product-view.acceptance.json"
+  ],
+  "acceptance_notes": [
+    "S8 consumes S4-S7 read models and does not add financial formulas.",
+    "Future rows are hidden by both trading/period date and available-at/as-of state; incomplete quality states remain inspectable.",
+    "The route dispatcher is in-memory and GET-only; no server, provider, cloud deployment, or trading path is included."
+  ]
+}

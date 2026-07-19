@@ -1,0 +1,139 @@
+schema: tw-quant-engine-product-alignment/v1
+formula_version: s4-v1
+scope: offline-source-to-product-read-model
+units:
+  price: TWD_per_share
+  volume: shares
+  return: ratio
+  percentage: ratio
+  currency: TWD
+  revenue: source_declared_unit_required
+quality_states:
+  - admitted
+  - unadmitted
+  - conflict
+  - invalid
+fields:
+  - id: instrument.security_id
+    type: string
+    source: canonical.security_id
+    required: true
+  - id: instrument.market
+    type: enum
+    values: [TWSE, TPEX]
+    source: source_registry.market
+    required: true
+  - id: bar.trading_date
+    type: date
+    source: canonical.price_bar.trading_date
+    required: true
+  - id: bar.open
+    type: number
+    unit: TWD_per_share
+    source: canonical.price_bar.open
+    required: true
+  - id: bar.high
+    type: number
+    unit: TWD_per_share
+    source: canonical.price_bar.high
+    required: true
+  - id: bar.low
+    type: number
+    unit: TWD_per_share
+    source: canonical.price_bar.low
+    required: true
+  - id: bar.close_raw
+    type: number
+    unit: TWD_per_share
+    source: canonical.price_bar.close
+    required: true
+  - id: bar.volume_shares
+    type: number
+    unit: shares
+    source: canonical.price_bar.volume
+    required: true
+  - id: bar.daily_return_1d
+    type: number
+    unit: ratio
+    formula: close_raw_t / close_raw_t_minus_1 - 1
+    required: false
+  - id: fundamental.monthly_revenue
+    type: number
+    unit: source_declared_unit_required
+    source: canonical.fundamental_observation.value
+    required: false
+  - id: fundamental.revenue_mom
+    type: number
+    unit: ratio
+    formula: revenue_period / revenue_previous_calendar_month - 1
+    required: false
+  - id: fundamental.revenue_yoy
+    type: number
+    unit: ratio
+    formula: revenue_period / revenue_same_calendar_month_previous_year - 1
+    required: false
+  - id: quality.admission_status
+    type: enum
+    source: admission_predicate
+    required: true
+  - id: provenance.source_id
+    type: string
+    source: snapshot.source_id
+    required: true
+  - id: provenance.endpoint
+    type: string
+    source: source_capture.endpoint
+    required: true
+  - id: provenance.snapshot_id
+    type: string
+    source: canonical.snapshot_id
+    required: true
+  - id: provenance.content_digest
+    type: string
+    source: snapshot.content_digest
+    required: true
+  - id: provenance.available_at
+    type: timestamp
+    source: canonical.available_at
+    required: false
+    rule: missing_source_publication_time_keeps_row_unadmitted
+mapping_rules:
+  twse_daily:
+    Code: instrument.security_id
+    Date: bar.trading_date
+    OpeningPrice: bar.open
+    HighestPrice: bar.high
+    LowestPrice: bar.low
+    ClosingPrice: bar.close_raw
+    TradeVolume: bar.volume_shares
+  tpex_daily:
+    SecuritiesCompanyCode: instrument.security_id
+    Date: bar.trading_date
+    Open: bar.open
+    High: bar.high
+    Low: bar.low
+    Close: bar.close_raw
+    TradingShares: bar.volume_shares
+  twse_monthly_revenue:
+    公司代號: instrument.security_id
+    資料年月: fundamental.period_end
+    營業收入-當月營收: fundamental.monthly_revenue
+    出表日期: provenance.source_published_date_candidate
+  tpex_monthly_revenue:
+    公司代號: instrument.security_id
+    資料年月: fundamental.period_end
+    營業收入-當月營收: fundamental.monthly_revenue
+    出表日期: provenance.source_published_date_candidate
+formula_rules:
+  - id: daily_return_1d
+    expression: close_raw_t / close_raw_t_minus_1 - 1
+    guard: prior_close_exists_and_nonzero_and_both_rows_admitted
+  - id: revenue_mom
+    expression: revenue_period / revenue_previous_calendar_month - 1
+    guard: exact_previous_calendar_month_exists_and_nonzero
+  - id: revenue_yoy
+    expression: revenue_period / revenue_same_calendar_month_previous_year - 1
+    guard: exact_same_calendar_month_previous_year_exists_and_nonzero
+  - id: admission_status
+    expression: http_200_and_schema_valid_and_required_fields_present_and_explicit_available_at_and_provenance_valid
+    guard: otherwise_unadmitted_or_invalid

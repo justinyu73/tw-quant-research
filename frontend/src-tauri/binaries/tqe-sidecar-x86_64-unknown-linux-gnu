@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+ROOT=""
+for CANDIDATE in "$SCRIPT_DIR/../../.." "$SCRIPT_DIR/../../../.."; do
+  CANDIDATE=$(CDPATH= cd -- "$CANDIDATE" && pwd)
+  if [ -f "$CANDIDATE/scripts/tqe_sidecar.py" ]; then
+    ROOT=$CANDIDATE
+    break
+  fi
+done
+if [ -z "$ROOT" ]; then
+  echo "unable to locate tw-quant-engine repo root" >&2
+  exit 2
+fi
+exec python3 "$ROOT/scripts/tqe_sidecar.py" "$@"

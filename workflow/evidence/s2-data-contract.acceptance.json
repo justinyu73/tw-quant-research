@@ -1,0 +1,84 @@
+{
+  "schema": "tw-quant-engine-stage-acceptance/v1",
+  "goal_id": "tw-quant-engine-q1-s1-s9",
+  "stage_id": "S2",
+  "status": "pass",
+  "captured_at": "2026-07-15T21:13:41+08:00",
+  "capture_method": "live subprocess capture and evidence re-verification",
+  "work_unit_id": "tw-quant-engine-s2-data-contract-001",
+  "network_used": false,
+  "provider_initialized": false,
+  "real_market_data": false,
+  "commands": [
+    {
+      "id": "dependency-free-tests",
+      "argv": ["/usr/bin/python3", "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stdout_bytes": 186,
+      "stderr_bytes": 1501,
+      "stderr_digest_normalized": "sha256:81a4b5cfd7aeb40f176984dc9b967bc7f129d9292bfd24a5bd618428c86137a3",
+      "stderr_normalization": "replace 'Ran <N> tests in <seconds>s' with 'Ran N tests in <duration>s'"
+    },
+    {
+      "id": "qlib-enabled-tests",
+      "argv": ["/tmp/tw-quant-engine-s1-venv/bin/python", "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stdout_bytes": 186,
+      "stderr_bytes": 3152,
+      "stderr_digest_normalized": "sha256:860b1490a3619113a6c2d475e34f734d15a7e1ca9c26d4e01ba634a57d6e2576",
+      "stderr_normalization": "replace 'Ran <N> tests in <seconds>s' with 'Ran N tests in <duration>s'"
+    },
+    {
+      "id": "engine-preflight",
+      "argv": ["/usr/bin/python3", "scripts/lh_preflight.py"],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stdout_bytes": 186,
+      "stderr_bytes": 0,
+      "stderr_digest_normalized": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": {
+        "schema": "tw-quant-engine-preflight/v1",
+        "status": "pass",
+        "engine_id": "tw-quant-engine",
+        "phase": "s1_qlib_integration",
+        "driver": "loop-hybrid",
+        "writes_repo": false,
+        "errors": []
+      }
+    }
+  ],
+  "tests": {
+    "dependency_free": {
+      "total": 11,
+      "passed": 10,
+      "failed": 0,
+      "skipped": 1
+    },
+    "qlib_enabled": {
+      "total": 11,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "fixture_digest": "sha256:adc14a20831067ad5d853541ddb116053bc4f277676070330cdfdbafaaf71510",
+  "checks": {
+    "engine_preflight": "pass",
+    "git_diff_check": "pass",
+    "json_parse": "pass"
+  },
+  "constraints_verified": [
+    "synthetic fixture only",
+    "no provider initialization",
+    "no network data fetch",
+    "point-in-time visibility",
+    "restatement replay",
+    "duplicate rejection",
+    "timezone rejection",
+    "explicit corporate action"
+  ],
+  "stop_reason": null,
+  "next_route": "human_stage_review"
+}

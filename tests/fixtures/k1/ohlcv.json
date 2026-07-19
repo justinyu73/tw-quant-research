@@ -1,0 +1,97 @@
+{
+  "schema": "tw-quant-engine-kline-fixture/v1",
+  "as_of": "2026-07-15T23:59:59Z",
+  "ingested_at": "2026-07-16T00:05:00Z",
+  "provenance": {
+    "source": "offline-fixture",
+    "fixture_id": "k1-ohlcv-v1",
+    "network": false,
+    "provider_calls": false
+  },
+  "datasets": [
+    {
+      "dataset_id": "twse-2330-valid",
+      "case": "valid",
+      "instrument": {
+        "instrument_id": "TWSE:2330",
+        "market": "TWSE",
+        "symbol": "2330",
+        "display_name": "台積電",
+        "asset_class": "equity",
+        "currency": "TWD",
+        "contract_month": null,
+        "expiry": null
+      },
+      "periods_available": ["1D", "1W"],
+      "unsupported_periods": [],
+      "adjustment_policy": "unadjusted",
+      "quality": {"status": "valid", "reason_codes": []},
+      "bars": [
+        {"trading_date": "2026-07-13", "bar_time": "2026-07-13T13:30:00+08:00", "timezone": "Asia/Taipei", "session": "regular", "available_at": "2026-07-13T18:00:00+08:00", "open": 1080, "high": 1110, "low": 1075, "close": 1105, "volume": 12000000},
+        {"trading_date": "2026-07-14", "bar_time": "2026-07-14T13:30:00+08:00", "timezone": "Asia/Taipei", "session": "regular", "available_at": "2026-07-14T18:00:00+08:00", "open": 1108, "high": 1120, "low": 1090, "close": 1098, "volume": 9800000},
+        {"trading_date": "2026-07-15", "bar_time": "2026-07-15T13:30:00+08:00", "timezone": "Asia/Taipei", "session": "regular", "available_at": "2026-07-15T18:00:00+08:00", "open": 1095, "high": 1130, "low": 1092, "close": 1125, "volume": 13500000}
+      ]
+    },
+    {
+      "dataset_id": "us-aapl-partial",
+      "case": "partial",
+      "instrument": {
+        "instrument_id": "US:NASDAQ:AAPL",
+        "market": "US",
+        "symbol": "AAPL",
+        "display_name": "Apple Inc.",
+        "asset_class": "equity",
+        "currency": "USD",
+        "contract_month": null,
+        "expiry": null
+      },
+      "periods_available": ["1D"],
+      "unsupported_periods": [],
+      "adjustment_policy": "unadjusted",
+      "quality": {"status": "partial", "reason_codes": ["missing_session"]},
+      "bars": [
+        {"trading_date": "2026-07-14", "bar_time": "2026-07-14T16:00:00-04:00", "timezone": "America/New_York", "session": "regular", "available_at": "2026-07-14T20:30:00Z", "open": 212.1, "high": 214.4, "low": 211.6, "close": 213.8, "volume": 45600000}
+      ]
+    },
+    {
+      "dataset_id": "taifex-tx-202610-empty",
+      "case": "empty",
+      "instrument": {
+        "instrument_id": "TAIFEX:TX:202610",
+        "market": "TAIFEX",
+        "symbol": "TX",
+        "display_name": "臺指期貨 2026-10",
+        "asset_class": "futures",
+        "currency": "TWD",
+        "contract_month": "202610",
+        "expiry": "2026-10-21"
+      },
+      "periods_available": [],
+      "unsupported_periods": ["1D", "1W", "M", "Q"],
+      "adjustment_policy": "unadjusted",
+      "quality": {"status": "unavailable", "reason_codes": ["no_data"]},
+      "bars": []
+    },
+    {
+      "dataset_id": "taifex-tx-202609-unsupported",
+      "case": "unsupported",
+      "instrument": {
+        "instrument_id": "TAIFEX:TX:202609",
+        "market": "TAIFEX",
+        "symbol": "TX",
+        "display_name": "臺指期貨 2026-09",
+        "asset_class": "futures",
+        "currency": "TWD",
+        "contract_month": "202609",
+        "expiry": "2026-09-16"
+      },
+      "periods_available": ["1D", "1W"],
+      "unsupported_periods": ["M", "Q"],
+      "adjustment_policy": "unadjusted",
+      "quality": {"status": "valid", "reason_codes": []},
+      "bars": [
+        {"trading_date": "2026-07-15", "bar_time": "2026-07-15T15:00:00+08:00", "timezone": "Asia/Taipei", "session": "regular", "available_at": "2026-07-15T16:00:00+08:00", "open": 22450, "high": 22610, "low": 22380, "close": 22590, "volume": 82000}
+      ]
+    }
+  ]
+}

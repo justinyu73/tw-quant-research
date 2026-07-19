@@ -1,0 +1,38 @@
+{
+  "schema": "loop-hybrid-work-unit/v1",
+  "work_unit_id": "tw-quant-engine-s2-data-contract-001",
+  "target_repo": "/absolute/path/to/tw-quant-engine",
+  "goal": "Build and test the canonical point-in-time data contract using synthetic fixtures only.",
+  "network": false,
+  "provider_initialized": false,
+  "real_market_data": false,
+  "verification": [
+    {
+      "id": "unit-tests",
+      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
+      "timeout_seconds": 120,
+      "read_only": false
+    },
+    {
+      "id": "engine-preflight",
+      "argv": ["python3", "scripts/lh_preflight.py"],
+      "timeout_seconds": 60,
+      "read_only": true
+    },
+    {
+      "id": "diff-check",
+      "argv": ["git", "diff", "--check"],
+      "timeout_seconds": 60,
+      "read_only": true
+    }
+  ],
+  "max_attempts": 1,
+  "cannot_claim": [
+    "Taiwan data source approved",
+    "S3 implementation approved",
+    "Qlib provider approved",
+    "backtest validity",
+    "investment performance",
+    "product acceptance"
+  ]
+}

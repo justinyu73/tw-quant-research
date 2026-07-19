@@ -1,0 +1,75 @@
+{
+  "schema": "tw-quant-engine-stage-acceptance/v1",
+  "stage_id": "S5",
+  "package_id": "tw-quant-engine-s5-s9-research-product-chain-001",
+  "status": "pass",
+  "capture_method": "offline corporate-action fixture plus subprocess verification",
+  "captured_at": "2026-07-15T14:10:29Z",
+  "approval": {
+    "approved": true,
+    "approved_by": "user",
+    "execution_boundary": "workflow/s5-s9-approval-package.json",
+    "network_enabled": false,
+    "network_requests": 0,
+    "finmind_used": false
+  },
+  "network_policy": {
+    "enabled": false,
+    "observed_network_calls": 0,
+    "fixture_only": true
+  },
+  "quality_report": {
+    "status": "pass",
+    "record_count": 3,
+    "issue_count": 0,
+    "issue_counts": {}
+  },
+  "corporate_action_contract": {
+    "convention": "price_multiplier_after_ex_date",
+    "raw_close": 100.0,
+    "adjustment_factor": 0.5,
+    "adjusted_close": 50.0,
+    "pre_action_visible": false,
+    "post_action_visible": true
+  },
+  "offline_verification": {
+    "tests": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:1803974ec028469df7dea374a42feb27562e70d54168d12acf23486ba07649c2"
+    },
+    "preflight": {
+      "argv": [
+        "/usr/bin/python3",
+        "scripts/lh_preflight.py"
+      ],
+      "exit_code": 0,
+      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "parsed": {
+        "driver": "loop-hybrid",
+        "engine_id": "tw-quant-engine",
+        "errors": [],
+        "phase": "s1_qlib_integration",
+        "schema": "tw-quant-engine-preflight/v1",
+        "status": "pass",
+        "writes_repo": false
+      }
+    }
+  },
+  "acceptance_notes": [
+    "Corporate actions remain explicit records and are not applied by mutating raw OHLCV.",
+    "Unknown factor direction is fail-closed; this fixture admits only price_multiplier_after_ex_date.",
+    "S5 does not approve S6, S7, S8, or S9 implementation until this evidence is reviewed by the stage loop."
+  ]
+}
