@@ -44,9 +44,9 @@ jobs:
         include:
           - os: windows-2022
             target: x86_64-pc-windows-msvc
-          - os: macos-13
+          - os: macos-15-intel
             target: x86_64-apple-darwin
-          - os: macos-14
+          - os: macos-15
             target: aarch64-apple-darwin
     runs-on: ${{ matrix.os }}
     steps:
@@ -67,6 +67,9 @@ jobs:
         working-directory: frontend
       - name: Build target-specific offline sidecar
         run: python scripts/build_tqe_sidecar.py --target "${{ matrix.target }}"
+      - name: Prepare Windows icon resource
+        if: runner.os == 'Windows'
+        run: python scripts/ensure_tauri_icon.py
       - name: Build Tauri bundle
         run: npm run tauri:build -- --target "${{ matrix.target }}"
         working-directory: frontend

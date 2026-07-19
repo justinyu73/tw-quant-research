@@ -17,6 +17,7 @@ frontend/src-tauri/binaries/tqe-sidecar-*.exe
 frontend/src-tauri/binaries/tqe-sidecar-x86_64-apple-darwin
 frontend/src-tauri/binaries/tqe-sidecar-aarch64-apple-darwin
 frontend/src-tauri/gen/
+frontend/src-tauri/icons/icon.ico
 data/raw/
 data/private/
 *.sqlite3
