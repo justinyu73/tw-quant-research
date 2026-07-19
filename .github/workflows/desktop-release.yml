@@ -67,8 +67,7 @@ jobs:
         working-directory: frontend
       - name: Build target-specific offline sidecar
         run: python scripts/build_tqe_sidecar.py --target "${{ matrix.target }}"
-      - name: Prepare Windows icon resource
-        if: runner.os == 'Windows'
+      - name: Prepare generated icon resources
         run: python scripts/ensure_tauri_icon.py
       - name: Build Tauri bundle
         run: npm run tauri:build -- --target "${{ matrix.target }}"

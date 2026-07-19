@@ -1,6 +1,6 @@
 [package]
 name = "tw-quant-engine-desktop"
-version = "0.1.3"
+version = "0.1.4"
 description = "TW Quant Research desktop shell"
 authors = ["TW Quant Engine contributors"]
 edition = "2021"
