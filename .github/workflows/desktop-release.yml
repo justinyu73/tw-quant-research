@@ -76,3 +76,61 @@ jobs:
           name: tw-quant-research-${{ matrix.target }}
           if-no-files-found: error
           path: frontend/src-tauri/target/${{ matrix.target }}/release/bundle/**
+
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [audit, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify tag matches desktop version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          APP_VERSION=$(python3 -c 'import json; print(json.load(open("frontend/src-tauri/tauri.conf.json"))["version"])')
+          test "${RELEASE_TAG}" = "v${APP_VERSION}"
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tw-quant-research-*
+          path: release-assets
+          merge-multiple: false
+      - name: Prepare draft release notes
+        run: |
+          cat > release-notes.md <<'EOF'
+          ## TW Quant Research ${{ github.ref_name }}
+
+          This is a read-only Taiwan stock research desktop app. It uses free,
+          bounded local fixtures and does not provide live feeds, order routes,
+          or automatic execution.
+
+          Download the installer matching your platform:
+
+          - Windows x64: `.msi` or `.exe`
+          - macOS Intel: `x86_64-apple-darwin`
+          - macOS Apple Silicon: `aarch64-apple-darwin`
+
+          The release is created as a draft so a human can complete the Windows
+          and macOS install/launch checks before publishing it.
+          EOF
+      - name: Generate SHA-256 checksums
+        run: |
+          (
+            cd release-assets
+            while IFS= read -r -d '' asset; do
+              hash=$(sha256sum "${asset}" | cut -d' ' -f1)
+              printf '%s  %s\n' "${hash}" "$(basename "${asset}")"
+            done < <(find . -type f ! -name SHA256SUMS.txt -print0 | sort -z)
+          ) | sort -k2,2 > release-assets/SHA256SUMS.txt
+      - name: Create draft GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mapfile -d '' ASSETS < <(find release-assets -type f -print0)
+          test "${#ASSETS[@]}" -gt 0
+          gh release create "${GITHUB_REF_NAME}" "${ASSETS[@]}" \
+            --draft \
+            --title "TW Quant Research ${GITHUB_REF_NAME}" \
+            --notes-file release-notes.md

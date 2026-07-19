@@ -13,6 +13,14 @@
 目前 Dashboard 已可由 Tauri 殼包成桌面 app；開源發布範圍與排除的設計製作
 紀錄見 [`docs/open-source-release-scope.md`](docs/open-source-release-scope.md)。
 
+## 下載桌面 APP
+
+桌面版下載頁：[`GitHub Releases`](https://github.com/justinyu73/tw-quant-research/releases/latest)。
+版本 tag 觸發 Windows x64、macOS Intel 與 macOS Apple Silicon 打包，先建立
+draft release，完成 Windows／macOS 人為安裝與啟動驗收後才公開發布。完整流程
+與 unsigned 版本的終端機下載、SHA-256 校驗、安裝指令見
+[`docs/desktop-release.md`](docs/desktop-release.md)。
+
 ## 與 LH 的關係
 
 Loop-Hybrid（LH）是外部驅動／編排載體，角色類似 Hermes driver platform：
@@ -68,7 +76,8 @@ python3 scripts/export_open_source_source.py
 
 Windows/macOS 桌面 build 由
 [`desktop-release.yml`](.github/workflows/desktop-release.yml) 以 target-specific
-sidecar 產生；公開 release 前仍須人為選定軟體授權並完成兩個平台的實機啟動驗收。
+sidecar 產生；公開 release 前仍須完成兩個平台的實機啟動驗收。尚未配置程式
+簽章與 macOS notarization，下載的 unsigned build 可能出現平台安全性提示。
 
 ## 目錄
 

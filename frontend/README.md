@@ -27,4 +27,6 @@ not replaced unless `--force-existing` is explicitly supplied.
 The Windows and macOS release matrix is defined in
 `.github/workflows/desktop-release.yml`. The app remains research-only:
 there is no provider call, live feed, broker route, order placement, or
-automatic execution.
+automatic execution. Version tags create a draft GitHub Release with the
+Windows installers, macOS disk images, and clean public source archive; see
+`docs/desktop-release.md` for the human install/launch gate.
