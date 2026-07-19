@@ -105,12 +105,33 @@ jobs:
           while IFS= read -r -d '' asset; do
             filename="$(basename "${asset}")"
             case "${filename}" in
-              *.msi|*-setup.exe|*.dmg|*.tar.gz)
-                relative="${asset#release-assets/}"
-                safe_name="${relative//\//__}"
-                cp "${asset}" "release-files/${safe_name}"
+              *.msi)
+                friendly_name="TQR-Windows-x64.msi"
+                ;;
+              *-setup.exe)
+                friendly_name="TQR-Windows-x64-setup.exe"
+                ;;
+              *_x64.dmg)
+                friendly_name="TQR-macOS-Intel.dmg"
+                ;;
+              *_aarch64.dmg)
+                friendly_name="TQR-macOS-Apple-Silicon.dmg"
+                ;;
+              *.tar.gz)
+                friendly_name="TQR-source.tar.gz"
+                ;;
+              *)
+                continue
                 ;;
             esac
+            if test -e "release-files/${friendly_name}"; then
+              echo "duplicate distributable asset name: ${friendly_name}" >&2
+              exit 1
+            fi
+            if test -n "${friendly_name}"; then
+                relative="${asset#release-assets/}"
+                cp "${asset}" "release-files/${friendly_name}"
+            fi
           done < <(find release-assets -type f -print0)
           test -n "$(find release-files -type f -print -quit)"
           mv release-assets release-assets-nested
@@ -126,9 +147,11 @@ jobs:
 
           Download the installer matching your platform:
 
-          - Windows x64: `.msi` or `.exe`
-          - macOS Intel: `x86_64-apple-darwin`
-          - macOS Apple Silicon: `aarch64-apple-darwin`
+          - Windows x64 MSI: `TQR-Windows-x64.msi`
+          - Windows x64 NSIS: `TQR-Windows-x64-setup.exe`
+          - macOS Intel: `TQR-macOS-Intel.dmg`
+          - macOS Apple Silicon: `TQR-macOS-Apple-Silicon.dmg`
+          - Source: `TQR-source.tar.gz`
 
           Release assets are limited to platform installers, the public source
           archive, and SHA-256 checksums. This release is unsigned; complete

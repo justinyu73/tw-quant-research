@@ -7,7 +7,7 @@ tag; the repository source remains the authority for the app and its evidence.
 ## Release flow
 
 1. Keep `frontend/src-tauri/tauri.conf.json` and the release tag on the same
-   version, for example `0.1.6` and `v0.1.6`.
+   version, for example `0.1.7` and `v0.1.7`.
 2. Push the version tag. `desktop-release.yml` runs the source audit, unit
    tests, deterministic preflight, and dashboard preview first.
 3. The build matrix creates target-specific sidecars and bundles for:
@@ -27,7 +27,7 @@ The download page is:
 ## Unsigned terminal download and install
 
 These commands assume the release has been published rather than left as a
-draft. Replace `v0.1.6` with the release tag you are installing. The release
+draft. Replace `v0.1.7` with the release tag you are installing. The release
 contains `SHA256SUMS.txt`; verify it before opening an unsigned installer.
 
 ### Prerequisites
@@ -48,10 +48,10 @@ gh auth login
 
 ```powershell
 $Repo = "justinyu73/tw-quant-research"
-$Release = "v0.1.6"
+$Release = "v0.1.7"
 $Download = Join-Path $env:USERPROFILE "Downloads\TQR-$Release"
 New-Item -ItemType Directory -Force $Download | Out-Null
-gh release download $Release --repo $Repo --pattern "*.msi" --pattern "SHA256SUMS.txt" --dir $Download
+gh release download $Release --repo $Repo --pattern "TQR-Windows-x64.msi" --pattern "SHA256SUMS.txt" --dir $Download
 
 $Installer = Get-ChildItem $Download -Filter *.msi | Select-Object -First 1
 $Expected = (Select-String -Path (Join-Path $Download "SHA256SUMS.txt") -Pattern ([regex]::Escape($Installer.Name) + '$')).Line.Split()[0]
@@ -65,7 +65,7 @@ Start-Process msiexec.exe -Verb RunAs -Wait -ArgumentList "/i `"$($Installer.Ful
 If the MSI is unavailable, download and launch the NSIS installer instead:
 
 ```powershell
-gh release download $Release --repo $Repo --pattern "*-setup.exe" --dir $Download
+gh release download $Release --repo $Repo --pattern "TQR-Windows-x64-setup.exe" --dir $Download
 $Installer = Get-ChildItem $Download -Filter *-setup.exe | Select-Object -First 1
 Unblock-File -Path $Installer.FullName
 Start-Process -FilePath $Installer.FullName -Verb RunAs -Wait
@@ -82,16 +82,16 @@ Mac:
 
 ```sh
 REPO="justinyu73/tw-quant-research"
-RELEASE="v0.1.6"
+RELEASE="v0.1.7"
 DOWNLOAD="$HOME/Downloads/tqr-$RELEASE"
 mkdir -p "$DOWNLOAD"
 cd "$DOWNLOAD"
 
 # Intel Mac:
-gh release download "$RELEASE" --repo "$REPO" --pattern '*_x64.dmg' --pattern 'SHA256SUMS.txt'
+gh release download "$RELEASE" --repo "$REPO" --pattern 'TQR-macOS-Intel.dmg' --pattern 'SHA256SUMS.txt'
 
 # Apple Silicon Mac: use this instead of the Intel command above.
-# gh release download "$RELEASE" --repo "$REPO" --pattern '*_aarch64.dmg' --pattern 'SHA256SUMS.txt'
+# gh release download "$RELEASE" --repo "$REPO" --pattern 'TQR-macOS-Apple-Silicon.dmg' --pattern 'SHA256SUMS.txt'
 
 DMG="$(find . -maxdepth 1 -name '*.dmg' -print -quit)"
 grep -F "  $(basename "$DMG")" SHA256SUMS.txt | shasum -a 256 -c -
