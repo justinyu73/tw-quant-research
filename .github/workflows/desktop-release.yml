@@ -99,17 +99,23 @@ jobs:
           pattern: tw-quant-research-*
           path: release-assets
           merge-multiple: false
-      - name: Flatten release assets with unique names
+      - name: Collect distributable release assets
         run: |
           mkdir release-files
           while IFS= read -r -d '' asset; do
-            relative="${asset#release-assets/}"
-            safe_name="${relative//\//__}"
-            cp "${asset}" "release-files/${safe_name}"
+            filename="$(basename "${asset}")"
+            case "${filename}" in
+              *.msi|*-setup.exe|*.dmg|*.tar.gz)
+                relative="${asset#release-assets/}"
+                safe_name="${relative//\//__}"
+                cp "${asset}" "release-files/${safe_name}"
+                ;;
+            esac
           done < <(find release-assets -type f -print0)
+          test -n "$(find release-files -type f -print -quit)"
           mv release-assets release-assets-nested
           mv release-files release-assets
-      - name: Prepare draft release notes
+      - name: Prepare release notes
         run: |
           cat > release-notes.md <<'EOF'
           ## TW Quant Research ${{ github.ref_name }}
@@ -124,8 +130,9 @@ jobs:
           - macOS Intel: `x86_64-apple-darwin`
           - macOS Apple Silicon: `aarch64-apple-darwin`
 
-          The release is created as a draft so a human can complete the Windows
-          and macOS install/launch checks before publishing it.
+          Release assets are limited to platform installers, the public source
+          archive, and SHA-256 checksums. This release is unsigned; complete
+          the human install/launch checks before treating it as production-ready.
           EOF
       - name: Generate SHA-256 checksums
         run: |

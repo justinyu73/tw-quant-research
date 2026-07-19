@@ -859,7 +859,7 @@
   }
 
   function render() {
-    root.innerHTML = '<div class="app-shell"><aside class="sidebar"><div class="sidebar-brand"><span class="brand-icon">TQ</span><span class="brand-name">台股研究 <small>研究工作台 v1</small></span></div><nav class="sidebar-nav" aria-label="主導覽"><div class="nav-label">研究模組</div><div class="nav-group">' + navMarkup() + '</div></nav><div class="sidebar-footer"><div class="sidebar-note"><span class="read-only-icon">唯</span><p><strong>免費優先 · 資料唯讀</strong><span>資料先保存，評估由人為確認；不含即時、下單或自動交易。</span></p></div></div></aside><main class="main"><header class="topbar"><div class="topbar-left"><div class="breadcrumb"><span>台股研究</span><span class="sep">/</span><span class="current">' + text(core.SECTIONS.find(function (item) { return item.id === state.activeSection; }).label) + '</span></div></div><div class="topbar-right"><span class="read-only-pill">資料唯讀</span><span class="free-first-topbar">免費優先</span><span class="snapshot">資料截至 ' + text(view.as_of) + '</span><button class="btn btn-outline btn-sm" type="button" data-action="reset">重設視圖</button></div></header><div class="page-wrapper" id="main-content" tabindex="-1">' + mainMarkup() + '</div><footer class="footer"><span>資料格式 ' + text(view.schema) + '</span><span>本機生成 · 免費資料／本機服務</span></footer></main></div>' + detailDialog();
+    root.innerHTML = '<div class="app-shell"><aside class="sidebar"><div class="sidebar-brand"><img class="brand-logo" src="./tqr-logo.svg" alt="TQR"><span class="brand-name">TQR <small>台股研究工作台</small></span></div><nav class="sidebar-nav" aria-label="主導覽"><div class="nav-label">研究模組</div><div class="nav-group">' + navMarkup() + '</div></nav><div class="sidebar-footer"><div class="sidebar-note"><span class="read-only-icon">唯</span><p><strong>免費優先 · 資料唯讀</strong><span>資料先保存，評估由人為確認；不含即時、下單或自動交易。</span></p></div></div></aside><main class="main"><header class="topbar"><div class="topbar-left"><div class="breadcrumb"><span>台股研究</span><span class="sep">/</span><span class="current">' + text(core.SECTIONS.find(function (item) { return item.id === state.activeSection; }).label) + '</span></div></div><div class="topbar-right"><span class="read-only-pill">資料唯讀</span><span class="free-first-topbar">免費優先</span><span class="snapshot">資料截至 ' + text(view.as_of) + '</span><button class="btn btn-outline btn-sm" type="button" data-action="reset">重設視圖</button></div></header><div class="page-wrapper" id="main-content" tabindex="-1">' + mainMarkup() + '</div><footer class="footer"><span>資料格式 ' + text(view.schema) + '</span><span>本機生成 · 免費資料／本機服務</span></footer></main></div>' + detailDialog();
     renderKlineChart();
     ensureKlineRuntime();
   }
@@ -867,6 +867,10 @@
   root.addEventListener("click", function (event) {
     var target = event.target.closest("[data-action]");
     if (!target) return;
+    // A click on a form control must not re-render the shell. Replacing the
+    // input/select immediately after the browser focuses it makes typing and
+    // native dropdown selection require holding the mouse button down.
+    if (target.matches("input, select, textarea")) return;
     var action = target.getAttribute("data-action");
     if (action === "kline-fit" && chartInstance) {
       chartInstance.timeScale().fitContent();

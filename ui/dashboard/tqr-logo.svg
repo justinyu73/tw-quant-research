@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">TQR</title>
+  <desc id="desc">台股研究的 K 線與證據標記</desc>
+  <defs>
+    <linearGradient id="bg" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#243144"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="line" x1="12" y1="47" x2="54" y2="18" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6ee7d4"/>
+      <stop offset="1" stop-color="#36b6a5"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#bg)"/>
+  <path d="M12 17.5h40M12 31.5h40M12 45.5h40" stroke="#8ea0b7" stroke-opacity=".14" stroke-width="1"/>
+  <path d="M18 22v24M29 27v20M40 19v25" stroke="#f2b86b" stroke-width="2" stroke-linecap="round"/>
+  <rect x="14" y="28" width="8" height="11" rx="2" fill="#f2b86b"/>
+  <rect x="25" y="34" width="8" height="9" rx="2" fill="#e39a52"/>
+  <rect x="36" y="23" width="8" height="13" rx="2" fill="#f2b86b"/>
+  <path d="M11.5 46.5c7-1 10.5-7.5 16-5.5 6.5 2.4 9.6-7.1 14.8-11.6 3.2-2.8 5.2-1.7 10.2-6.9" fill="none" stroke="url(#line)" stroke-linecap="round" stroke-linejoin="round" stroke-width="3.5"/>
+  <circle cx="52.5" cy="22.5" r="3.5" fill="#f47f6b" stroke="#111827" stroke-width="2"/>
+</svg>

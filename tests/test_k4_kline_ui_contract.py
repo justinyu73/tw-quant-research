@@ -16,6 +16,7 @@ class K4KlineUiContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             summary = build_preview(Path(directory) / "preview")
             self.assertIn("lightweight-charts.js", summary["files"])
+            self.assertIn("tqr-logo.svg", summary["files"])
             self.assertGreater((Path(directory) / "preview/lightweight-charts.js").stat().st_size, 100000)
             html = (Path(directory) / "preview/index.html").read_text(encoding="utf-8")
             app = (Path(directory) / "preview/app.js").read_text(encoding="utf-8")

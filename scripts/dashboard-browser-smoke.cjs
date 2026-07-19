@@ -10,12 +10,12 @@ const ROOT = path.resolve(__dirname, "..");
 const PREVIEW_DIR = path.join(ROOT, "outputs", "dashboard-preview");
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
-  overview: "a91d85ec9dc0e84cd2755f8b535ce6dba7f81b152f415c2f3c179b37994af64d",
-  market_valid: "e68a973cf08df06bd49cb8febda8296134dd93cee6e893f8df8e93a7c6a43e3b",
-  market_partial: "5130ded5d265ae7ba5cf187b22603cfab458522f81af87ecae059719022f7cc0",
-  market_future: "0cf5577936c6162c9df8c276d2f2bcbbf980d3d3070c37b385f9dca69f704028",
-  products: "a3adf9f1986f6e5b125af1956ed0c7a6ab105294a6d666acd8aa408cd057fce9",
-  detail_dialog: "52dbe01abfd82f6c1df9854eec94eec275c631c6cb8360514150eff700dd6d94",
+  overview: "f0a9a38c2b4e21d4e17cf8e8658f73f831ad4b8f60ef0f807ee4f5b4dd6ce79a",
+  market_valid: "df5cf03d85b373484768eb2b497adbc763bec7800883bcde888636e5f4dc2fc8",
+  market_partial: "f1449a3eca7c35cf23f0baa1c7e6804dc6a6eb7b98dcbac239e86a5a73e800f1",
+  market_future: "56d98b46b4b0fe15f605ba2f842d77e9f7f6381228f15943ac0f5c21cd9ce662",
+  products: "5417174af5c98d424a6fe02b63fa24d3bf0894a90bde7579752aca5816707c8e",
+  detail_dialog: "44d10f53497858afdd99380d818cc3aad369090cfc9f0926a4bb7a2710951987",
 };
 
 function freePort() {
@@ -230,7 +230,11 @@ async function main() {
     assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 1);
     assert.match(await page.locator('[data-testid="watchlist-state"]').innerText(), /瀏覽器預覽草稿/);
     assert.equal(await page.locator('[data-testid="watchlist-save"]').isDisabled(), false);
-    await page.locator('[data-testid="watchlist-picker"]').fill("2330");
+    const watchlistPicker = page.locator('[data-testid="watchlist-picker"]');
+    await watchlistPicker.click();
+    assert.equal(await watchlistPicker.evaluate((element) => document.activeElement === element), true);
+    await watchlistPicker.type("2330");
+    assert.equal(await watchlistPicker.inputValue(), "2330");
     await page.locator('[data-testid="watchlist-symbol-results"] .symbol-search-result').filter({ hasText: "2330" }).first().click();
     await page.locator('[data-testid="watchlist-add"]').click();
     assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 2);

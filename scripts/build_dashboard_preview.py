@@ -85,7 +85,7 @@ def build_preview(output_dir: Path = DEFAULT_OUTPUT) -> dict[str, Any]:
     (output_dir / "index.html").write_text(html, encoding="utf-8")
     if not CHART_VENDOR.is_file():
         raise FileNotFoundError("bundled Lightweight Charts vendor is missing; run npm ci")
-    for name in ("styles.css", "dashboard-core.js", "app.js"):
+    for name in ("styles.css", "dashboard-core.js", "app.js", "tqr-logo.svg"):
         shutil.copyfile(SOURCE_DIR / name, output_dir / name)
     shutil.copyfile(CHART_VENDOR, output_dir / "lightweight-charts.js")
     return {

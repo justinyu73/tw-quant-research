@@ -25,7 +25,7 @@ def main() -> int:
         html = (output / "index.html").read_text(encoding="utf-8")
         browser_code = "\n".join((output / name).read_text(encoding="utf-8") for name in ("dashboard-core.js", "app.js"))
         static_checks = {
-            "expected_assets": summary["files"] == ["app.js", "dashboard-core.js", "index.html", "lightweight-charts.js", "styles.css"],
+            "expected_assets": summary["files"] == ["app.js", "dashboard-core.js", "index.html", "lightweight-charts.js", "styles.css", "tqr-logo.svg"],
             "kline_bundle": (output / "lightweight-charts.js").stat().st_size > 100000,
             "read_only_snapshot": summary["read_only"] is True,
             "schema_embedded": "tw-quant-engine-read-only-product-view/v1" in html,
