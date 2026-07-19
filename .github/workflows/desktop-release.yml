@@ -26,7 +26,7 @@ jobs:
           python3 scripts/run_dashboard_preview.py
       - name: Enforce strict audit for version tags
         if: github.event_name == 'push'
-        run: python3 scripts/open_source_audit.py --strict
+        run: python3 scripts/open_source_audit.py --strict --public-tree
       - name: Export clean open-source source archive
         run: python3 scripts/export_open_source_source.py
       - name: Upload clean source archive

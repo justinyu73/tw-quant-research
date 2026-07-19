@@ -71,6 +71,8 @@ python3 scripts/lh_preflight.py
 ```sh
 python3 scripts/open_source_audit.py
 python3 scripts/open_source_audit.py --strict
+# 在已匯出的 public tree 驗證排除檔案不存在
+python3 scripts/open_source_audit.py --strict --public-tree
 python3 scripts/export_open_source_source.py
 ```
 

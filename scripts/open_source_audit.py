@@ -24,6 +24,11 @@ SECRET_PATTERNS = (
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--strict", action="store_true", help="fail when a publication blocker exists")
+    parser.add_argument(
+        "--public-tree",
+        action="store_true",
+        help="audit an already-exported public tree where manifest exclusions must be absent",
+    )
     return parser
 
 
@@ -76,17 +81,20 @@ def _scan_public_files(paths: list[Path]) -> tuple[list[str], list[str]]:
     return sorted(set(forbidden)), sorted(set(secret_hits))
 
 
-def audit(strict: bool = False) -> dict[str, Any]:
+def audit(strict: bool = False, public_tree: bool = False) -> dict[str, Any]:
     manifest = _manifest()
     candidates = _candidate_files()
     excluded = _excluded_paths(manifest)
     missing_exclusions = sorted(path for path in excluded if not (ROOT / path).is_file())
+    present_exclusions = sorted(path for path in excluded if (ROOT / path).is_file())
     public = [path for path in candidates if str(path) not in excluded]
     forbidden, secret_hits = _scan_public_files(public)
     license_present = any((ROOT / name).is_file() for name in ("LICENSE", "LICENSE.md", "COPYING"))
     blockers: list[str] = []
-    if missing_exclusions:
+    if missing_exclusions and not public_tree:
         blockers.append("manifest_exclusion_missing")
+    if present_exclusions and public_tree:
+        blockers.append("excluded_file_present_in_public_tree")
     if forbidden:
         blockers.append("forbidden_or_large_public_file")
     if secret_hits:
@@ -98,12 +106,14 @@ def audit(strict: bool = False) -> dict[str, Any]:
         "schema": "tw-quant-engine-open-source-audit/v1",
         "status": status,
         "strict": strict,
+        "public_tree": public_tree,
         "manifest": str(MANIFEST.relative_to(ROOT)),
         "candidate_file_count": len(candidates),
         "public_file_count": len(public),
         "excluded_file_count": len(excluded),
         "excluded_files": [{"path": path, "reason": excluded[path]} for path in sorted(excluded)],
         "missing_exclusions": missing_exclusions,
+        "present_exclusions": present_exclusions,
         "license_present": license_present,
         "forbidden_or_large_public_files": forbidden,
         "secret_pattern_public_files": secret_hits,
@@ -114,7 +124,7 @@ def audit(strict: bool = False) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    report = audit(strict=args.strict)
+    report = audit(strict=args.strict, public_tree=args.public_tree)
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
     return 1 if args.strict and report["status"] != "pass" else 0
 

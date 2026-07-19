@@ -26,7 +26,9 @@ released product boundary.
 The exclusion list is machine-checked by:
 
 ```sh
+# Run from the complete source tree: manifest exclusions must be present.
 python3 scripts/open_source_audit.py
+python3 scripts/open_source_audit.py --strict
 ```
 
 The actual clean source archive is generated with:
@@ -37,6 +39,15 @@ python3 scripts/export_open_source_source.py
 
 It uses the same manifest, so excluded records are absent from the archive
 rather than merely undocumented.
+
+The exported public tree uses the complementary check:
+
+```sh
+python3 scripts/open_source_audit.py --strict --public-tree
+```
+
+In that mode, the manifest exclusions must be absent. This is the check used
+by the version-tag desktop release workflow.
 
 ## Release blockers
 
