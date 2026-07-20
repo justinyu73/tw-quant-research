@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "TW Quant Research",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "identifier": "io.github.justinyu73.twquantengine",
   "build": {
     "frontendDist": "../../outputs/dashboard-preview",
@@ -32,7 +32,7 @@
     "icon": ["icons/icon.png", "icons/icon.ico"],
     "externalBin": ["binaries/tqe-sidecar"],
     "category": "DeveloperTool",
-    "shortDescription": "Read-only Taiwan quantitative research viewer",
-    "longDescription": "Local read-only EOD K-line research viewer backed by committed K6 fixtures."
+    "shortDescription": "Taiwan quantitative research viewer",
+    "longDescription": "Local EOD K-line research viewer with explicit user-triggered TWSE local data capture."
   }
 }

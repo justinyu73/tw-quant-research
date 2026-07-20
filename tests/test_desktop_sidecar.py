@@ -53,6 +53,7 @@ class DesktopSidecarTests(unittest.TestCase):
         self.assertTrue(payload["read_only"])
         ids = {item["instrument_id"] for item in payload["instruments"]}
         self.assertIn("TWSE:2330", ids)
+        self.assertIn("TWSE:2308", ids)
         self.assertIn("TAIFEX:TX:202608", ids)
         self.assertEqual(self.catalog.digest, payload["digest"])
         self.assertEqual(self.catalog.digest, load_catalog(ROOT / "tests" / "fixtures").digest)
@@ -74,6 +75,11 @@ class DesktopSidecarTests(unittest.TestCase):
         self.assertIsNotNone(model["indicators"]["macd"]["values"][-1]["value"])
         self.assertEqual(payload["digest"], model["snapshot_digest"])
         self.assertEqual(model["snapshot_digest"], self.catalog.models[("TWSE:2330", "1D")]["snapshot_digest"])
+
+    def test_data_status_is_explicitly_disabled_in_browser_preview(self) -> None:
+        status, payload = self._get("/data/status")
+        self.assertEqual(status, 200)
+        self.assertFalse(payload["enabled"])
 
     def test_only_get_routes_are_served(self) -> None:
         request = Request(f"{self.base}/kline", method="POST")

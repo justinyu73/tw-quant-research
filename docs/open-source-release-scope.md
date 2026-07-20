@@ -7,13 +7,17 @@ and the human platform launch checks to pass.
 ## Public product
 
 The public product is a local research application with a Tauri desktop shell,
-a Python sidecar, bundled local fixtures, a read-only loopback API, and a
-local watchlist file. The app does not provide live quotes, broker access,
-order placement, automatic execution, credentials, or a provider runtime.
+a Python sidecar, bundled local fixtures, a read-only loopback catalog, and a
+local watchlist file. The desktop sidecar also exposes one explicit user action:
+download the selected TWSE listed equity for 1, 2, or 3 trailing years into the
+user application-data directory. The app does not provide live quotes, broker
+access, order placement, automatic execution, credentials, or background
+provider refresh.
 
 The Windows and macOS artifacts are built from the target-specific sidecar
-outputs listed in `config/open-source-release.json`. The sidecar contains only
-the committed K6 fixtures used by the research preview.
+outputs listed in `config/open-source-release.json`. The sidecar contains the
+committed K6 fixtures used by the research preview; user-downloaded raw and
+normalized data remains outside the repository.
 
 ## Excluded from the source publication
 

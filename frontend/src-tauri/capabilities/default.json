@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "TQR desktop shell and its local read-only sidecar",
+  "description": "TQR desktop shell and its local research sidecar",
   "windows": ["main"],
   "permissions": [
     "core:default",

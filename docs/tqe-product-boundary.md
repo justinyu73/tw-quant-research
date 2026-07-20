@@ -19,6 +19,9 @@ or autonomous quantitative-computation service.
 - Human-directed financial, valuation, comparison, and tracking calculations.
 - Company story, event, filing, and research-note tracking.
 - Read-only charts, tables, evidence panels, and local watchlists.
+- Desktop-only explicit update of the currently selected TWSE listed equity for
+  a trailing 1, 2, or 3 years; the downloaded raw responses and normalized K
+  line snapshots stay in the user's application data directory.
 
 ## Out of scope
 
@@ -28,6 +31,7 @@ or autonomous quantitative-computation service.
 - Broker integration, order placement, portfolio execution, or auto-trading.
 - Automatic strategy execution, unattended screening, or automatic promotion.
 - Treating a calculated score as an investment decision or product acceptance.
+- Full-market or TPEx historical download from the current update panel.
 
 ## Data flow
 
@@ -43,3 +47,8 @@ human selects symbol/topic/range
 P5 must therefore reject paid subscription products even when their schema and
 coverage are technically suitable. A free source contract must be established
 before any human-run capture work-unit is activated.
+
+The current desktop update is a bounded TWSE implementation of that rule. It is
+not a background refresh: the human chooses the selected listed stock and the
+1/2/3-year range, then explicitly starts the download. Browser preview mode is
+fixture-only and does not download data.

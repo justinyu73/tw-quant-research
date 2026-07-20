@@ -209,12 +209,14 @@ class KlineFixture:
         if not isinstance(provenance, Mapping):
             raise KlineContractError("provenance must be an object")
         _fields(provenance, _PROVENANCE_FIELDS, "provenance")
-        if provenance["source"] != "offline-fixture":
-            raise KlineContractError("K1 fixture source must be offline-fixture")
-        if not isinstance(provenance["network"], bool) or provenance["network"]:
-            raise KlineContractError("K1 fixture network must be false")
-        if not isinstance(provenance["provider_calls"], bool) or provenance["provider_calls"]:
-            raise KlineContractError("K1 fixture provider_calls must be false")
+        if provenance["source"] not in {"offline-fixture", "official-user-download"}:
+            raise KlineContractError("K1 fixture source must be offline-fixture or official-user-download")
+        if not isinstance(provenance["network"], bool) or not isinstance(provenance["provider_calls"], bool):
+            raise KlineContractError("K1 fixture network and provider_calls must be booleans")
+        if provenance["source"] == "offline-fixture" and (provenance["network"] or provenance["provider_calls"]):
+            raise KlineContractError("offline K1 fixture network and provider_calls must be false")
+        if provenance["source"] == "official-user-download" and (not provenance["network"] or not provenance["provider_calls"]):
+            raise KlineContractError("official user-download K1 fixture must retain network provenance")
         _non_empty(provenance["fixture_id"], "provenance.fixture_id")
         datasets = payload["datasets"]
         if not isinstance(datasets, list) or not datasets:

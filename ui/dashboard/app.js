@@ -30,6 +30,7 @@
   var chartDrawingModelKey = null;
   var chartTemplateName = "default";
   var screenConditions = [];
+  var dataUpdateInFlight = false;
 
   function chartTemplateLabel(name) {
     return name === "research" ? "研究模板" : "預設模板";
@@ -199,7 +200,7 @@
     return pageHeader("市場首頁", "我的自選 · 個股行情 · 研究工具") +
       '<section class="system-command-bar" data-testid="system-command-bar"><div><span class="eyebrow">TQR MARKET SYSTEM</span><strong>我的市場</strong><span>本機 EOD · 截止 ' + text(view.as_of || "—") + '</span></div><div class="system-command-actions"><button class="btn btn-primary" type="button" data-action="section" data-section="market">開啟行情</button><button class="btn btn-outline" type="button" data-action="section" data-section="research">建立選股條件</button><button class="btn btn-outline" type="button" data-action="section" data-section="stories">新增筆記</button></div></section>' +
       '<div class="system-metric-strip" data-testid="cockpit-stats"><article><span>自選</span><strong>' + text((state.watchlist && state.watchlist.items || []).length) + '</strong><small>我的行情</small></article><article><span>可用資料</span><strong>' + text(summary.admitted) + '</strong><small>已納入資料列</small></article><article><span>筆記</span><strong>' + text((state.notes || []).length) + '</strong><small>本機保存</small></article><article><span>資料狀態</span><strong>唯讀</strong><small>' + text((view.as_of || "—").slice(0, 10)) + '</small></article></div>' +
-      '<div class="terminal-home-grid"><section class="terminal-home-main">' + card("我的行情", "XQ 式自選報價與快速切換", watchlistMarkup(), "") + card("研究工具列", "TradingView 圖表 · XQ 選股 · FinLab 報告 · MultiCharts 指標", researchModulesMarkup(), "") + '</section><aside class="terminal-home-side">' + card("目前標的", "價格、K 線與自選連動", stockQuoteMarkup(), "") + card("研究捷徑", "從一個標的開始", '<div class="analysis-check-list"><button type="button" class="analysis-check" data-action="section" data-section="market"><span>01</span><strong>看 K 線與技術線</strong><small>價格、成交量、指標</small></button><button type="button" class="analysis-check" data-action="section" data-section="stories"><span>02</span><strong>記錄研究筆記</strong><small>支持、反證、待確認</small></button><button type="button" class="analysis-check" data-action="section" data-section="fundamentals"><span>03</span><strong>核對財報</strong><small>期間、來源、可用性</small></button></div>', "") + '</aside></div>';
+      dataUpdateMarkup() + '<div class="terminal-home-grid"><section class="terminal-home-main">' + card("我的行情", "XQ 式自選報價與快速切換", watchlistMarkup(), "") + card("研究工具列", "TradingView 圖表 · XQ 選股 · FinLab 報告 · MultiCharts 指標", researchModulesMarkup(), "") + '</section><aside class="terminal-home-side">' + card("目前標的", "價格、K 線與自選連動", stockQuoteMarkup(), "") + card("研究捷徑", "從一個標的開始", '<div class="analysis-check-list"><button type="button" class="analysis-check" data-action="section" data-section="market"><span>01</span><strong>看 K 線與技術線</strong><small>價格、成交量、指標</small></button><button type="button" class="analysis-check" data-action="section" data-section="stories"><span>02</span><strong>記錄研究筆記</strong><small>支持、反證、待確認</small></button><button type="button" class="analysis-check" data-action="section" data-section="fundamentals"><span>03</span><strong>核對財報</strong><small>期間、來源、可用性</small></button></div>', "") + '</aside></div>';
   }
 
   function fundamentalsMarkup() {
@@ -271,6 +272,13 @@
     return Promise.reject(new Error("Tauri shell API unavailable"));
   }
 
+  function desktopDataUpdateAvailable() {
+    return Boolean(
+      (window.__TAURI__ && window.__TAURI__.core && typeof window.__TAURI__.core.invoke === "function") ||
+      (window.__TAURI_INTERNALS__ && typeof window.__TAURI_INTERNALS__.invoke === "function")
+    );
+  }
+
   function sidecarBaseUrl() {
     var raw = window.__TW_QUANT_SIDECAR_URL__ || "http://127.0.0.1:8766";
     try {
@@ -282,13 +290,20 @@
     }
   }
 
-  function sidecarFetch(path) {
+  function sidecarRequest(path, options) {
     var base = sidecarBaseUrl();
     if (!base) return Promise.reject(new Error("sidecar must use loopback HTTP"));
-    return fetch(base + path, { method: "GET", cache: "no-store" }).then(function (response) {
-      if (!response.ok) throw new Error("sidecar request failed: " + response.status);
-      return response.json();
+    var request = Object.assign({ method: "GET", cache: "no-store" }, options || {});
+    return fetch(base + path, request).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (payload) {
+        if (!response.ok) throw new Error(payload.error || ("sidecar request failed: " + response.status));
+        return payload;
+      });
     });
+  }
+
+  function sidecarFetch(path) {
+    return sidecarRequest(path);
   }
 
   function parseWatchlist(raw) {
@@ -463,6 +478,15 @@
       .filter(Boolean).join(" ").toLowerCase();
   }
 
+  function resolveSearchSelection(instruments, query) {
+    var normalizedQuery = String(query || "").trim().toLowerCase();
+    if (!normalizedQuery) return null;
+    return instruments.find(function (instrument) {
+      return [instrument.instrument_id, instrument.symbol, instrument.display_name]
+        .filter(Boolean).some(function (value) { return String(value).toLowerCase() === normalizedQuery; });
+    }) || null;
+  }
+
   function symbolSearchResults(instruments, query, excluded, selectedId, testId, action) {
     var normalizedQuery = String(query || "").trim().toLowerCase();
     var blocked = excluded || [];
@@ -491,6 +515,16 @@
   function refreshSearchResults(testId, markup) {
     var current = root.querySelector('[data-testid="' + testId + '"]');
     if (current) current.outerHTML = markup;
+  }
+
+  function refreshWatchlistAddButtons() {
+    var instruments = core.klineInstruments(state.view);
+    var items = core.watchlistItemsForActiveGroup(state);
+    var selected = instrumentForId(watchlistSearchSelection) || resolveSearchSelection(instruments, watchlistSearchQuery);
+    var enabled = Boolean(selected && items.indexOf(selected.instrument_id) < 0);
+    root.querySelectorAll('[data-action="watchlist-add"]').forEach(function (button) {
+      button.disabled = !enabled;
+    });
   }
 
   function requestWatchlistModels() {
@@ -569,6 +603,43 @@
     }
   }
 
+  function requestDataUpdate() {
+    if (dataUpdateInFlight) return;
+    var instrument = selectedKlineInstrument();
+    if (!instrument) {
+      state = core.reduce(state, { type: "DATA_UPDATE_ERROR", message: "請先選取一個個股" });
+      render();
+      return;
+    }
+    dataUpdateInFlight = true;
+    state = core.reduce(state, { type: "DATA_UPDATE_START" });
+    render();
+    var years = state.dataUpdate && state.dataUpdate.years || 1;
+    sidecarRequest("/data/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ instrument_id: instrument.instrument_id, years: years })
+    }).then(function (payload) {
+      var result = payload && payload.data || {};
+      var message = result.status === "partial"
+        ? "已更新 " + (result.bars_downloaded || 0) + " 筆；部分月份失敗"
+        : "已更新 " + (result.bars_downloaded || 0) + " 筆本機 K 線資料";
+      state = core.reduce(state, { type: "DATA_UPDATE_SUCCESS", status: result.status || "success", message: message });
+      if (Array.isArray(payload.instruments)) {
+        state = core.reduce(state, { type: "SET_KLINE_INSTRUMENTS", instruments: payload.instruments });
+      }
+      klineRequestKey = null;
+      watchlistModelRequests = {};
+    }).catch(function (error) {
+      state = core.reduce(state, { type: "DATA_UPDATE_ERROR", message: error.message || "本機資料更新失敗" });
+    }).then(function () {
+      dataUpdateInFlight = false;
+      render();
+      requestKlineModel();
+      requestWatchlistModels();
+    });
+  }
+
   function selectedQuoteSnapshot() {
     var model = core.selectedKline(state);
     var instrument = (model && model.instrument) || selectedKlineInstrument() || { instrument_id: state.selectedKlineInstrumentId || "TWSE:2330", symbol: "2330", display_name: "台積電", market: "TWSE" };
@@ -594,7 +665,7 @@
     var instruments = core.klineInstruments(state.view);
     var items = core.watchlistItemsForActiveGroup(state);
     var groups = Array.isArray(state.watchlistGroups) ? state.watchlistGroups : [];
-    var selected = instrumentForId(watchlistSearchSelection);
+    var selected = instrumentForId(watchlistSearchSelection) || resolveSearchSelection(instruments, watchlistSearchQuery);
     var canAdd = Boolean(selected && items.indexOf(selected.instrument_id) < 0);
     return '<section class="terminal-watchlist" data-testid="terminal-watchlist"><header class="terminal-panel-heading"><div><span class="eyebrow">我的行情</span><h2>自選清單</h2></div><span class="terminal-count">' + items.length + '</span></header><div class="terminal-watchlist-controls"><div class="symbol-search"><label><span>搜尋代號／名稱</span><input type="search" autocomplete="off" placeholder="例如 2330" value="' + escapeHtml(watchlistSearchQuery) + '" data-action="watchlist-search" data-testid="terminal-watchlist-picker" aria-controls="terminal-watchlist-results"></label>' + symbolSearchResults(instruments, watchlistSearchQuery, items, watchlistSearchSelection, "terminal-watchlist-results", "watchlist-search-pick") + '</div><button class="btn btn-primary btn-sm" type="button" data-action="watchlist-add" data-testid="terminal-watchlist-add"' + (canAdd ? "" : " disabled") + '>加入</button></div><label class="terminal-watchlist-group"><span>目前群組</span><select data-action="watchlist-group-select" data-testid="terminal-watchlist-group-select">' + groups.map(function (group) { return '<option value="' + escapeHtml(group.id) + '"' + (group.id === state.activeWatchlistGroupId ? ' selected' : '') + '>' + text(group.name) + '</option>'; }).join("") + '</select></label><div class="terminal-watchlist-list">' + (items.length ? items.map(function (instrumentId) {
       var instrument = instrumentForId(instrumentId) || { instrument_id: instrumentId, symbol: instrumentId, display_name: "未在商品清單" };
@@ -603,8 +674,19 @@
       var latest = bars.length ? bars[bars.length - 1] : null;
       var previous = bars.length > 1 ? bars[bars.length - 2] : null;
       var delta = latest && previous ? latest.close - previous.close : null;
-      return '<button class="terminal-watchlist-row' + (instrumentId === state.selectedKlineInstrumentId ? ' active' : '') + '" type="button" data-action="kline-search-pick" data-instrument-id="' + escapeHtml(instrumentId) + '"><span><strong>' + text(instrument.symbol || instrumentId) + '</strong><small>' + text(instrument.display_name) + '</small></span><span class="terminal-watchlist-price"><strong>' + core.formatNumber(latest && latest.close) + '</strong><small class="' + (delta === null ? "" : delta >= 0 ? "positive" : "negative") + '">' + (delta === null ? "—" : (delta >= 0 ? "+" : "") + core.formatNumber(delta)) + '</small></span></button>';
+      return '<div class="terminal-watchlist-row-wrap"><button class="terminal-watchlist-row' + (instrumentId === state.selectedKlineInstrumentId ? ' active' : '') + '" type="button" data-action="kline-search-pick" data-instrument-id="' + escapeHtml(instrumentId) + '"><span><strong>' + text(instrument.symbol || instrumentId) + '</strong><small>' + text(instrument.display_name) + '</small></span><span class="terminal-watchlist-price"><strong>' + core.formatNumber(latest && latest.close) + '</strong><small class="' + (delta === null ? "" : delta >= 0 ? "positive" : "negative") + '">' + (delta === null ? "—" : (delta >= 0 ? "+" : "") + core.formatNumber(delta)) + '</small></button><button class="terminal-watchlist-remove" type="button" data-action="watchlist-remove" data-instrument-id="' + escapeHtml(instrumentId) + '" aria-label="移除 ' + escapeHtml(instrument.symbol || instrumentId) + '">×</button></div>';
     }).join("") : '<div class="terminal-watchlist-empty"><strong>還沒有自選標的</strong><span>搜尋 2330，加入後就能在右側快速切換。</span></div>') + '</div><footer class="terminal-watchlist-footer"><span>' + text(noteStatus()) + '</span><button class="btn btn-outline btn-sm" type="button" data-action="section" data-section="products">管理自選</button></footer></section>';
+  }
+
+  function dataUpdateMarkup() {
+    var update = state.dataUpdate || { years: 1, status: "idle", message: "" };
+    var instrument = selectedKlineInstrument();
+    var desktopAvailable = desktopDataUpdateAvailable();
+    var enabled = Boolean(instrument) && desktopAvailable && !dataUpdateInFlight;
+    var statusText = !desktopAvailable
+      ? "瀏覽器預覽不下載；請使用桌面版"
+      : update.status === "idle" ? "尚未更新；只下載目前選取的個股" : (update.message || STATUS_LABELS[update.status] || update.status);
+    return '<section class="data-update-panel" data-testid="data-update-panel"><div class="data-update-heading"><div><span class="eyebrow">官方免費來源 → 本機保存</span><h2>更新台股資料</h2><p>目前範圍：' + text(instrument ? (instrument.market + ":" + instrument.symbol + " · " + instrument.display_name) : "尚未選取個股") + '</p></div><span class="data-update-status status-' + escapeHtml(update.status) + '" data-testid="data-update-status">' + text(statusText) + '</span></div><div class="data-update-controls"><label><span>歷史範圍</span><select data-action="data-update-years" data-testid="data-update-years"><option value="1"' + (update.years === 1 ? ' selected' : '') + '>近 1 年</option><option value="2"' + (update.years === 2 ? ' selected' : '') + '>近 2 年</option><option value="3"' + (update.years === 3 ? ' selected' : '') + '>近 3 年</option></select></label><button class="btn btn-primary" type="button" data-action="data-update" data-testid="data-update-button"' + (enabled ? '' : ' disabled') + '>' + (dataUpdateInFlight ? '更新中…' : '下載並更新本機資料') + '</button></div><small class="data-update-note">目前提供 TWSE 上市個股；資料保存於本機 raw 與 K 線快照，不是即時行情，也不會自動下載全市場。瀏覽器預覽僅展示介面。</small></section>';
   }
 
   function watchlistRows() {
@@ -632,7 +714,7 @@
     var instruments = core.klineInstruments(state.view);
     var items = core.watchlistItemsForActiveGroup(state);
     var groups = Array.isArray(state.watchlistGroups) ? state.watchlistGroups : [{ id: "default", name: "我的自選", items: items }];
-    var selected = instrumentForId(watchlistSearchSelection);
+    var selected = instrumentForId(watchlistSearchSelection) || resolveSearchSelection(instruments, watchlistSearchQuery);
     var canAdd = Boolean(selected && items.indexOf(selected.instrument_id) < 0);
     var saving = state.watchlist && state.watchlist.status === "saving";
     var canSave = state.watchlist && state.watchlist.dirty && !saving && watchlistPersistenceAvailable !== false;
@@ -1065,6 +1147,10 @@
       persistWatchlist();
       return;
     }
+    if (action === "data-update") {
+      requestDataUpdate();
+      return;
+    }
     if (action === "watchlist-group-create") {
       state = core.reduce(state, { type: "CREATE_WATCHLIST_GROUP", name: watchlistGroupNameQuery });
       watchlistGroupNameQuery = "";
@@ -1096,10 +1182,13 @@
       state = core.reduce(state, { type: "TOGGLE_KLINE_INDICATOR", indicator: chartTemplateName === "research" ? "ma" : "ema" });
     }
     if (action === "watchlist-add") {
-      if (watchlistSearchSelection) {
-        state = core.reduce(state, { type: "TOGGLE_WATCHLIST", instrumentId: watchlistSearchSelection });
+      var exactSelection = resolveSearchSelection(core.klineInstruments(state.view), watchlistSearchQuery);
+      var addInstrumentId = watchlistSearchSelection || (exactSelection && exactSelection.instrument_id);
+      if (addInstrumentId) {
+        state = core.reduce(state, { type: "TOGGLE_WATCHLIST", instrumentId: addInstrumentId });
         watchlistSearchSelection = null;
         watchlistSearchQuery = "";
+        watchlistSearchFocused = false;
       }
     }
     if (action === "watchlist-toggle" && state.selectedKlineInstrumentId) {
@@ -1111,6 +1200,8 @@
     if (action === "screen-apply") state = core.reduce(state, { type: "APPLY_SCREEN_SPEC" });
     if (action === "watchlist-remove") {
       state = core.reduce(state, { type: "REMOVE_WATCHLIST", instrumentId: target.getAttribute("data-instrument-id") });
+      if (watchlistSearchSelection === target.getAttribute("data-instrument-id")) watchlistSearchSelection = null;
+      watchlistSearchFocused = false;
     }
     if (action === "watchlist-clear") {
       if (window.confirm("確定清除目前自選草稿？要同步到本機 JSON，仍需再按「儲存自選清單」。")) {
@@ -1150,6 +1241,11 @@
       render();
       return;
     }
+    if (target.getAttribute("data-action") === "data-update-years") {
+      state = core.reduce(state, { type: "SET_DATA_UPDATE_YEARS", years: target.value });
+      render();
+      return;
+    }
     if (target.getAttribute("data-action") === "screen-input") {
       state = core.reduce(state, { type: "SET_SCREEN_SPEC", field: target.getAttribute("data-field"), value: target.value });
     }
@@ -1165,6 +1261,7 @@
       var watchlistResults = symbolSearchResults(core.klineInstruments(state.view), watchlistSearchQuery, core.watchlistItemsForActiveGroup(state), null, "watchlist-symbol-results", "watchlist-search-pick");
       refreshSearchResults("watchlist-symbol-results", watchlistResults);
       refreshSearchResults("terminal-watchlist-results", symbolSearchResults(core.klineInstruments(state.view), watchlistSearchQuery, core.watchlistItemsForActiveGroup(state), null, "terminal-watchlist-results", "watchlist-search-pick"));
+      refreshWatchlistAddButtons();
       return;
     }
     if (target.getAttribute("data-action") === "watchlist-group-name") {

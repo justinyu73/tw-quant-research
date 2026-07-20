@@ -10,7 +10,7 @@ const ROOT = path.resolve(__dirname, "..");
 const PREVIEW_DIR = path.join(ROOT, "outputs", "dashboard-preview");
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
-  overview: "ccdff96caf8061309af0a683f3184c162c249426dfc3042a3092f3fa1fc39a56",
+  overview: "9a0b3422566d020fcb6922711ff89020778ae4612565029a54e1155c8685d522",
   market_valid: "b84a2b3806c6619accd0d1b466977687c74ab350ea321da0060b85dd8a7b3066",
   market_partial: "d4ef725a23528ec687b87109333061a5d65612103722a44eb1197a4663b9a70e",
   market_future: "8975648c050edcf10d3cee1fb0bb0d2a5cdf78cd1da77fc6c3c66db874426d31",
@@ -156,6 +156,9 @@ async function main() {
     assert.equal(await page.locator(".sidebar").count(), 1);
     assert.equal(await page.locator(".card").count() > 0, true);
     assert.equal(await page.locator('[data-testid="watchlist-toolbar"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="data-update-panel"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="data-update-button"]').isDisabled(), true);
+    assert.match(await page.locator('[data-testid="data-update-status"]').innerText(), /瀏覽器預覽不下載/);
     assert.equal(await page.locator(".read-only-pill").innerText(), "研究唯讀");
     assert.equal(await page.locator(".page-title").innerText(), "市場首頁");
     const overviewText = await page.locator("#app").innerText();
@@ -203,6 +206,14 @@ async function main() {
     assert.equal(await page.locator('[data-testid="kline-watchlist-toggle"]').innerText(), "移出自選");
     await page.locator('[data-testid="kline-watchlist-toggle"]').click();
     assert.equal(await page.locator('[data-testid="kline-watchlist-toggle"]').innerText(), "加入自選");
+
+    // Exact symbol input must be sufficient; selecting a dropdown result is optional.
+    await terminalWatchlistPicker.fill("2308");
+    assert.equal(await page.locator('[data-testid="terminal-watchlist-add"]').isDisabled(), false);
+    await page.locator('[data-testid="terminal-watchlist-add"]').click();
+    assert.equal(await page.locator('[data-testid="terminal-watchlist"] .terminal-watchlist-row').count(), 1);
+    await page.locator('[data-action="watchlist-remove"][data-instrument-id="TWSE:2308"]').click();
+    assert.equal(await page.locator('[data-testid="terminal-watchlist"] .terminal-watchlist-row').count(), 0);
 
     await page.locator('[data-action="section"][data-section="features"]').first().click();
     await page.locator('[data-testid="feature-workbench"]').waitFor();
@@ -263,6 +274,12 @@ async function main() {
     assert.equal(await watchlistPicker.inputValue(), "2330");
     await page.locator('[data-testid="watchlist-symbol-results"] .symbol-search-result').filter({ hasText: "2330" }).first().click();
     await page.locator('[data-testid="watchlist-add"]').click();
+    assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 2);
+    await watchlistPicker.fill("2308");
+    assert.equal(await page.locator('[data-testid="watchlist-add"]').isDisabled(), false);
+    await page.locator('[data-testid="watchlist-add"]').click();
+    assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 3);
+    await page.locator('[data-action="watchlist-remove"][data-instrument-id="TWSE:2308"]').click();
     assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 2);
     await page.locator('[data-testid="watchlist-save"]').click();
     assert.match(await page.locator('[data-testid="watchlist-state"]').innerText(), /已儲存至瀏覽器預覽/);

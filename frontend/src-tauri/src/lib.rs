@@ -18,9 +18,15 @@ pub fn run() {
             watchlist::save_watchlist
         ])
         .setup(|app| {
+            let data_dir = app.path().app_data_dir().map_err(|error| {
+                Box::<dyn std::error::Error>::from(format!("resolve app data directory: {error}"))
+            })?;
+            std::fs::create_dir_all(&data_dir).map_err(|error| {
+                Box::<dyn std::error::Error>::from(format!("create app data directory: {error}"))
+            })?;
             let command = app.shell().sidecar(SIDECAR_NAME).map_err(|error| {
                 Box::<dyn std::error::Error>::from(format!("resolve sidecar: {error}"))
-            })?;
+            })?.env("TQE_DATA_DIR", data_dir.to_string_lossy().to_string());
             let (mut events, child) = command.spawn().map_err(|error| {
                 Box::<dyn std::error::Error>::from(format!("spawn sidecar: {error}"))
             })?;
