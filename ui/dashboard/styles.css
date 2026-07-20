@@ -385,6 +385,15 @@ td small { display: block; margin-top: 3px; color: var(--text-muted); font-size:
 .data-update-status.status-partial, .data-update-status.status-loading { color: var(--warning); }
 .data-update-status.status-error { color: var(--danger); }
 .data-update-note { color: var(--text-muted); font-size: 10px; line-height: 1.4; }
+.data-update-results { display: grid; gap: 5px; max-height: 180px; overflow: auto; padding-top: 4px; border-top: 1px solid var(--border-light); }
+.data-update-result { display: grid; grid-template-columns: minmax(90px, 0.6fr) auto minmax(120px, 1fr); align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border-light); }
+.data-update-result > span:first-child { display: grid; gap: 2px; min-width: 0; }
+.data-update-result strong { color: var(--text); font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 11px; }
+.data-update-result span small, .data-update-result-detail { overflow: hidden; color: var(--text-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.data-update-result-status { font-size: 10px; font-weight: 700; white-space: nowrap; }
+.data-update-result-status.status-success { color: var(--success); }
+.data-update-result-status.status-partial { color: var(--warning); }
+.data-update-result-status.status-error, .data-update-result-status.status-unsupported { color: var(--danger); }
 .system-metric-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin-bottom: 14px; border: 1px solid var(--border); background: var(--border); }
 .system-metric-strip article { display: grid; gap: 4px; min-height: 68px; padding: 12px 14px; background: #fff; }
 .system-metric-strip article > span { color: var(--text-muted); font-size: 9px; font-weight: 750; }
@@ -429,6 +438,11 @@ td small { display: block; margin-top: 3px; color: var(--text-muted); font-size:
   .system-global-search { width: 125px; }
   .system-feed-status, .system-topbar-right .read-only-pill { display: none; }
   .system-command-bar, .report-command-bar { align-items: flex-start; flex-direction: column; }
+  .data-update-heading, .data-update-controls { align-items: stretch; flex-direction: column; }
+  .data-update-status { max-width: none; text-align: left; }
+  .data-update-controls label, .data-update-controls .btn { width: 100%; }
+  .data-update-result { grid-template-columns: minmax(70px, .7fr) auto; }
+  .data-update-result-detail { grid-column: 1 / -1; }
   .system-command-actions, .report-tabs { justify-content: flex-start; }
   .system-metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .screen-condition-groups { grid-template-columns: 1fr; }

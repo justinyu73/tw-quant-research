@@ -10,7 +10,7 @@ const ROOT = path.resolve(__dirname, "..");
 const PREVIEW_DIR = path.join(ROOT, "outputs", "dashboard-preview");
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
-  overview: "9a0b3422566d020fcb6922711ff89020778ae4612565029a54e1155c8685d522",
+  overview: "ce694fb51998afd01fd434cd07eecaaa747867d54e22b74586107c11409903a6",
   market_valid: "b84a2b3806c6619accd0d1b466977687c74ab350ea321da0060b85dd8a7b3066",
   market_partial: "d4ef725a23528ec687b87109333061a5d65612103722a44eb1197a4663b9a70e",
   market_future: "8975648c050edcf10d3cee1fb0bb0d2a5cdf78cd1da77fc6c3c66db874426d31",
@@ -157,6 +157,8 @@ async function main() {
     assert.equal(await page.locator(".card").count() > 0, true);
     assert.equal(await page.locator('[data-testid="watchlist-toolbar"]').count(), 1);
     assert.equal(await page.locator('[data-testid="data-update-panel"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="data-update-scope"]').inputValue(), "watchlist");
+    assert.equal(await page.locator('[data-testid="data-update-scope"] option').count(), 2);
     assert.equal(await page.locator('[data-testid="data-update-button"]').isDisabled(), true);
     assert.match(await page.locator('[data-testid="data-update-status"]').innerText(), /瀏覽器預覽不下載/);
     assert.equal(await page.locator(".read-only-pill").innerText(), "研究唯讀");

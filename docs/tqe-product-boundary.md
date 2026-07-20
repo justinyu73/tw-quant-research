@@ -19,9 +19,10 @@ or autonomous quantitative-computation service.
 - Human-directed financial, valuation, comparison, and tracking calculations.
 - Company story, event, filing, and research-note tracking.
 - Read-only charts, tables, evidence panels, and local watchlists.
-- Desktop-only explicit update of the currently selected TWSE listed equity for
-  a trailing 1, 2, or 3 years; the downloaded raw responses and normalized K
-  line snapshots stay in the user's application data directory.
+- Desktop-only explicit update of the user's selected watchlist, or one
+  currently selected TWSE listed equity, for a trailing 1, 2, or 3 years; the
+  downloaded raw responses and normalized K line snapshots stay in the user's
+  application data directory.
 
 ## Out of scope
 
@@ -49,6 +50,6 @@ coverage are technically suitable. A free source contract must be established
 before any human-run capture work-unit is activated.
 
 The current desktop update is a bounded TWSE implementation of that rule. It is
-not a background refresh: the human chooses the selected listed stock and the
-1/2/3-year range, then explicitly starts the download. Browser preview mode is
-fixture-only and does not download data.
+not a background refresh: the human chooses the watchlist or selected listed
+stock and the 1/2/3-year range, then explicitly starts the download. Browser
+preview mode is fixture-only and does not download data.

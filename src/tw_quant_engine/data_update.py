@@ -19,6 +19,7 @@ TWSE_TERMS_URL = "https://www.twse.com.tw/"
 DATA_MANIFEST_SCHEMA = "tw-quant-engine-local-data-manifest/v1"
 TAIWAN_DATA_LICENSE = "https://data.gov.tw/license"
 MAX_YEARS = 3
+MAX_WATCHLIST_INSTRUMENTS = 100
 
 
 class DataUpdateError(ValueError):
@@ -299,10 +300,86 @@ def update_twse_history(
     }
 
 
+def update_twse_watchlist(
+    data_dir: str | Path,
+    instruments: list[Mapping[str, Any]],
+    years: int,
+    *,
+    today: date | None = None,
+    fetcher: Fetcher | None = None,
+) -> dict[str, Any]:
+    """Update only the caller-provided watchlist, one instrument at a time.
+
+    The caller must provide the explicit watchlist identities; this function
+    never discovers or downloads the full market universe. Unsupported
+    instruments remain visible as per-instrument results instead of aborting
+    the other selected stocks.
+    """
+    current_day = today or date.today()
+    requested_years = int(years)
+    _month_range(current_day, requested_years)
+    selected = list(instruments)
+    if len(selected) > MAX_WATCHLIST_INSTRUMENTS:
+        raise DataUpdateError(f"watchlist update is limited to {MAX_WATCHLIST_INSTRUMENTS} instruments")
+    if not selected:
+        return {
+            "scope": "watchlist",
+            "status": "empty",
+            "years": requested_years,
+            "requested_count": 0,
+            "updated_count": 0,
+            "bars_downloaded": 0,
+            "results": [],
+        }
+
+    results: list[dict[str, Any]] = []
+    for instrument in selected:
+        instrument_id = str(instrument.get("instrument_id") or "")
+        try:
+            result = update_twse_history(
+                data_dir,
+                instrument,
+                requested_years,
+                today=current_day,
+                fetcher=fetcher,
+            )
+        except (DataUpdateError, OSError, ValueError, TypeError) as exc:
+            market = str(instrument.get("market") or "")
+            symbol = str(instrument.get("symbol") or "")
+            unsupported = market != "TWSE" or not re.fullmatch(r"[1-9][0-9]{3}", symbol)
+            result = {
+                "status": "unsupported" if unsupported else "error",
+                "instrument_id": instrument_id,
+                "symbol": symbol,
+                "market": market,
+                "years": requested_years,
+                "months_requested": len(_month_range(current_day, requested_years)),
+                "months_downloaded": 0,
+                "bars_downloaded": 0,
+                "errors": [{"error": str(exc)}],
+            }
+        result["display_name"] = str(instrument.get("display_name") or result.get("symbol") or instrument_id)
+        results.append(result)
+
+    updated = [result for result in results if result["status"] in {"success", "partial"}]
+    status = "success" if len(updated) == len(results) else "partial" if updated else "error"
+    return {
+        "scope": "watchlist",
+        "status": status,
+        "years": requested_years,
+        "requested_count": len(results),
+        "updated_count": len(updated),
+        "bars_downloaded": sum(int(result.get("bars_downloaded") or 0) for result in results),
+        "results": results,
+    }
+
+
 __all__ = [
     "DATA_MANIFEST_SCHEMA",
     "DataUpdateError",
+    "MAX_WATCHLIST_INSTRUMENTS",
     "TWSE_STOCK_DAY_ENDPOINT",
     "read_manifest",
     "update_twse_history",
+    "update_twse_watchlist",
 ]

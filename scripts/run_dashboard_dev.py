@@ -199,6 +199,7 @@ def collect_report(*, serve_loopback: bool = True) -> dict[str, object]:
                 "provider_calls": False,
                 "write_routes": False,
                 "user_initiated_data_update": True,
+                "data_update_scope": "explicit_watchlist_or_selected_twse_equity",
                 "visual_browser": "separate Playwright pixel gate",
             },
             "summary": summary,
