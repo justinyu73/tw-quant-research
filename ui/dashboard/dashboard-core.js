@@ -48,6 +48,11 @@
       },
       watchlistGroups: [{ id: "default", name: "我的自選", items: [] }],
       activeWatchlistGroupId: "default",
+      dataUpdate: {
+        years: 1,
+        status: "idle",
+        message: ""
+      },
       screenSpec: {
         schema: "tw-quant-engine-screen-spec/v1",
         universe: "s8.product_rows",
@@ -305,6 +310,20 @@
       return Object.assign({}, current, {
         watchlist: { items: normalizeWatchlist(current.watchlist.items), status: "saved", dirty: false, message: "" }
       });
+    }
+    if (event.type === "SET_DATA_UPDATE_YEARS") {
+      var requestedYears = Number(event.years);
+      if ([1, 2, 3].indexOf(requestedYears) < 0) return current;
+      return Object.assign({}, current, { dataUpdate: Object.assign({}, current.dataUpdate, { years: requestedYears }) });
+    }
+    if (event.type === "DATA_UPDATE_START") {
+      return Object.assign({}, current, { dataUpdate: Object.assign({}, current.dataUpdate, { status: "loading", message: "正在下載並驗證官方資料…" }) });
+    }
+    if (event.type === "DATA_UPDATE_SUCCESS") {
+      return Object.assign({}, current, { dataUpdate: Object.assign({}, current.dataUpdate, { status: event.status || "success", message: event.message || "本機資料已更新" }) });
+    }
+    if (event.type === "DATA_UPDATE_ERROR") {
+      return Object.assign({}, current, { dataUpdate: Object.assign({}, current.dataUpdate, { status: "error", message: event.message || "本機資料更新失敗" }) });
     }
     if (event.type === "SET_SCREEN_SPEC" && ["quality", "market", "max_rows"].indexOf(event.field) >= 0) {
       var nextSpec = Object.assign({}, current.screenSpec);

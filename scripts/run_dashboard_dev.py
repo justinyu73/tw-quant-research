@@ -39,6 +39,7 @@ REQUIRED_APP_MARKUP = (
     'data-action="close-dialog"',
     'data-testid="kline-chart"',
     'data-action="kline-period"',
+    'data-testid="data-update-panel"',
 )
 REQUIRED_CSS_SELECTORS = (
     ".sidebar",
@@ -167,7 +168,7 @@ def collect_report(*, serve_loopback: bool = True) -> dict[str, object]:
             "required_css": all(token in styles for token in REQUIRED_CSS_SELECTORS),
             "browser_runtime_sidecar_loopback": "fetch(" in browser_code and "http://127.0.0.1" in browser_code,
             "browser_no_external_network": all(token not in browser_code for token in ("xmlhttprequest", "websocket", "https://")),
-            "browser_no_sidecar_write_route": "/orders" not in browser_code and not re.search(r"fetch\([^)]*method\s*:\s*[\"'](?:post|put|patch|delete)", browser_code),
+            "browser_no_order_route": "/orders" not in browser_code,
         }
 
         if serve_loopback:
@@ -197,6 +198,7 @@ def collect_report(*, serve_loopback: bool = True) -> dict[str, object]:
                 "connection": "127.0.0.1 loopback only",
                 "provider_calls": False,
                 "write_routes": False,
+                "user_initiated_data_update": True,
                 "visual_browser": "separate Playwright pixel gate",
             },
             "summary": summary,

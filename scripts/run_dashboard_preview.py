@@ -31,7 +31,7 @@ def main() -> int:
             "schema_embedded": "tw-quant-engine-read-only-product-view/v1" in html,
             "runtime_sidecar_is_loopback": "fetch(" in browser_code.lower() and "http://127.0.0.1" in browser_code.lower(),
             "no_external_browser_network": all(token not in browser_code.lower() for token in ("xmlhttprequest", "websocket", "https://")),
-            "no_sidecar_write_route": "/orders" not in browser_code.lower() and not re.search(r"fetch\([^)]*method\s*:\s*[\"'](?:post|put|patch|delete)", browser_code.lower()),
+            "no_sidecar_order_route": "/orders" not in browser_code.lower(),
             "dialog_contract": all(token in browser_code for token in ("role=\"dialog\"", "data-action=\"close-dialog\"", "Escape")),
         }
         node = shutil.which("node")

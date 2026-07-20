@@ -1,4 +1,4 @@
-"""Offline, GET-only loopback catalog for the TQE desktop app."""
+"""Loopback catalog with an explicit user-triggered local data update route."""
 from __future__ import annotations
 
 import copy
@@ -17,6 +17,7 @@ from .k6b_snapshot import K6B_SNAPSHOT_SCHEMA, load_snapshot as load_k6b_snapsho
 from .kline_aggregation import PERIODS, aggregate_dataset
 from .kline_contract import KlineFixture
 from .kline_view import KLINE_READ_MODEL_SCHEMA, build_kline_read_model
+from .data_update import DataUpdateError, read_manifest, update_twse_history
 
 
 SIDECAR_INSTRUMENTS_SCHEMA = "tw-quant-engine-sidecar-instruments/v1"
@@ -57,9 +58,11 @@ def _load_snapshot(path: Path) -> dict[str, Any]:
     raise SidecarContractError(f"unsupported desktop snapshot schema in {path.name!r}")
 
 
-def _snapshot_paths(fixture_root: Path) -> list[Path]:
-    paths = sorted((fixture_root / "k6a").glob("*.json.gz"))
-    paths.extend(sorted((fixture_root / "k6b").glob("*.json.gz")))
+def _snapshot_paths(fixture_root: Path, data_dir: Path | None = None) -> list[tuple[Path, bool]]:
+    paths = [(path, False) for path in sorted((fixture_root / "k6a").glob("*.json.gz"))]
+    paths.extend((path, False) for path in sorted((fixture_root / "k6b").glob("*.json.gz")))
+    if data_dir is not None:
+        paths.extend((path, True) for path in sorted((data_dir / "k6a").glob("*.json.gz")))
     if not paths:
         raise SidecarContractError(f"no K6a/K6b snapshots found under {fixture_root}")
     return paths
@@ -121,7 +124,7 @@ def _merge_datasets(entries: list[tuple[dict[str, Any], dict[str, Any]]], instru
 
 @dataclass(frozen=True)
 class KlineCatalog:
-    """Deterministic read-only models derived from committed K6 snapshots."""
+    """Deterministic read-only models from bundled and local K6 snapshots."""
 
     instruments: tuple[dict[str, Any], ...]
     models: dict[tuple[str, str], dict[str, Any]]
@@ -151,16 +154,31 @@ class KlineCatalog:
         }
 
 
-def load_catalog(fixture_root: str | Path) -> KlineCatalog:
-    """Load K6a/K6b gzip snapshots and build all period read models offline."""
+def load_catalog(fixture_root: str | Path, data_dir: str | Path | None = None) -> KlineCatalog:
+    """Load bundled and user-downloaded K6a/K6b snapshots into read models."""
     root = Path(fixture_root).resolve()
-    grouped: dict[str, list[tuple[dict[str, Any], dict[str, Any]]]] = defaultdict(list)
-    for path in _snapshot_paths(root):
+    local_root = Path(data_dir).expanduser().resolve() if data_dir is not None else None
+    grouped_by_date: dict[str, dict[tuple[str, str, str], tuple[dict[str, Any], dict[str, Any], bool]]] = defaultdict(dict)
+    for path, is_local in _snapshot_paths(root, local_root):
         snapshot = _load_snapshot(path)
         fixture = KlineFixture.from_payload(snapshot["kline_fixture"])
         for dataset in fixture.datasets:
             instrument_id = dataset["instrument"]["instrument_id"]
-            grouped[instrument_id].append((snapshot, dataset))
+            for bar in dataset["bars"]:
+                trading_date = str(bar["trading_date"])
+                session = str(bar.get("session") or "regular")
+                day_dataset = copy.deepcopy(dataset)
+                day_dataset["bars"] = [copy.deepcopy(bar)]
+                day_dataset["dataset_id"] = f"{dataset['dataset_id']}-{trading_date}-{session}"
+                key = (instrument_id, trading_date, session)
+                existing = grouped_by_date[instrument_id].get(key)
+                if existing is None or is_local or not existing[2]:
+                    grouped_by_date[instrument_id][key] = (snapshot, day_dataset, is_local)
+
+    grouped: dict[str, list[tuple[dict[str, Any], dict[str, Any]]]] = {
+        instrument_id: [(snapshot, dataset) for snapshot, dataset, _ in sorted(entries.values(), key=lambda item: item[1]["bars"][0]["trading_date"])]
+        for instrument_id, entries in grouped_by_date.items()
+    }
 
     models: dict[tuple[str, str], dict[str, Any]] = {}
     instrument_rows: list[dict[str, Any]] = []
@@ -192,7 +210,7 @@ def _json_response(handler: BaseHTTPRequestHandler, status: int, payload: Mappin
     handler.wfile.write(body)
 
 
-def _request_handler(catalog: KlineCatalog) -> type[BaseHTTPRequestHandler]:
+def _request_handler(runtime: dict[str, Any]) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
 
@@ -203,7 +221,33 @@ def _request_handler(catalog: KlineCatalog) -> type[BaseHTTPRequestHandler]:
             _json_response(self, 405, {"error": "read_only", "allow": ["GET"]})
 
         def do_POST(self) -> None:  # noqa: N802
-            self._method_not_allowed()
+            parsed = urlsplit(self.path)
+            if parsed.path != "/data/update":
+                self._method_not_allowed()
+                return
+            data_dir = runtime.get("data_dir")
+            fixture_root = runtime.get("fixture_root")
+            if data_dir is None or fixture_root is None:
+                _json_response(self, 409, {"error": "data_update_unavailable_in_preview"})
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or "0")
+                if length <= 0 or length > 65536:
+                    raise DataUpdateError("data update body size is invalid")
+                body = json.loads(self.rfile.read(length).decode("utf-8"))
+                if not isinstance(body, Mapping):
+                    raise DataUpdateError("data update body must be an object")
+                years = int(body.get("years"))
+                instrument_id = str(body.get("instrument_id") or "")
+                instrument = next((item for item in runtime["catalog"].instruments if item["instrument_id"] == instrument_id), None)
+                if instrument is None:
+                    _json_response(self, 404, {"error": "instrument_not_found"})
+                    return
+                result = update_twse_history(data_dir, instrument, years)
+                runtime["catalog"] = load_catalog(fixture_root, data_dir=data_dir)
+                _json_response(self, 200, {"read_only": False, "data": result, "instruments": runtime["catalog"].instruments})
+            except (DataUpdateError, ValueError, TypeError, json.JSONDecodeError) as exc:
+                _json_response(self, 400, {"error": str(exc)})
 
         def do_PUT(self) -> None:  # noqa: N802
             self._method_not_allowed()
@@ -223,7 +267,12 @@ def _request_handler(catalog: KlineCatalog) -> type[BaseHTTPRequestHandler]:
                 if parsed.query:
                     _json_response(self, 400, {"error": "unexpected_query"})
                     return
-                _json_response(self, 200, catalog.instruments_response())
+                _json_response(self, 200, runtime["catalog"].instruments_response())
+                return
+            if parsed.path == "/data/status":
+                data_dir = runtime.get("data_dir")
+                manifest = read_manifest(data_dir) if data_dir is not None else {"schema": "tw-quant-engine-local-data-manifest/v1", "downloads": []}
+                _json_response(self, 200, {"enabled": data_dir is not None, "manifest": manifest})
                 return
             if parsed.path != "/kline":
                 _json_response(self, 404, {"error": "unknown_route"})
@@ -233,16 +282,28 @@ def _request_handler(catalog: KlineCatalog) -> type[BaseHTTPRequestHandler]:
             if set(query) != {"instrument", "period"} or any(len(values) != 1 or not values[0] for values in query.values()):
                 _json_response(self, 400, {"error": "instrument_and_period_required"})
                 return
-            status, payload = catalog.kline_response(query["instrument"][0], query["period"][0])
+            status, payload = runtime["catalog"].kline_response(query["instrument"][0], query["period"][0])
             _json_response(self, status, payload)
 
     return Handler
 
 
-def create_server(catalog: KlineCatalog, *, host: str = "127.0.0.1", port: int = 8766) -> ThreadingHTTPServer:
+def create_server(
+    catalog: KlineCatalog,
+    *,
+    host: str = "127.0.0.1",
+    port: int = 8766,
+    fixture_root: str | Path | None = None,
+    data_dir: str | Path | None = None,
+) -> ThreadingHTTPServer:
     """Create a loopback-only HTTP server; the caller owns its lifecycle."""
     validate_loopback_host(host)
-    handler = _request_handler(catalog)
+    runtime = {
+        "catalog": catalog,
+        "fixture_root": Path(fixture_root).resolve() if fixture_root is not None else None,
+        "data_dir": Path(data_dir).expanduser().resolve() if data_dir is not None else None,
+    }
+    handler = _request_handler(runtime)
     return ThreadingHTTPServer((host, int(port)), handler)
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the TQE offline read-only sidecar on loopback."""
+"""Run the TQE loopback sidecar with optional desktop local-data updates."""
 from __future__ import annotations
 
 import argparse
@@ -27,14 +27,16 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--host", default=os.getenv("TQE_SIDECAR_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.getenv("TQE_SIDECAR_PORT", "8766")))
     parser.add_argument("--fixture-dir", type=Path, default=Path(os.getenv("TQE_FIXTURE_DIR", _default_fixture_dir())))
+    parser.add_argument("--data-dir", type=Path, default=None, help="optional writable local data directory for explicit user updates")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     host = validate_loopback_host(args.host)
-    catalog = load_catalog(args.fixture_dir)
-    server = create_server(catalog, host=host, port=args.port)
+    data_dir = args.data_dir or (Path(os.environ["TQE_DATA_DIR"]) if os.getenv("TQE_DATA_DIR") else None)
+    catalog = load_catalog(args.fixture_dir, data_dir=data_dir)
+    server = create_server(catalog, host=host, port=args.port, fixture_root=args.fixture_dir, data_dir=data_dir)
     print(
         f"TQR sidecar listening on http://{host}:{args.port} "
         f"instruments={len(catalog.instruments)} digest={catalog.digest}",

@@ -1,6 +1,8 @@
 # Desktop release and download contract
 
-TW Quant Research is distributed as a local, read-only desktop application.
+TW Quant Research is distributed as a local research desktop application. Its
+market and research views are read-only; the only write-capable data action is
+the explicit, bounded TWSE local-history update described below.
 The public download surface is the GitHub Release for the matching `vX.Y.Z`
 tag; the repository source remains the authority for the app and its evidence.
 
@@ -116,14 +118,35 @@ System Settings → Privacy & Security → Open Anyway. Removing the quarantine
 attribute is an explicit security exception for this app; it is not a
 substitute for verifying `SHA256SUMS.txt`.
 
+## Desktop local-data update
+
+After launching the desktop app:
+
+1. Open `行情` and choose a listed TWSE stock, such as `2308`.
+2. On `市場首頁`, find `更新台股資料`.
+3. Select `近 1 年`, `近 2 年`, or `近 3 年`, then press
+   `下載並更新本機資料`.
+4. Wait for the result count and return to `行情` to confirm the K-line
+   history and technical indicators use the updated local snapshot.
+
+This action is manual and limited to the selected TWSE listed equity. Raw
+responses are kept under the app data directory's `raw/twse/<symbol>/`, while
+normalized daily snapshots are kept under `k6a/`; browser preview has no
+download capability. TPEx, full-market, real-time, and background refresh are
+not enabled by this button.
+
 ## Product boundary
 
 The app reads the committed offline fixtures through a loopback sidecar. It
-does not call providers, place orders, connect to a broker, or execute an
-automatic strategy. The release workflow does not add signing credentials or
-private data. Code signing and notarization are separate release decisions;
-unsigned builds may show platform security warnings until those decisions are
-approved and configured.
+does not refresh providers in the background, place orders, connect to a broker,
+or execute an automatic strategy. In the desktop app, a human can explicitly
+download the selected TWSE listed equity for 1, 2, or 3 trailing years; raw
+responses and normalized K6a snapshots are saved in the app data directory.
+Browser preview remains fixture-only, and TPEx/full-market download is not
+enabled. The release workflow does not add signing credentials or private data.
+Code signing and notarization are separate release decisions; unsigned builds
+may show platform security warnings until those decisions are approved and
+configured.
 
 ## Local verification
 

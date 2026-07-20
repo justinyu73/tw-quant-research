@@ -5,6 +5,7 @@ import calendar
 import hashlib
 import json
 import math
+import re
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
@@ -41,8 +42,12 @@ def _number(value: Any) -> int | float | None:
 
 def parse_roc_date(value: Any) -> str:
     text = str(value).strip()
-    if len(text) == 8 and text[4] == "-" and text[7] == "-":
+    if len(text) == 10 and text[4] == "-" and text[7] == "-":
         return date.fromisoformat(text).isoformat()
+    slash_match = re.fullmatch(r"(\d{2,4})/(\d{1,2})/(\d{1,2})", text)
+    if slash_match:
+        year, month, day = (int(part) for part in slash_match.groups())
+        return date(year if year >= 1911 else year + 1911, month, day).isoformat()
     if len(text) != 7 or not text.isdigit():
         raise ValueError(f"unsupported ROC date: {value!r}")
     year = int(text[:3]) + 1911
