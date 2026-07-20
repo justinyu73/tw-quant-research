@@ -30,6 +30,11 @@ These commands assume the release has been published rather than left as a
 draft. Replace `v0.1.8` with the release tag you are installing. The release
 contains `SHA256SUMS.txt`; verify it before opening an unsigned installer.
 
+The macOS Finder message `TW Quant Research 已損毀，無法打開` can be caused by
+Gatekeeper quarantining an unsigned or non-notarized app; it does not by itself
+prove that the DMG is corrupt. Do not remove quarantine until the checksum
+matches the published `SHA256SUMS.txt`.
+
 ### Prerequisites
 
 Install GitHub CLI and authenticate once:
@@ -75,45 +80,41 @@ Windows SmartScreen may still warn because the build is unsigned. Only choose
 `More info` → `Run anyway` after the SHA-256 check passes and the source tag is
 the expected one.
 
-### macOS Terminal: download, verify, and install DMG
+### macOS Terminal: download, verify, install, and clear quarantine
 
-Use the Intel pattern on an Intel Mac and the Apple Silicon pattern on an M1+
-Mac:
+The command below selects Intel or Apple Silicon automatically. It verifies the
+DMG before copying the app and then clears the quarantine attribute that causes
+the Finder “damaged” message on an unsigned build:
 
 ```sh
 REPO="justinyu73/tw-quant-research"
 RELEASE="v0.1.8"
 DOWNLOAD="$HOME/Downloads/tqr-$RELEASE"
 mkdir -p "$DOWNLOAD"
-cd "$DOWNLOAD"
+case "$(uname -m)" in
+  arm64) ASSET="TQR-macOS-Apple-Silicon.dmg" ;;
+  x86_64) ASSET="TQR-macOS-Intel.dmg" ;;
+  *) echo "Unsupported macOS architecture: $(uname -m)" >&2; exit 1 ;;
+esac
 
-# Intel Mac:
-gh release download "$RELEASE" --repo "$REPO" --pattern 'TQR-macOS-Intel.dmg' --pattern 'SHA256SUMS.txt'
-
-# Apple Silicon Mac: use this instead of the Intel command above.
-# gh release download "$RELEASE" --repo "$REPO" --pattern 'TQR-macOS-Apple-Silicon.dmg' --pattern 'SHA256SUMS.txt'
-
-DMG="$(find . -maxdepth 1 -name '*.dmg' -print -quit)"
-grep -F "  $(basename "$DMG")" SHA256SUMS.txt | shasum -a 256 -c -
+gh release download "$RELEASE" --repo "$REPO" \
+  --pattern "$ASSET" --pattern 'SHA256SUMS.txt' --dir "$DOWNLOAD"
+DMG="$DOWNLOAD/$ASSET"
+grep -F "  $ASSET" "$DOWNLOAD/SHA256SUMS.txt" | shasum -a 256 -c -
 
 MOUNT_POINT="$(hdiutil attach -nobrowse -readonly "$DMG" | sed -n 's#^.*\(/Volumes/.*\)$#\1#p' | head -n 1)"
 APP_SOURCE="$(find "$MOUNT_POINT" -maxdepth 1 -name '*.app' -print -quit)"
-sudo ditto "$APP_SOURCE" "/Applications/TW Quant Research.app"
+APP_PATH="/Applications/TW Quant Research.app"
+sudo ditto "$APP_SOURCE" "$APP_PATH"
 hdiutil detach "$MOUNT_POINT"
-open "/Applications/TW Quant Research.app"
+sudo xattr -dr com.apple.quarantine "$APP_PATH"
+open "$APP_PATH"
 ```
 
-If macOS blocks the unsigned app, first use System Settings → Privacy &
-Security → Open Anyway. After the SHA-256 check has passed, the terminal
-alternative is:
-
-```sh
-sudo xattr -dr com.apple.quarantine "/Applications/TW Quant Research.app"
-open "/Applications/TW Quant Research.app"
-```
-
-Removing the quarantine attribute is an explicit security exception for this
-app; it is not a substitute for verifying `SHA256SUMS.txt`.
+If you prefer the GUI, after the checksum passes open the app once, then use
+System Settings → Privacy & Security → Open Anyway. Removing the quarantine
+attribute is an explicit security exception for this app; it is not a
+substitute for verifying `SHA256SUMS.txt`.
 
 ## Product boundary
 
