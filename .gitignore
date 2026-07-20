@@ -4,6 +4,7 @@ node_modules/
 .venv/
 venv/
 .pytest_cache/
+test-results/
 .mypy_cache/
 .ruff_cache/
 .coverage
