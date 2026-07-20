@@ -122,18 +122,18 @@ substitute for verifying `SHA256SUMS.txt`.
 
 After launching the desktop app:
 
-1. Open `行情` and choose a listed TWSE stock, such as `2308`.
-2. On `市場首頁`, find `更新台股資料`.
-3. Select `近 1 年`, `近 2 年`, or `近 3 年`, then press
-   `下載並更新本機資料`.
-4. Wait for the result count and return to `行情` to confirm the K-line
+1. Add one or more listed TWSE stocks to `我的自選`.
+2. On `市場首頁`, find `更新台股資料` and choose `全部自選` or `目前個股`.
+3. Select `近 1 年`, `近 2 年`, or `近 3 年`, then press the matching update
+   button.
+4. Review the per-stock result list, then return to `行情` to confirm the K-line
    history and technical indicators use the updated local snapshot.
 
-This action is manual and limited to the selected TWSE listed equity. Raw
-responses are kept under the app data directory's `raw/twse/<symbol>/`, while
-normalized daily snapshots are kept under `k6a/`; browser preview has no
-download capability. TPEx, full-market, real-time, and background refresh are
-not enabled by this button.
+This action is manual and limited to the explicit watchlist or selected TWSE
+listed equity. Raw responses are kept under the app data directory's
+`raw/twse/<symbol>/`, while normalized daily snapshots are kept under `k6a/`;
+browser preview has no download capability. TPEx, full-market, real-time, and
+background refresh are not enabled by this button.
 
 ## Product boundary
 

@@ -603,28 +603,51 @@
     }
   }
 
+  function dataUpdateTargetIds() {
+    var update = state.dataUpdate || {};
+    if (update.scope === "selected") {
+      var selected = selectedKlineInstrument();
+      return selected ? [selected.instrument_id] : [];
+    }
+    return state.watchlist && Array.isArray(state.watchlist.items) ? state.watchlist.items.slice() : [];
+  }
+
+  function dataUpdateResultMarkup(results) {
+    if (!Array.isArray(results) || !results.length) return "";
+    var labels = { success: "完成", partial: "部分完成", error: "失敗", unsupported: "未支援" };
+    return '<div class="data-update-results" data-testid="data-update-results">' + results.map(function (result) {
+      var instrument = instrumentForId(result.instrument_id) || {};
+      var name = instrument.symbol || result.symbol || result.instrument_id || "未指定標的";
+      var detail = result.bars_downloaded ? "K 線 " + result.bars_downloaded + " 筆" : (result.errors && result.errors[0] && (result.errors[0].error || result.errors[0].message)) || "沒有新增資料";
+      return '<div class="data-update-result"><span><strong>' + text(name) + '</strong><small>' + text(instrument.display_name || result.display_name || result.instrument_id) + '</small></span><span class="data-update-result-status status-' + escapeHtml(result.status || "error") + '">' + text(labels[result.status] || result.status || "失敗") + '</span><small class="data-update-result-detail">' + text(detail) + '</small></div>';
+    }).join("") + '</div>';
+  }
+
   function requestDataUpdate() {
     if (dataUpdateInFlight) return;
-    var instrument = selectedKlineInstrument();
-    if (!instrument) {
-      state = core.reduce(state, { type: "DATA_UPDATE_ERROR", message: "請先選取一個個股" });
+    var update = state.dataUpdate || { scope: "watchlist", years: 1 };
+    var instrumentIds = dataUpdateTargetIds();
+    if (!instrumentIds.length) {
+      state = core.reduce(state, { type: "DATA_UPDATE_ERROR", message: update.scope === "selected" ? "請先選取一個個股" : "請先加入自選標的" });
       render();
       return;
     }
     dataUpdateInFlight = true;
     state = core.reduce(state, { type: "DATA_UPDATE_START" });
     render();
-    var years = state.dataUpdate && state.dataUpdate.years || 1;
+    var years = update.years || 1;
+    var body = { scope: update.scope || "watchlist", instrument_ids: instrumentIds, years: years };
+    if (update.scope === "selected") body.instrument_id = instrumentIds[0];
     sidecarRequest("/data/update", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ instrument_id: instrument.instrument_id, years: years })
+      body: JSON.stringify(body)
     }).then(function (payload) {
       var result = payload && payload.data || {};
-      var message = result.status === "partial"
-        ? "已更新 " + (result.bars_downloaded || 0) + " 筆；部分月份失敗"
-        : "已更新 " + (result.bars_downloaded || 0) + " 筆本機 K 線資料";
-      state = core.reduce(state, { type: "DATA_UPDATE_SUCCESS", status: result.status || "success", message: message });
+      var message = update.scope === "watchlist"
+        ? "自選更新：" + (result.updated_count || 0) + "/" + (result.requested_count || instrumentIds.length) + " 檔，K 線 " + (result.bars_downloaded || 0) + " 筆"
+        : "目前個股：K 線 " + (result.bars_downloaded || 0) + " 筆";
+      state = core.reduce(state, { type: "DATA_UPDATE_SUCCESS", status: result.status || "success", message: message, results: result.results || [result] });
       if (Array.isArray(payload.instruments)) {
         state = core.reduce(state, { type: "SET_KLINE_INSTRUMENTS", instruments: payload.instruments });
       }
@@ -679,14 +702,20 @@
   }
 
   function dataUpdateMarkup() {
-    var update = state.dataUpdate || { years: 1, status: "idle", message: "" };
+    var update = state.dataUpdate || { scope: "watchlist", years: 1, status: "idle", message: "", results: [] };
     var instrument = selectedKlineInstrument();
+    var targetIds = dataUpdateTargetIds();
+    var isWatchlist = update.scope !== "selected";
     var desktopAvailable = desktopDataUpdateAvailable();
-    var enabled = Boolean(instrument) && desktopAvailable && !dataUpdateInFlight;
+    var enabled = targetIds.length > 0 && desktopAvailable && !dataUpdateInFlight;
+    var targetLabel = isWatchlist
+      ? "全部自選（" + targetIds.length + " 檔）"
+      : instrument ? (instrument.market + ":" + instrument.symbol + " · " + instrument.display_name) : "尚未選取個股";
     var statusText = !desktopAvailable
       ? "瀏覽器預覽不下載；請使用桌面版"
-      : update.status === "idle" ? "尚未更新；只下載目前選取的個股" : (update.message || STATUS_LABELS[update.status] || update.status);
-    return '<section class="data-update-panel" data-testid="data-update-panel"><div class="data-update-heading"><div><span class="eyebrow">官方免費來源 → 本機保存</span><h2>更新台股資料</h2><p>目前範圍：' + text(instrument ? (instrument.market + ":" + instrument.symbol + " · " + instrument.display_name) : "尚未選取個股") + '</p></div><span class="data-update-status status-' + escapeHtml(update.status) + '" data-testid="data-update-status">' + text(statusText) + '</span></div><div class="data-update-controls"><label><span>歷史範圍</span><select data-action="data-update-years" data-testid="data-update-years"><option value="1"' + (update.years === 1 ? ' selected' : '') + '>近 1 年</option><option value="2"' + (update.years === 2 ? ' selected' : '') + '>近 2 年</option><option value="3"' + (update.years === 3 ? ' selected' : '') + '>近 3 年</option></select></label><button class="btn btn-primary" type="button" data-action="data-update" data-testid="data-update-button"' + (enabled ? '' : ' disabled') + '>' + (dataUpdateInFlight ? '更新中…' : '下載並更新本機資料') + '</button></div><small class="data-update-note">目前提供 TWSE 上市個股；資料保存於本機 raw 與 K 線快照，不是即時行情，也不會自動下載全市場。瀏覽器預覽僅展示介面。</small></section>';
+      : targetIds.length === 0 ? (isWatchlist ? "請先加入自選標的" : "請先選取個股")
+      : update.status === "idle" ? "尚未更新；只下載目前範圍的個股" : (update.message || STATUS_LABELS[update.status] || update.status);
+    return '<section class="data-update-panel" data-testid="data-update-panel"><div class="data-update-heading"><div><span class="eyebrow">官方免費來源 → 本機保存</span><h2>更新台股資料</h2><p>更新範圍：' + text(targetLabel) + '</p></div><span class="data-update-status status-' + escapeHtml(update.status) + '" data-testid="data-update-status">' + text(statusText) + '</span></div><div class="data-update-controls"><label><span>更新範圍</span><select data-action="data-update-scope" data-testid="data-update-scope"><option value="watchlist"' + (isWatchlist ? ' selected' : '') + '>全部自選（' + targetIds.length + ' 檔）</option><option value="selected"' + (isWatchlist ? '' : ' selected') + '>目前個股</option></select></label><label><span>歷史範圍</span><select data-action="data-update-years" data-testid="data-update-years"><option value="1"' + (update.years === 1 ? ' selected' : '') + '>近 1 年</option><option value="2"' + (update.years === 2 ? ' selected' : '') + '>近 2 年</option><option value="3"' + (update.years === 3 ? ' selected' : '') + '>近 3 年</option></select></label><button class="btn btn-primary" type="button" data-action="data-update" data-testid="data-update-button"' + (enabled ? '' : ' disabled') + '>' + (dataUpdateInFlight ? '更新中…' : (isWatchlist ? '下載並更新自選資料' : '下載並更新目前個股')) + '</button></div><small class="data-update-note">目前提供 TWSE 上市個股；只處理目前範圍，不下載全市場。資料保存於本機 raw 與 K 線快照，不是即時行情；瀏覽器預覽僅展示介面。</small>' + dataUpdateResultMarkup(update.results) + '</section>';
   }
 
   function watchlistRows() {
@@ -1243,6 +1272,11 @@
     }
     if (target.getAttribute("data-action") === "data-update-years") {
       state = core.reduce(state, { type: "SET_DATA_UPDATE_YEARS", years: target.value });
+      render();
+      return;
+    }
+    if (target.getAttribute("data-action") === "data-update-scope") {
+      state = core.reduce(state, { type: "SET_DATA_UPDATE_SCOPE", scope: target.value });
       render();
       return;
     }

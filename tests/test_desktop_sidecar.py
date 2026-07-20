@@ -2,7 +2,9 @@ import json
 import sys
 import threading
 import unittest
+from tempfile import TemporaryDirectory
 from pathlib import Path
+from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
@@ -89,6 +91,52 @@ class DesktopSidecarTests(unittest.TestCase):
         with self.assertRaises(HTTPError) as context:
             urlopen(f"{self.base}/orders", timeout=5)  # nosec B310 - test server is loopback-only
         self.assertEqual(context.exception.code, 404)
+
+    def test_configured_watchlist_update_route_passes_only_requested_instruments(self) -> None:
+        with TemporaryDirectory(prefix="tqr-sidecar-update-") as directory:
+            server = create_server(
+                self.catalog,
+                port=0,
+                fixture_root=ROOT / "tests" / "fixtures",
+                data_dir=directory,
+            )
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                base = f"http://127.0.0.1:{server.server_address[1]}"
+                body = json.dumps({
+                    "scope": "watchlist",
+                    "instrument_ids": ["TWSE:2308", "TWSE:2330"],
+                    "years": 2,
+                }).encode("utf-8")
+                request = Request(
+                    f"{base}/data/update",
+                    data=body,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                expected = {
+                    "scope": "watchlist",
+                    "status": "success",
+                    "years": 2,
+                    "requested_count": 2,
+                    "updated_count": 2,
+                    "bars_downloaded": 20,
+                    "results": [],
+                }
+                with patch("tw_quant_engine.desktop_sidecar.update_twse_watchlist", return_value=expected) as updater:
+                    with urlopen(request, timeout=5) as response:  # nosec B310 - test server is loopback-only
+                        status = response.status
+                        payload = json.loads(response.read().decode("utf-8"))
+                self.assertEqual(status, 200)
+                self.assertFalse(payload["read_only"])
+                self.assertEqual(payload["data"]["scope"], "watchlist")
+                self.assertEqual([item["instrument_id"] for item in updater.call_args.args[1]], ["TWSE:2308", "TWSE:2330"])
+                self.assertEqual(updater.call_args.args[2], 2)
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
 
     def test_kline_query_requires_both_explicit_parameters(self) -> None:
         with self.assertRaises(HTTPError) as context:

@@ -9,7 +9,7 @@
     "loopback_only": true,
     "provider_calls_from_app": false,
     "user_initiated_data_update": true,
-    "data_update_scope": "selected_twse_equity_only",
+    "data_update_scope": "explicit_watchlist_or_selected_twse_equity",
     "provider_calls_from_explicit_user_update": true,
     "order_routes": false,
     "automatic_execution": false

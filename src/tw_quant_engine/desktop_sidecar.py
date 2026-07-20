@@ -17,7 +17,12 @@ from .k6b_snapshot import K6B_SNAPSHOT_SCHEMA, load_snapshot as load_k6b_snapsho
 from .kline_aggregation import PERIODS, aggregate_dataset
 from .kline_contract import KlineFixture
 from .kline_view import KLINE_READ_MODEL_SCHEMA, build_kline_read_model
-from .data_update import DataUpdateError, read_manifest, update_twse_history
+from .data_update import (
+    MAX_WATCHLIST_INSTRUMENTS,
+    DataUpdateError,
+    read_manifest,
+    update_twse_watchlist,
+)
 
 
 SIDECAR_INSTRUMENTS_SCHEMA = "tw-quant-engine-sidecar-instruments/v1"
@@ -238,12 +243,29 @@ def _request_handler(runtime: dict[str, Any]) -> type[BaseHTTPRequestHandler]:
                 if not isinstance(body, Mapping):
                     raise DataUpdateError("data update body must be an object")
                 years = int(body.get("years"))
-                instrument_id = str(body.get("instrument_id") or "")
-                instrument = next((item for item in runtime["catalog"].instruments if item["instrument_id"] == instrument_id), None)
-                if instrument is None:
-                    _json_response(self, 404, {"error": "instrument_not_found"})
-                    return
-                result = update_twse_history(data_dir, instrument, years)
+                scope = str(body.get("scope") or "selected")
+                if scope == "selected":
+                    instrument_id = str(body.get("instrument_id") or "")
+                    instrument_ids = [instrument_id] if instrument_id else []
+                elif scope == "watchlist":
+                    requested_ids = body.get("instrument_ids")
+                    if not isinstance(requested_ids, list):
+                        raise DataUpdateError("watchlist update requires instrument_ids")
+                    if len(requested_ids) > MAX_WATCHLIST_INSTRUMENTS:
+                        raise DataUpdateError(f"watchlist update is limited to {MAX_WATCHLIST_INSTRUMENTS} instruments")
+                    instrument_ids = [str(item) for item in requested_ids]
+                else:
+                    raise DataUpdateError("scope must be selected or watchlist")
+                if not instrument_ids or len(set(instrument_ids)) != len(instrument_ids):
+                    raise DataUpdateError("data update instrument list must be non-empty and unique")
+                instruments = []
+                for instrument_id in instrument_ids:
+                    instrument = next((item for item in runtime["catalog"].instruments if item["instrument_id"] == instrument_id), None)
+                    if instrument is None:
+                        _json_response(self, 404, {"error": "instrument_not_found", "instrument_id": instrument_id})
+                        return
+                    instruments.append(instrument)
+                result = update_twse_watchlist(data_dir, instruments, years)
                 runtime["catalog"] = load_catalog(fixture_root, data_dir=data_dir)
                 _json_response(self, 200, {"read_only": False, "data": result, "instruments": runtime["catalog"].instruments})
             except (DataUpdateError, ValueError, TypeError, json.JSONDecodeError) as exc:
