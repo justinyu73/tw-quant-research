@@ -83,6 +83,25 @@ class DesktopSidecarTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertFalse(payload["enabled"])
 
+    def test_health_and_json_update_preflight_are_available(self) -> None:
+        status, payload = self._get("/health")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["status"], "ok")
+        request = Request(
+            f"{self.base}/data/update",
+            headers={
+                "Origin": "tauri://localhost",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type",
+            },
+            method="OPTIONS",
+        )
+        with urlopen(request, timeout=5) as response:  # nosec B310 - test server is loopback-only
+            self.assertEqual(response.status, 204)
+            self.assertEqual(response.headers.get("Access-Control-Allow-Origin"), "*")
+            self.assertIn("POST", response.headers.get("Access-Control-Allow-Methods", ""))
+            self.assertIn("Content-Type", response.headers.get("Access-Control-Allow-Headers", ""))
+
     def test_only_get_routes_are_served(self) -> None:
         request = Request(f"{self.base}/kline", method="POST")
         with self.assertRaises(HTTPError) as context:

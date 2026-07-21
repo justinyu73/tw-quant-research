@@ -39,8 +39,14 @@ state = core.reduce(state, { type: "SET_WATCHLIST", items: ["TWSE:2330", "TAIFEX
 assert.deepEqual(state.watchlist.items, ["TWSE:2330", "TAIFEX:TX:202608"]);
 state = core.reduce(state, { type: "CREATE_WATCHLIST_GROUP", name: "半導體" });
 assert.notEqual(state.activeWatchlistGroupId, "default");
+const customGroupId = state.activeWatchlistGroupId;
 state = core.reduce(state, { type: "ADD_TO_WATCHLIST_GROUP", instrumentId: "TWSE:2330" });
 assert.deepEqual(core.watchlistItemsForActiveGroup(state), ["TWSE:2330"]);
+state = core.reduce(state, { type: "DELETE_WATCHLIST_GROUP", groupId: customGroupId });
+assert.equal(state.activeWatchlistGroupId, "default");
+assert.equal(state.watchlistGroups.some((group) => group.id === customGroupId), false);
+const stateAfterDefaultDelete = core.reduce(state, { type: "DELETE_WATCHLIST_GROUP", groupId: "default" });
+assert.deepEqual(stateAfterDefaultDelete.watchlistGroups, state.watchlistGroups);
 assert.deepEqual(core.screenProducts(view, { quality: "admitted", market: "TWSE", max_rows: 20 }).map((row) => row.instrument.security_id), ["2330"]);
 state = core.reduce(state, { type: "SELECT_WATCHLIST_GROUP", groupId: "default" });
 state = core.reduce(state, { type: "TOGGLE_WATCHLIST", instrumentId: "TPEx:006201" });
