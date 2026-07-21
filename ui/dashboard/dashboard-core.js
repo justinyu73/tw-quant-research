@@ -12,10 +12,10 @@
     { id: "market", label: "行情分析" },
     { id: "products", label: "我的自選" },
     { id: "features", label: "技術指標" },
-    { id: "research", label: "選股中心" },
-    { id: "fundamentals", label: "財報" },
+    { id: "research", label: "因子與公式" },
+    { id: "fundamentals", label: "財務追蹤" },
     { id: "stories", label: "研究筆記" },
-    { id: "backtest", label: "回測報告" },
+    { id: "backtest", label: "驗證報告" },
     { id: "evidence", label: "資料來源" }
   ]);
 
