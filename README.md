@@ -33,7 +33,7 @@ macOS 若顯示「已損毀，無法打開」，在確認下載檔案的 SHA-256
 並移除這個 unsigned app 的 quarantine 標記：
 
 ```sh
-REPO="justinyu73/tw-quant-research"; RELEASE="v0.1.8"
+REPO="justinyu73/tw-quant-research"; RELEASE="v0.1.9"
 case "$(uname -m)" in arm64) ASSET="TQR-macOS-Apple-Silicon.dmg";; x86_64) ASSET="TQR-macOS-Intel.dmg";; *) echo "不支援的 Mac 架構"; exit 1;; esac
 DOWNLOAD="$HOME/Downloads/tqr-$RELEASE"; mkdir -p "$DOWNLOAD"
 gh release download "$RELEASE" --repo "$REPO" --pattern "$ASSET" --pattern 'SHA256SUMS.txt' --dir "$DOWNLOAD"
@@ -43,14 +43,14 @@ APP_PATH="/Applications/TW Quant Research.app"; sudo ditto "$(find "$MOUNT_POINT
 sudo xattr -dr com.apple.quarantine "$APP_PATH"; open "$APP_PATH"
 ```
 
-將 `v0.1.8` 換成要安裝的 release tag；需先安裝並登入 GitHub CLI：
+將 `v0.1.9` 換成要安裝的 release tag；需先安裝並登入 GitHub CLI：
 `brew install gh`、`gh auth login`。完整說明見
 [`docs/desktop-release.md`](docs/desktop-release.md)。
 
 ### Windows x64 PowerShell 快速安裝
 
 ```powershell
-$Repo="justinyu73/tw-quant-research"; $Release="v0.1.8"; $Download="$env:USERPROFILE\Downloads\TQR-$Release"
+$Repo="justinyu73/tw-quant-research"; $Release="v0.1.9"; $Download="$env:USERPROFILE\Downloads\TQR-$Release"
 New-Item -ItemType Directory -Force $Download | Out-Null
 gh release download $Release --repo $Repo --pattern "TQR-Windows-x64.msi" --pattern "SHA256SUMS.txt" --dir $Download
 $Installer=Get-ChildItem $Download -Filter *.msi | Select-Object -First 1; $Expected=(Select-String (Join-Path $Download "SHA256SUMS.txt") ([regex]::Escape($Installer.Name)+'$')).Line.Split()[0]; $Actual=(Get-FileHash -Algorithm SHA256 $Installer.FullName).Hash.ToLowerInvariant()

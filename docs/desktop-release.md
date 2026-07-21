@@ -9,7 +9,7 @@ tag; the repository source remains the authority for the app and its evidence.
 ## Release flow
 
 1. Keep `frontend/src-tauri/tauri.conf.json` and the release tag on the same
-   version, for example `0.1.8` and `v0.1.8`.
+   version, for example `0.1.9` and `v0.1.9`.
 2. Push the version tag. `desktop-release.yml` runs the source audit, unit
    tests, deterministic preflight, and dashboard preview first.
 3. The build matrix creates target-specific sidecars and bundles for:
@@ -29,7 +29,7 @@ The download page is:
 ## Unsigned terminal download and install
 
 These commands assume the release has been published rather than left as a
-draft. Replace `v0.1.8` with the release tag you are installing. The release
+draft. Replace `v0.1.9` with the release tag you are installing. The release
 contains `SHA256SUMS.txt`; verify it before opening an unsigned installer.
 
 The macOS Finder message `TW Quant Research 已損毀，無法打開` can be caused by
@@ -55,7 +55,7 @@ gh auth login
 
 ```powershell
 $Repo = "justinyu73/tw-quant-research"
-$Release = "v0.1.8"
+$Release = "v0.1.9"
 $Download = Join-Path $env:USERPROFILE "Downloads\TQR-$Release"
 New-Item -ItemType Directory -Force $Download | Out-Null
 gh release download $Release --repo $Repo --pattern "TQR-Windows-x64.msi" --pattern "SHA256SUMS.txt" --dir $Download
@@ -90,7 +90,7 @@ the Finder “damaged” message on an unsigned build:
 
 ```sh
 REPO="justinyu73/tw-quant-research"
-RELEASE="v0.1.8"
+RELEASE="v0.1.9"
 DOWNLOAD="$HOME/Downloads/tqr-$RELEASE"
 mkdir -p "$DOWNLOAD"
 case "$(uname -m)" in
