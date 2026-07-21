@@ -302,6 +302,23 @@
     });
   }
 
+  function sidecarErrorMessage(error) {
+    var message = error && error.message ? String(error.message) : "";
+    if (!message || /load failed|failed to fetch|networkerror|network request failed/i.test(message)) {
+      return "本機資料服務無法連線；請重新啟動 TQR 後再試。";
+    }
+    if (message === "data_update_unavailable_in_preview") {
+      return "瀏覽器預覽不提供下載；請使用桌面版 TQR。";
+    }
+    if (message === "instrument_not_found") {
+      return "找不到這個自選標的，請重新載入商品清單。";
+    }
+    if (/^TWSE (returned|response)/i.test(message)) {
+      return "官方 TWSE 資料回應失敗：" + message;
+    }
+    return "本機資料更新失敗：" + message;
+  }
+
   function sidecarFetch(path) {
     return sidecarRequest(path);
   }
@@ -654,7 +671,7 @@
       klineRequestKey = null;
       watchlistModelRequests = {};
     }).catch(function (error) {
-      state = core.reduce(state, { type: "DATA_UPDATE_ERROR", message: error.message || "本機資料更新失敗" });
+      state = core.reduce(state, { type: "DATA_UPDATE_ERROR", message: sidecarErrorMessage(error) });
     }).then(function () {
       dataUpdateInFlight = false;
       render();
@@ -688,9 +705,11 @@
     var instruments = core.klineInstruments(state.view);
     var items = core.watchlistItemsForActiveGroup(state);
     var groups = Array.isArray(state.watchlistGroups) ? state.watchlistGroups : [];
+    var activeGroup = groups.find(function (group) { return group.id === state.activeWatchlistGroupId; }) || groups[0];
+    var canDeleteGroup = activeGroup && activeGroup.id !== "default";
     var selected = instrumentForId(watchlistSearchSelection) || resolveSearchSelection(instruments, watchlistSearchQuery);
     var canAdd = Boolean(selected && items.indexOf(selected.instrument_id) < 0);
-    return '<section class="terminal-watchlist" data-testid="terminal-watchlist"><header class="terminal-panel-heading"><div><span class="eyebrow">我的行情</span><h2>自選清單</h2></div><span class="terminal-count">' + items.length + '</span></header><div class="terminal-watchlist-controls"><div class="symbol-search"><label><span>搜尋代號／名稱</span><input type="search" autocomplete="off" placeholder="例如 2330" value="' + escapeHtml(watchlistSearchQuery) + '" data-action="watchlist-search" data-testid="terminal-watchlist-picker" aria-controls="terminal-watchlist-results"></label>' + symbolSearchResults(instruments, watchlistSearchQuery, items, watchlistSearchSelection, "terminal-watchlist-results", "watchlist-search-pick") + '</div><button class="btn btn-primary btn-sm" type="button" data-action="watchlist-add" data-testid="terminal-watchlist-add"' + (canAdd ? "" : " disabled") + '>加入</button></div><label class="terminal-watchlist-group"><span>目前群組</span><select data-action="watchlist-group-select" data-testid="terminal-watchlist-group-select">' + groups.map(function (group) { return '<option value="' + escapeHtml(group.id) + '"' + (group.id === state.activeWatchlistGroupId ? ' selected' : '') + '>' + text(group.name) + '</option>'; }).join("") + '</select></label><div class="terminal-watchlist-list">' + (items.length ? items.map(function (instrumentId) {
+    return '<section class="terminal-watchlist" data-testid="terminal-watchlist"><header class="terminal-panel-heading"><div><span class="eyebrow">我的行情</span><h2>自選清單</h2></div><span class="terminal-count">' + items.length + '</span></header><div class="terminal-watchlist-controls"><div class="symbol-search"><label><span>搜尋代號／名稱</span><input type="search" autocomplete="off" placeholder="例如 2330" value="' + escapeHtml(watchlistSearchQuery) + '" data-action="watchlist-search" data-testid="terminal-watchlist-picker" aria-controls="terminal-watchlist-results"></label>' + symbolSearchResults(instruments, watchlistSearchQuery, items, watchlistSearchSelection, "terminal-watchlist-results", "watchlist-search-pick") + '</div><button class="btn btn-primary btn-sm" type="button" data-action="watchlist-add" data-testid="terminal-watchlist-add"' + (canAdd ? "" : " disabled") + '>加入</button></div><div class="terminal-watchlist-group"><label><span>目前群組</span><select data-action="watchlist-group-select" data-testid="terminal-watchlist-group-select">' + groups.map(function (group) { return '<option value="' + escapeHtml(group.id) + '"' + (group.id === state.activeWatchlistGroupId ? ' selected' : '') + '>' + text(group.name) + '</option>'; }).join("") + '</select></label><button class="btn btn-outline btn-sm" type="button" data-action="watchlist-group-delete" data-group-id="' + escapeHtml(activeGroup && activeGroup.id || "default") + '" data-testid="terminal-watchlist-group-delete"' + (canDeleteGroup ? '' : ' disabled') + '>刪除群組</button></div><div class="terminal-watchlist-list">' + (items.length ? items.map(function (instrumentId) {
       var instrument = instrumentForId(instrumentId) || { instrument_id: instrumentId, symbol: instrumentId, display_name: "未在商品清單" };
       var model = core.klineModel(state.view, instrumentId, "1D");
       var bars = model && Array.isArray(model.bars) ? model.bars : [];
@@ -747,12 +766,14 @@
     var canAdd = Boolean(selected && items.indexOf(selected.instrument_id) < 0);
     var saving = state.watchlist && state.watchlist.status === "saving";
     var canSave = state.watchlist && state.watchlist.dirty && !saving && watchlistPersistenceAvailable !== false;
+    var activeGroup = groups.find(function (group) { return group.id === state.activeWatchlistGroupId; }) || groups[0];
+    var canDeleteGroup = activeGroup && activeGroup.id !== "default";
     return card("自選清單", "本機保存 · 明確儲存 · 資料唯讀", '<div class="watchlist-toolbar" data-testid="watchlist-toolbar">' +
-      '<label class="watchlist-group-picker"><span>群組</span><select data-action="watchlist-group-select" data-testid="watchlist-group-select">' + groups.map(function (group) {
+      '<div class="watchlist-group-control"><label class="watchlist-group-picker"><span>群組</span><select data-action="watchlist-group-select" data-testid="watchlist-group-select">' + groups.map(function (group) {
         return '<option value="' + escapeHtml(group.id) + '"' + (group.id === state.activeWatchlistGroupId ? ' selected' : '') + '>' + text(group.name) + ' · ' + group.items.length + '</option>';
-      }).join("") + '</select></label>' +
-      '<label class="watchlist-group-new"><span>新增群組</span><input type="text" maxlength="32" placeholder="例如 半導體" value="' + escapeHtml(watchlistGroupNameQuery) + '" data-action="watchlist-group-name" data-testid="watchlist-group-name"></label>' +
-      '<button class="btn btn-outline" type="button" data-action="watchlist-group-create" data-testid="watchlist-group-create"' + (watchlistGroupNameQuery.trim() ? '' : ' disabled') + '>建立群組</button>' +
+      }).join("") + '</select></label><button class="btn btn-outline btn-sm watchlist-group-delete" type="button" data-action="watchlist-group-delete" data-group-id="' + escapeHtml(activeGroup && activeGroup.id || "default") + '" data-testid="watchlist-group-delete"' + (canDeleteGroup ? '' : ' disabled') + '>刪除群組</button></div>' +
+      '<div class="watchlist-group-new-control"><label class="watchlist-group-new"><span>新增群組</span><input type="text" maxlength="32" placeholder="例如 半導體" value="' + escapeHtml(watchlistGroupNameQuery) + '" data-action="watchlist-group-name" data-testid="watchlist-group-name"></label>' +
+      '<button class="btn btn-outline" type="button" data-action="watchlist-group-create" data-testid="watchlist-group-create"' + (watchlistGroupNameQuery.trim() ? '' : ' disabled') + '>建立群組</button></div>' +
       '<div class="watchlist-picker symbol-search' + (watchlistSearchFocused ? " search-open" : "") + '"><label><span>搜尋商品</span><input type="search" autocomplete="off" placeholder="代號、名稱或市場，例如 2330 / 台積電" value="' + escapeHtml(watchlistSearchQuery) + '" data-action="watchlist-search" data-testid="watchlist-picker" aria-controls="watchlist-symbol-results"></label>' +
       symbolSearchResults(instruments, watchlistSearchQuery, items, watchlistSearchSelection, "watchlist-symbol-results", "watchlist-search-pick") + '</div>' +
       '<button class="btn btn-primary" type="button" data-action="watchlist-add" data-testid="watchlist-add"' + (canAdd ? '' : ' disabled') + '>加入自選</button>' +
@@ -1183,6 +1204,13 @@
     if (action === "watchlist-group-create") {
       state = core.reduce(state, { type: "CREATE_WATCHLIST_GROUP", name: watchlistGroupNameQuery });
       watchlistGroupNameQuery = "";
+    }
+    if (action === "watchlist-group-delete") {
+      var groupId = target.getAttribute("data-group-id") || state.activeWatchlistGroupId;
+      var group = (state.watchlistGroups || []).find(function (item) { return item.id === groupId; });
+      if (group && group.id !== "default" && window.confirm("確定刪除群組「" + group.name + "」？群組內個股不會從其他群組移除。")) {
+        state = core.reduce(state, { type: "DELETE_WATCHLIST_GROUP", groupId: group.id });
+      }
     }
     if (action === "section") state = core.reduce(state, { type: "SELECT_SECTION", section: target.getAttribute("data-section") });
     if (action === "product") state = core.reduce(state, { type: "OPEN_PRODUCT_DETAIL", index: Number(target.getAttribute("data-index")) });

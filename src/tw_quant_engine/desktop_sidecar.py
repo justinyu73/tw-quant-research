@@ -211,6 +211,8 @@ def _json_response(handler: BaseHTTPRequestHandler, status: int, payload: Mappin
     handler.send_header("Content-Length", str(len(body)))
     handler.send_header("Cache-Control", "no-store")
     handler.send_header("Access-Control-Allow-Origin", "*")
+    handler.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    handler.send_header("Access-Control-Allow-Headers", "Content-Type")
     handler.end_headers()
     handler.wfile.write(body)
 
@@ -224,6 +226,20 @@ def _request_handler(runtime: dict[str, Any]) -> type[BaseHTTPRequestHandler]:
 
         def _method_not_allowed(self) -> None:
             _json_response(self, 405, {"error": "read_only", "allow": ["GET"]})
+
+        def do_OPTIONS(self) -> None:  # noqa: N802
+            """Complete the WebView CORS preflight for explicit JSON updates."""
+            parsed = urlsplit(self.path)
+            if parsed.path not in {"/data/update", "/instruments", "/data/status", "/health", "/kline"}:
+                _json_response(self, 404, {"error": "unknown_route"})
+                return
+            self.send_response(204)
+            self.send_header("Content-Length", "0")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.end_headers()
 
         def do_POST(self) -> None:  # noqa: N802
             parsed = urlsplit(self.path)
@@ -295,6 +311,9 @@ def _request_handler(runtime: dict[str, Any]) -> type[BaseHTTPRequestHandler]:
                 data_dir = runtime.get("data_dir")
                 manifest = read_manifest(data_dir) if data_dir is not None else {"schema": "tw-quant-engine-local-data-manifest/v1", "downloads": []}
                 _json_response(self, 200, {"enabled": data_dir is not None, "manifest": manifest})
+                return
+            if parsed.path == "/health":
+                _json_response(self, 200, {"status": "ok", "data_update_enabled": runtime.get("data_dir") is not None})
                 return
             if parsed.path != "/kline":
                 _json_response(self, 404, {"error": "unknown_route"})

@@ -10,12 +10,12 @@ const ROOT = path.resolve(__dirname, "..");
 const PREVIEW_DIR = path.join(ROOT, "outputs", "dashboard-preview");
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
-  overview: "ce694fb51998afd01fd434cd07eecaaa747867d54e22b74586107c11409903a6",
-  market_valid: "b84a2b3806c6619accd0d1b466977687c74ab350ea321da0060b85dd8a7b3066",
-  market_partial: "d4ef725a23528ec687b87109333061a5d65612103722a44eb1197a4663b9a70e",
-  market_future: "8975648c050edcf10d3cee1fb0bb0d2a5cdf78cd1da77fc6c3c66db874426d31",
-  products: "e88c2dae9411b022e3ce0457a16aa3c7fb55b7efdae20c53ce4529fe4fa0444a",
-  detail_dialog: "f5ed390e8f0328360e663ef85a4a9d752f09dd05c66493b78ca790f337ff4c62",
+  overview: "e82bbdabe73bfbbf92eeddae4ec8d709fd6f74bdbe6838ccf3c46f84b7d1430e",
+  market_valid: "c335de291acfcaddf3dc0cc45cc2660c5029891bba02c8234264946adb2690ea",
+  market_partial: "0ac7099d8f0e519b8005bf67bdaa08e654191c58f6857e4e206eaafab032c4a7",
+  market_future: "cf83d1d4da7afc5cd9942eece480b4167c1ef90e6c3929ba0fa527b1f9764b09",
+  products: "a1d4f602f6d1a05e8786bb7a7905b1990d3167996e7bfd6231c890022ae354ce",
+  detail_dialog: "df2fa0d2e261a5d286ebe3ce34dc248c4f7419fe73330bd5af4783b4b2b0ff24",
 };
 
 function freePort() {
@@ -292,6 +292,15 @@ async function main() {
     await page.locator('[data-testid="watchlist-group-name"]').fill("半導體");
     await page.locator('[data-testid="watchlist-group-create"]').click();
     assert.notEqual(await page.locator('[data-testid="watchlist-group-select"]').inputValue(), "default");
+    const watchlistGroupDelete = page.locator('[data-testid="watchlist-toolbar"] [data-testid="watchlist-group-delete"]');
+    assert.equal(await watchlistGroupDelete.isDisabled(), false);
+    page.once("dialog", (dialog) => dialog.accept());
+    await watchlistGroupDelete.click();
+    assert.equal(await page.locator('[data-testid="watchlist-group-select"]').inputValue(), "default");
+    assert.equal(await watchlistGroupDelete.isDisabled(), true);
+    await page.locator('[data-testid="watchlist-group-name"]').fill("半導體");
+    await page.locator('[data-testid="watchlist-group-create"]').click();
+    assert.notEqual(await page.locator('[data-testid="watchlist-group-select"]').inputValue(), "default");
     await page.locator('[data-action="section"][data-section="research"]').first().click();
     await page.locator('[data-testid="research-results"]').waitFor();
     await page.locator('[data-testid="screen-builder"]').waitFor();
@@ -346,7 +355,7 @@ async function main() {
     await page.locator('[data-action="reset"]').click();
     assert.equal(await page.locator(".page-title").innerText(), "市場首頁");
     const responsive = [];
-    for (const size of [{ width: 1024, height: 768 }, { width: 820, height: 768 }]) {
+    for (const size of [{ width: 1024, height: 768 }, { width: 820, height: 768 }, { width: 720, height: 768 }, { width: 390, height: 844 }]) {
       await page.setViewportSize(size);
       responsive.push({
         width: size.width,

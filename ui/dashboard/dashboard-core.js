@@ -288,6 +288,19 @@
         activeWatchlistGroupId: groupId
       });
     }
+    if (event.type === "DELETE_WATCHLIST_GROUP" && typeof event.groupId === "string") {
+      var groupsToDelete = watchlistGroupsFor(current);
+      var groupToDelete = groupsToDelete.find(function (group) { return group.id === event.groupId; });
+      if (!groupToDelete || groupToDelete.id === "default") return current;
+      var remainingGroups = groupsToDelete.filter(function (group) { return group.id !== event.groupId; });
+      var nextActiveGroupId = current.activeWatchlistGroupId === event.groupId
+        ? "default"
+        : current.activeWatchlistGroupId;
+      return Object.assign({}, current, {
+        watchlistGroups: remainingGroups,
+        activeWatchlistGroupId: nextActiveGroupId
+      });
+    }
     if (event.type === "ADD_TO_WATCHLIST_GROUP" && typeof event.instrumentId === "string") {
       var groupList = watchlistGroupsFor(current);
       var targetGroup = groupList.find(function (group) { return group.id === current.activeWatchlistGroupId; });
