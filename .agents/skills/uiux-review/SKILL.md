@@ -53,6 +53,26 @@ badge colors that are not already in the token set.
   the parent label grid uses `grid-template-columns: minmax(0, 1fr)` so
   intrinsic input/select widths never escape their track.
 
+## Form rejection feedback (TQR-FORM-FEEDBACK)
+
+- 任何因「不符合計算或規則」而 disabled 的按鈕（或被拒絕的提交）都必須跳出
+  可見提示：指出**哪個欄位錯**與**正確格式/規則**（例：「門檻值需為數字，
+  例如 950 或 12.5」、「折現率 r 必須大於股利成長率 g」）。靜默 disabled
+  不允許；按鈕 enabled 時提示必須隱藏。
+- Issue 清單由 `dashboard-core.js` 的純函式產生（`alertFormIssues`、
+  `valuationFormIssues`、`watchlistGroupNameIssues`、`watchlistAddIssues`），
+  回傳 `[{field, message}]`，message 用中文。規則必須抄自引擎 fail-closed
+  validators（`alerts.py` / `valuation.py`）或 reducer 守衛——不要在 UI 另造
+  規則。
+- 呈現用共享 `.form-issues`（跨欄 `<ul>`，放按鈕旁/表單下方）：
+  `var(--type-helper)`（12px）、`var(--warning)` 文字色、無背景無邊框、
+  `•` 標記，克制不喧賓奪主；`hidden` 時完全不占位。
+- 輸入時用 `refreshFormIssues(testId, issues)` 直接更新 DOM——打字不能觸發
+  整頁 re-render（會丟焦點）。
+- 引擎/sidecar 在 evaluation 時才發現的拒絕（如 r<=g），錯誤訊息經
+  `engineErrorMessage` **原樣**顯示在既有 status 行，不改寫引擎文案；引擎
+  訊息本身必須含欄位與規則，fail-closed 行為不變。
+
 ## Color principles (de-AI)
 
 - Neutral deep blue-gray chrome (sidebar `#131722`), light warm-gray body,

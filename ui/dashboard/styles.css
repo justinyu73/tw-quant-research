@@ -213,6 +213,30 @@ td small { display: block; margin-top: 3px; color: var(--text-muted); font-size:
 .valuation-reference > div > span:last-child { color: var(--text-secondary); font-size: 11px; }
 .valuation-price { color: var(--text); font-size: 18px; font-weight: 650; }
 .valuation-note { margin: 12px 0 0; color: var(--text-muted); font-size: 10px; line-height: 1.5; }
+.valuation-form { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.valuation-field-wide { grid-column: 1 / -1; }
+.valuation-field select { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--surface); }
+.valuation-form .btn { justify-self: start; }
+.valuation-worksheet-list { display: grid; gap: 8px; margin-top: 14px; }
+.valuation-worksheet { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: 3px; background: var(--surface-secondary); }
+.valuation-worksheet > div { min-width: 0; }
+.valuation-worksheet strong { display: block; font-size: 12px; }
+.valuation-worksheet small { color: var(--text-muted); font-size: 10px; overflow-wrap: anywhere; }
+.valuation-indicator-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.valuation-indicator { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--border-light); border-radius: 3px; background: var(--surface-secondary); }
+.valuation-indicator > span { color: var(--text-muted); font-size: 10px; font-weight: 700; }
+.valuation-indicator strong { font-size: 17px; overflow-wrap: anywhere; }
+.valuation-indicator label { display: grid; gap: 4px; color: var(--text-muted); font-size: 10px; font-weight: 700; }
+.valuation-indicator input { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--surface); }
+.valuation-indicator small { color: var(--text-muted); font-size: 10px; }
+.valuation-result-list { display: grid; gap: 12px; margin-top: 14px; }
+.valuation-result { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border-light); border-radius: 3px; background: var(--surface); }
+.valuation-result header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.valuation-result-params { color: var(--text-muted); font-size: 10px; overflow-wrap: anywhere; }
+.valuation-result-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 12px; border: 1px solid var(--border-light); border-radius: 3px; background: var(--surface-secondary); }
+.valuation-result-grid > div { display: grid; gap: 4px; min-width: 0; }
+.valuation-result-grid .valuation-price { overflow-wrap: anywhere; }
+.valuation-result-badges { display: flex; flex-wrap: wrap; gap: 8px; }
 .research-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 9px; margin-bottom: 16px; padding: 12px; border: 1px solid var(--border-light); border-radius: var(--radius); background: var(--surface-secondary); }
 .research-toolbar label { display: grid; min-width: 130px; gap: 6px; color: var(--text-muted); font-size: 10px; font-weight: 700; }
 .research-toolbar label input, .research-toolbar label select { width: 100%; }
@@ -252,6 +276,7 @@ td small { display: block; margin-top: 3px; color: var(--text-muted); font-size:
 @media (max-width: 1100px) {
   .col-8-4 { grid-template-columns: minmax(0, 1fr); }
   .page-wrapper { padding: 20px 22px 36px; }
+  .valuation-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 820px) {
   html, body { min-width: 0; }
@@ -264,6 +289,7 @@ td small { display: block; margin-top: 3px; color: var(--text-muted); font-size:
   .kline-context { align-items: flex-start; flex-direction: column; }
   .kline-context-right { justify-content: flex-start; }
   .valuation-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .valuation-form, .valuation-indicator-row, .valuation-result-grid { grid-template-columns: 1fr; }
 }
 
 /* Personal market terminal layer: quote strip, chart workspace, watchlist, and notes. */
@@ -936,7 +962,7 @@ input, select, textarea, button { font-family: inherit; }
 .alert-event-badge { border-color: var(--border); color: var(--text-secondary); background: var(--surface-secondary); }
 .terminal-watchlist-controls label, .terminal-watchlist-group { font-size: 10px; }
 .system-global-search label { font-size: 10px; }
-.kline-control input, .terminal-watchlist-controls input, .terminal-watchlist-group select, .system-global-search input, .valuation-field input, .note-composer input, .research-toolbar select, .research-toolbar input, .alert-form input, .alert-form select {
+.kline-control input, .terminal-watchlist-controls input, .terminal-watchlist-group select, .system-global-search input, .valuation-field input, .valuation-field select, .valuation-indicator input, .note-composer input, .research-toolbar select, .research-toolbar input, .alert-form input, .alert-form select {
   min-height: var(--control-h);
   padding: 0 10px;
   font-size: var(--type-helper);
@@ -944,3 +970,11 @@ input, select, textarea, button { font-family: inherit; }
 .note-composer textarea { padding: 8px 10px; font-size: var(--type-helper); }
 .terminal-watchlist-group .btn { min-height: var(--control-h); }
 .alert-note { margin: 0; color: var(--text-muted); font-size: 10px; line-height: 1.5; }
+
+/* TQR-FORM-FEEDBACK: field-level rejection hints shown whenever a form button
+   is disabled by a validation rule. Helper size, restrained warning tone,
+   spans the form grid so it stays aligned under the fields it describes. */
+.form-issues { grid-column: 1 / -1; display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; color: var(--warning); font-size: var(--type-helper); line-height: 1.5; }
+.form-issues[hidden] { display: none; }
+.form-issues li { overflow-wrap: anywhere; }
+.form-issues li::before { content: "• "; }
