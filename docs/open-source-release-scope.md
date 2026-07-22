@@ -27,10 +27,14 @@ authority, visual exploration, requirements review, UI/UX planning, or
 implementation slicing; they are not required to run, test, or understand the
 released product boundary.
 
-The exclusion list is machine-checked by:
+The exclusion list is a denylist applied at export time against the private
+TQE source tree. This repository is the clean synced open-source tree (TQR),
+so the excluded private files are expected to be absent here. The audit is
+machine-checked by:
 
 ```sh
-# Run from the complete source tree: manifest exclusions must be present.
+# Run from this clean tree: absent exclusions are informational; blockers are
+# forbidden/large/secret-patterned public files and a missing license.
 python3 scripts/open_source_audit.py
 python3 scripts/open_source_audit.py --strict
 ```

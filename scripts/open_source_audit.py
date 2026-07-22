@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Audit the current source tree before publishing an open-source release."""
+"""Audit the current source tree before publishing an open-source release.
+
+This repository is the clean synced open-source tree (TQR). Manifest
+exclusions name private-TQE files that the export denylist strips when an
+archive is built from the private source tree; their absence here is expected
+and reported as informational. Blockers are: forbidden/large/secret-patterned
+public files, missing license, and (in --public-tree mode) any manifest
+exclusion present in an exported tree.
+"""
 from __future__ import annotations
 
 import argparse
@@ -91,8 +99,11 @@ def audit(strict: bool = False, public_tree: bool = False) -> dict[str, Any]:
     forbidden, secret_hits = _scan_public_files(public)
     license_present = any((ROOT / name).is_file() for name in ("LICENSE", "LICENSE.md", "COPYING"))
     blockers: list[str] = []
-    if missing_exclusions and not public_tree:
-        blockers.append("manifest_exclusion_missing")
+    # Exclusions are a denylist applied at export time against the private TQE
+    # source tree. This repository is the clean synced open-source tree (TQR),
+    # so excluded private files are EXPECTED to be absent here; missing
+    # exclusions are reported as informational, not a blocker. In --public-tree
+    # mode any present exclusion remains a hard blocker.
     if present_exclusions and public_tree:
         blockers.append("excluded_file_present_in_public_tree")
     if forbidden:
