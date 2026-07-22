@@ -5,10 +5,10 @@ Scope: 已完成節點驗收（S1–S9、K2–K6、P5.0/P5.2）後盤點出的 5
 
 | # | 項目 | 目標產出 | 驗收標準 | Evidence | 狀態 |
 |---|------|----------|----------|----------|------|
-| 1 | P5.1 TWSE source contract `source_contract_blocked` | 來源契約決議紀錄（解阻塞或具體 amendment 選項） | `docs/tqe-p5-source-contract-research.md` 候選全部重新驗證；`workflow/tqe-p5-twse-source-contract.json` 狀態有明確決議與下一步 | `workflow/evidence/p5.1-source-contract-decision.acceptance.json` | blocked（decision recorded，decision_options A/B/C/D 待人工擇一） |
+| 1 | P5.1 TWSE source contract `source_contract_blocked` | 來源契約決議紀錄（解阻塞或具體 amendment 選項） | `docs/tqe-p5-source-contract-research.md` 候選全部重新驗證；`workflow/tqe-p5-twse-source-contract.json` 狀態有明確決議與下一步 | `workflow/evidence/p5.1-source-contract-decision.acceptance.json` | blocked（2026-07-22 人工選定選項 C；啟動前證據 2/7 完成，`p5.1-trial-capture-2308` pass；fresh P5.1 pass pending） |
 | 2 | TQR wireframe 六斷點無驗收證據 | 瀏覽器 smoke 覆蓋 1440/1280/1024/820/720/390px 並存證 | 六斷點全部無水平溢出；evidence 記錄指令、exit code、各斷點結果 | `workflow/evidence/tqr-wireframe-rwd.acceptance.json` | pass（六斷點全 pass，browser smoke exit 0） |
 | 3 | TQR unavailable 欄位（財務、Adjusted Close、市場廣度等）無 pending 契約 | 每類 unavailable 欄位有對應 pending 來源契約檔 | 契約檔列出欄位、所需來源、啟用條件；與 `docs/tqr-research-platform-spec.md` 的 unavailable 清單一致 | `workflow/evidence/tqr-unavailable-field-contracts.acceptance.json` | pass（12 類 contract，26 條 spec cross-check 全對齊） |
-| 4 | P4 deferred 能力（provider feed、alerts、news、paper trading）與 7B runtime | 啟動提案文件（human gate，不直接實作） | 提案逐項列出能力、前置契約、風險與批准條件；不違反 `docs/tqe-p4-runtime-boundary.md` 的自動下單 prohibited | `workflow/evidence/p4-deferred-capability-proposal.acceptance.json` | proposal_complete_pending_human_gate（6 項能力，待人工批准） |
+| 4 | P4 deferred 能力（provider feed、alerts、news、paper trading）與 7B runtime | 啟動提案文件（human gate，不直接實作） | 提案逐項列出能力、前置契約、風險與批准條件；不違反 `docs/tqe-p4-runtime-boundary.md` 的自動下單 prohibited | `workflow/evidence/p4-deferred-capability-proposal.acceptance.json` | approved_activation_order_3_5_2（能力 3 implemented_pending_human_acceptance；能力 5、2 approved_next；1、4、6 暫緩） |
 | 5 | 文件狀態漂移 | `engine-manifest.json`、`workflow/README.md`、`k2-k5-final.acceptance.json` 狀態與實際證據一致 | `current_phase` 不再為 `s1_qlib_integration`；README 不再寫 K2-K5 pending；K2-K5 final 頂層狀態反映 JY 已 accepted | `workflow/evidence/doc-state-drift-fix.acceptance.json` | pass（三處對齊，138 tests OK） |
 
 ## 驗收結果（2026-07-22）

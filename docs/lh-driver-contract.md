@@ -46,10 +46,14 @@ requested
   -> data_contract_admitted  (separate approved work unit)
 ```
 
-The current repository is intentionally stopped at
-`framework_selection_pending`. After the comparison documents are complete,
-the state may move to `awaiting_framework_review`, but no workflow file may
-silently promote either state.
+Historical note (pre-S1): the repository was intentionally stopped at
+`framework_selection_pending` until the comparison documents were complete,
+and no workflow file silently promoted either state. That stop has since
+been cleared through the approved stage gates: as of 2026-07-22 all S1–S9
+and K2–K6 acceptance evidence records status pass (`workflow/evidence/`),
+and `workflow/engine-manifest.json` records `current_phase:
+p5_history_admission`. Every state transition went through its own human
+gate; none was a silent promotion.
 
 ## Evidence shape
 

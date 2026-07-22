@@ -3,7 +3,7 @@
   "package_id": "tw-quant-engine-s4-ingestion-product-alignment-001",
   "goal_id": "tw-quant-engine-q1-s1-s9",
   "stage_id": "S4",
-  "status": "approval_pending",
+  "status": "approved_executed",
   "objective": "Build a deterministic offline source-to-S2 mapper, provenance-preserving product read model, and versioned OHLCV/revenue formulas from S3 fixtures.",
   "execution_authorized": false,
   "inputs": [
@@ -127,8 +127,11 @@
     "S5 approval"
   ],
   "approval": {
-    "decision": "pending",
-    "approved_by": null,
-    "approved_at": null
+    "decision": "approved",
+    "approved_by": "user",
+    "approved_at": null,
+    "aligned_at": "2026-07-22",
+    "basis": "workflow/evidence/s4-ingestion-product-alignment.acceptance.json",
+    "note": "Drift alignment, not a re-approval: the S4 acceptance evidence (status pass, captured 2026-07-15) already records approval.approved=true and approved_by=user with this package as its execution_boundary; the package status lagged behind that evidence and is aligned here on 2026-07-22. approved_at stays null because the evidence does not record the original approval date. No new approval is granted by this edit and execution_authorized remains false."
   }
 }
