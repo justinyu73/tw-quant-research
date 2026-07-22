@@ -42,6 +42,7 @@ const VIEWS = [
   { id: "backtest", label: "驗證報告" },
   { id: "stories", label: "研究筆記" },
   { id: "evidence", label: "資料來源", title: "資料與證據" },
+  { id: "settings", label: "設定" },
 ];
 
 function findChromium(playwright) {

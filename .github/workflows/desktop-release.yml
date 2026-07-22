@@ -70,8 +70,13 @@ jobs:
       - name: Prepare generated icon resources
         run: python scripts/ensure_tauri_icon.py
       - name: Build Tauri bundle
+        # Signed build: minisign updater signatures (.sig) are emitted next to
+        # the nsis installer and the macOS app tarball when the key is present.
         run: npm run tauri:build -- --target "${{ matrix.target }}"
         working-directory: frontend
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       - name: Upload desktop bundle
         uses: actions/upload-artifact@v4
         with:
@@ -104,7 +109,24 @@ jobs:
           mkdir release-files
           while IFS= read -r -d '' asset; do
             filename="$(basename "${asset}")"
+            relative="${asset#release-assets/}"
             case "${filename}" in
+              *.app.tar.gz.sig)
+                # Updater payloads keep their .sig sidecars (minisign).
+                case "${relative}" in
+                  *aarch64*) friendly_name="TQR-macOS-Apple-Silicon.app.tar.gz.sig" ;;
+                  *) friendly_name="TQR-macOS-Intel.app.tar.gz.sig" ;;
+                esac
+                ;;
+              *.app.tar.gz)
+                case "${relative}" in
+                  *aarch64*) friendly_name="TQR-macOS-Apple-Silicon.app.tar.gz" ;;
+                  *) friendly_name="TQR-macOS-Intel.app.tar.gz" ;;
+                esac
+                ;;
+              *-setup.exe.sig)
+                friendly_name="TQR-Windows-x64-setup.exe.sig"
+                ;;
               *.msi)
                 friendly_name="TQR-Windows-x64.msi"
                 ;;
@@ -129,7 +151,6 @@ jobs:
               exit 1
             fi
             if test -n "${friendly_name}"; then
-                relative="${asset#release-assets/}"
                 cp "${asset}" "release-files/${friendly_name}"
             fi
           done < <(find release-assets -type f -print0)
@@ -153,8 +174,13 @@ jobs:
           - macOS Apple Silicon: `TQR-macOS-Apple-Silicon.dmg`
           - Source: `TQR-source.tar.gz`
 
-          Release assets are limited to platform installers, the public source
-          archive, and SHA-256 checksums. This release is unsigned; complete
+          In-app updates: the desktop app checks this release's `latest.json`
+          when the user explicitly asks in Settings. Update payloads
+          (`*.app.tar.gz`, `*-setup.exe`) are minisign-signed; the app verifies
+          the signature against the embedded public key before installing.
+
+          Release assets are limited to platform installers, signed updater
+          payloads, the public source archive, and SHA-256 checksums. Complete
           the human install/launch checks before treating it as production-ready.
           EOF
       - name: Generate SHA-256 checksums
@@ -176,3 +202,66 @@ jobs:
             --draft \
             --title "TW Quant Research ${GITHUB_REF_NAME}" \
             --notes-file release-notes.md
+      - name: Assemble and upload latest.json for the in-app updater
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          python3 - << 'PY'
+          import datetime, json, os, subprocess, time
+
+          repo = os.environ['GH_REPO']
+          tag = os.environ['GITHUB_REF_NAME']
+
+          def fetch_assets():
+              rel = json.loads(subprocess.check_output(['gh', 'api', f'repos/{repo}/releases/tags/{tag}']))
+              return rel, {a['name']: a for a in rel['assets']}
+
+          def have_updater_assets(names):
+              mac_arm = 'TQR-macOS-Apple-Silicon.app.tar.gz' in names and 'TQR-macOS-Apple-Silicon.app.tar.gz.sig' in names
+              mac_intel = 'TQR-macOS-Intel.app.tar.gz' in names and 'TQR-macOS-Intel.app.tar.gz.sig' in names
+              win = 'TQR-Windows-x64-setup.exe' in names and 'TQR-Windows-x64-setup.exe.sig' in names
+              return mac_arm and mac_intel and win
+
+          # The releases API is read-after-write eventually consistent; wait
+          # for the just-uploaded draft assets to become visible.
+          for _ in range(12):
+              rel, assets = fetch_assets()
+              if have_updater_assets(assets):
+                  break
+              time.sleep(10)
+          else:
+              raise SystemExit('updater assets not all present after waiting ~2min')
+
+          def sig_text(name):
+              return subprocess.check_output(
+                  ['gh', 'api', '-H', 'Accept: application/octet-stream',
+                   f"repos/{repo}/releases/assets/{assets[name]['id']}"]).decode().strip()
+
+          def asset_url(name):
+              return f"https://api.github.com/repos/{repo}/releases/assets/{assets[name]['id']}"
+
+          out = {
+              'version': tag.lstrip('v'),
+              'notes': rel.get('body') or '',
+              'pub_date': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+              'platforms': {
+                  'darwin-aarch64': {
+                      'signature': sig_text('TQR-macOS-Apple-Silicon.app.tar.gz.sig'),
+                      'url': asset_url('TQR-macOS-Apple-Silicon.app.tar.gz'),
+                  },
+                  'darwin-x86_64': {
+                      'signature': sig_text('TQR-macOS-Intel.app.tar.gz.sig'),
+                      'url': asset_url('TQR-macOS-Intel.app.tar.gz'),
+                  },
+                  'windows-x86_64': {
+                      'signature': sig_text('TQR-Windows-x64-setup.exe.sig'),
+                      'url': asset_url('TQR-Windows-x64-setup.exe'),
+                  },
+              },
+          }
+          with open('latest.json', 'w') as fh:
+              json.dump(out, fh, indent=1)
+          print(json.dumps({k: v for k, v in out.items() if k != 'platforms'}))
+          PY
+          gh release upload "${GITHUB_REF_NAME}" latest.json --clobber

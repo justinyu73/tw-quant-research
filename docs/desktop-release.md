@@ -9,22 +9,48 @@ tag; the repository source remains the authority for the app and its evidence.
 ## Release flow
 
 1. Keep `frontend/src-tauri/tauri.conf.json` and the release tag on the same
-   version, for example `0.1.8` and `v0.1.8`.
+   version, for example `0.2.0` and `v0.2.0`.
 2. Push the version tag. `desktop-release.yml` runs the source audit, unit
    tests, deterministic preflight, and dashboard preview first.
 3. The build matrix creates target-specific sidecars and bundles for:
    `x86_64-pc-windows-msvc`, `x86_64-apple-darwin`, and
-   `aarch64-apple-darwin`.
-4. GitHub creates a draft release containing only the Windows installers, macOS
-   disk images, the clean public source archive, and `SHA256SUMS.txt`. Build
-   internals such as `.app` contents, icons, scripts, and plist files are not
-   published as release downloads.
+   `aarch64-apple-darwin`. Bundles are minisign-signed when the
+   `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+   repository secrets are configured (required for in-app updates).
+4. GitHub creates a draft release containing the Windows installers, macOS
+   disk images, the signed updater payloads (`*-setup.exe` + `.sig`,
+   `*.app.tar.gz` + `.sig`), `latest.json`, the clean public source archive,
+   and `SHA256SUMS.txt`. Build internals such as unpacked `.app` contents,
+   icons, scripts, and plist files are not published as release downloads.
 5. A human installs and launches both Windows and macOS artifacts, then
    publishes the draft release if the checks pass.
 
 The download page is:
 
 `https://github.com/justinyu73/tw-quant-research/releases/latest`
+
+## In-app updates
+
+Since 0.2.0 the desktop app can update itself: Settings → 應用程式更新 →
+檢查更新. The mechanism is intentionally narrow:
+
+- The check runs in the Rust shell (`check_app_update` /
+  `install_app_update` commands, tauri-plugin-updater), never in the browser
+  bundle — the loopback-only research surface is unchanged. It is a
+  user-triggered, anonymous, read-only request to the public GitHub release
+  listed in `plugins.updater.endpoints` (`releases/latest` → `latest.json`).
+- Update payloads are minisign-signed at build time; the app verifies the
+  signature against the public key embedded in `tauri.conf.json` before
+  installing, then restarts. The bundled sidecar is stopped during install
+  (Windows file locking) and revived if the install fails.
+- Signing requires the repository secrets `TAURI_SIGNING_PRIVATE_KEY` and
+  `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. The private key and its password live
+  outside the repository and must never be committed.
+- The release job assembles `latest.json` (per-platform asset API URLs plus
+  signatures for `windows-x86_64`, `darwin-x86_64`, `darwin-aarch64`) and
+  uploads it to the draft release after the installers.
+- Browser preview shows 瀏覽器預覽不提供更新; updates are a desktop-only
+  feature.
 
 ## Unsigned terminal download and install
 
