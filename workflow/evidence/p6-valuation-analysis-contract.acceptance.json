@@ -1,0 +1,100 @@
+{
+  "schema": "tw-quant-engine-p6-valuation-analysis-contract/v1",
+  "stage_id": "P6-valuation-analysis-contract",
+  "status": "contract_defined_pending_digest_approval",
+  "user_decision": {
+    "date": "2026-07-22",
+    "decision_verbatim": "同意能力 5，但我不需要模擬下單，我要算的是分析和股票價值。",
+    "effect": [
+      "Capability 5 reshaped from paper trading simulation to valuation & analysis.",
+      "Paper trading / simulated order matching returned to deferred_not_approved.",
+      "Broker read-only connector remains a separate, unapproved human gate.",
+      "Automatic order placement remains prohibited."
+    ]
+  },
+  "approval": {
+    "approved_by": "user",
+    "approval_date": "2026-07-22",
+    "activation_order": [3, 5, 2],
+    "capability": 5,
+    "scope": "valuation_analysis_only",
+    "network_enabled": false,
+    "provider_calls": 0,
+    "credentials": false
+  },
+  "contract": "docs/tqe-p6-valuation-analysis-contract.md",
+  "work_unit_draft": "workflow/tqe-p6-valuation-analysis.work-unit.draft.json",
+  "superseded": {
+    "contract": "docs/tqe-p6-paper-trading-simulation-contract.md",
+    "work_unit_draft": "workflow/tqe-p6-paper-trading.work-unit.draft.json",
+    "evidence": "workflow/evidence/p6-paper-trading-contract.acceptance.json",
+    "marker": "superseded_by_user_decision_2026_07_22",
+    "retention": "retained for audit history only; authorizes nothing"
+  },
+  "alignment_checks": [
+    {
+      "reference": "docs/tqr-research-platform-spec.md fair_value_worksheet (lines 96-100)",
+      "requirement": "worksheet shows EPS source, PE source, safety margin, formula version, data status; manual input labelled draft, never consensus or official forward estimate",
+      "aligned": true,
+      "note": "Contract schema tqe-fair-value-worksheet/v1 carries safety_margin, formula_version tqe-fair-value/v1, data status draft, and fixed user_supplied_assumption source labels for EPS/PE."
+    },
+    {
+      "reference": "workflow/tqr-unavailable-field-contracts.json tqr-draft/fair-value-worksheet",
+      "requirement": "enabling_preconditions partially satisfied only via contract definition; no status flip",
+      "aligned": true,
+      "note": "activation_note added to that contract entry pointing to the P6 contract; render_behavior stays draft."
+    },
+    {
+      "reference": "docs/tqr-research-platform-spec.md zscore (lines 85-88)",
+      "requirement": "period, price basis, and population/sample convention recorded before computation",
+      "aligned": true,
+      "note": "Contract records all three conventions for this slice: explicit integer period, raw close basis, population standard deviation."
+    },
+    {
+      "reference": "workflow/tqr-unavailable-field-contracts.json tqr-draft/zscore-computed-field",
+      "requirement": "admitted price-policy contract exists before zscore becomes a computed field",
+      "aligned": true,
+      "note": "Admitted price basis is EOD OHLCV close under the P4/P5 boundary with the P5 adjusted-OHLCV policy; zscore included in this slice with recorded conventions."
+    },
+    {
+      "reference": "workflow/tqr-unavailable-field-contracts.json tqr-unavailable/financial-tracker-official-fundamentals and forward-eps-pe",
+      "requirement": "official fundamentals and forward EPS/PE remain unavailable in this phase",
+      "aligned": true,
+      "note": "Contract excludes automatic fundamental population (blocked on C1 source admission) and any estimate/consensus source; cannot-claim list records both."
+    }
+  ],
+  "offline_verification": {
+    "p4_closure": {
+      "argv": ["python3", "scripts/p4_research_closure.py"],
+      "exit_code": 0,
+      "status": "pass",
+      "network": false,
+      "provider_calls": 0
+    },
+    "full_tests": {
+      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests"],
+      "exit_code": 0,
+      "result": "152 tests passed, 1 skipped"
+    },
+    "json_load": {
+      "argv": ["python3", "-c", "json.load on new/modified JSON files"],
+      "files": [
+        "workflow/tqe-p6-valuation-analysis.work-unit.draft.json",
+        "workflow/tqe-p6-paper-trading.work-unit.draft.json",
+        "workflow/evidence/p6-paper-trading-contract.acceptance.json",
+        "workflow/evidence/p6-valuation-analysis-contract.acceptance.json",
+        "workflow/tqr-unavailable-field-contracts.json"
+      ],
+      "exit_code": 0
+    }
+  },
+  "acceptance_notes": [
+    "Capability 5 is reshaped per the owner's 2026-07-22 decision: valuation & analysis replaces paper trading simulation in the approved order 3 -> 5 -> 2.",
+    "Scope layering reflects the data reality: only admitted EOD OHLCV is computable today; official fundamentals stay defined_pending_source_admission (C1) and are excluded.",
+    "All valuation inputs are user-supplied assumptions labelled draft; the engine computes fair value and buy-zone deterministically and never fetches or estimates fundamentals.",
+    "No simulated order matching, no order artifact, no investment advice, solicitation, or performance promise is authorized.",
+    "This evidence records a contract and a work-unit draft only; no valuation or analysis functionality is implemented. Implementation requires human approval of the work-unit digest.",
+    "Capabilities 1, 4, and 6 remain deferred_not_approved; paper trading joins them as deferred_not_approved; capability 2 remains approved_next pending capability 5 completion.",
+    "The approved P4 boundary is unchanged and p4_research_closure.py passes."
+  ]
+}

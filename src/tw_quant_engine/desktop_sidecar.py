@@ -14,6 +14,16 @@ from typing import Any, Mapping
 from urllib.parse import parse_qs, urlsplit
 
 from .alerts import ALERT_STORE_SCHEMA, AlertValidationError, evaluate_alerts, parse_alert_store, validate_alert
+from .valuation import (
+    WORKSHEET_STORE_SCHEMA,
+    ValuationValidationError,
+    closes_from_bars,
+    compute_indicator,
+    evaluate_worksheets,
+    parse_worksheet_store,
+    validate_indicator_request,
+    validate_worksheet,
+)
 from .k6a_snapshot import K6A_SNAPSHOT_SCHEMA, load_snapshot as load_k6a_snapshot
 from .k6b_snapshot import K6B_SNAPSHOT_SCHEMA, load_snapshot as load_k6b_snapshot
 from .kline_aggregation import PERIODS, aggregate_dataset
@@ -30,6 +40,7 @@ from .data_update import (
 SIDECAR_INSTRUMENTS_SCHEMA = "tw-quant-engine-sidecar-instruments/v1"
 SIDECAR_KLINE_SCHEMA = "tw-quant-engine-sidecar-kline/v1"
 SIDECAR_ALERTS_SCHEMA = "tw-quant-engine-sidecar-alerts/v1"
+SIDECAR_VALUATION_SCHEMA = "tw-quant-engine-sidecar-valuation/v1"
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 PERIOD_ORDER = ("1D", "1W", "M", "Q")
 
@@ -161,6 +172,53 @@ class KlineCatalog:
             "digest": model["snapshot_digest"],
         }
 
+    def _admitted_market_bars(self) -> dict[str, list[dict[str, Any]] | None]:
+        """Admitted 1D bar series keyed by symbol, for alerts and valuation evaluation."""
+        bars_by_symbol: dict[str, list[dict[str, Any]] | None] = {}
+        for item in self.instruments:
+            symbol = str(item["symbol"])
+            if symbol not in bars_by_symbol:
+                model = self.models.get((str(item["instrument_id"]), "1D"))
+                bars_by_symbol[symbol] = model.get("bars") if isinstance(model, Mapping) else None
+        return bars_by_symbol
+
+    def valuation_response(self, worksheets_payload: Any, indicators_payload: Any) -> tuple[int, dict[str, Any]]:
+        """Evaluate P6 fair value worksheets and price/volume indicators over admitted data.
+
+        Valuation-analysis only: no order or simulated-order artifact, no
+        fundamentals fetch, deterministic and read-only.
+        """
+        admitted = {str(item["symbol"]) for item in self.instruments}
+        market_data = self._admitted_market_bars()
+        try:
+            if isinstance(worksheets_payload, Mapping) and worksheets_payload.get("schema") == WORKSHEET_STORE_SCHEMA:
+                worksheets = parse_worksheet_store(worksheets_payload, admitted)
+            elif isinstance(worksheets_payload, list):
+                worksheets = [validate_worksheet(item, admitted) for item in worksheets_payload]
+            elif worksheets_payload is None:
+                worksheets = []
+            else:
+                raise ValuationValidationError("worksheets must be a worksheet list or a tqe-fair-value-worksheets/v1 store")
+            if indicators_payload is None:
+                indicator_requests = []
+            elif isinstance(indicators_payload, list):
+                indicator_requests = [validate_indicator_request(item, admitted) for item in indicators_payload]
+            else:
+                raise ValuationValidationError("indicators must be a list of indicator requests")
+        except ValuationValidationError as exc:
+            return 400, {"error": str(exc)}
+        evaluation = evaluate_worksheets(worksheets, market_data)
+        indicators: list[dict[str, Any]] = []
+        for request in indicator_requests:
+            result = compute_indicator(request["type"], closes_from_bars(market_data.get(request["security_id"])), request["period"])
+            result["security_id"] = request["security_id"]
+            indicators.append(result)
+        return 200, {
+            "schema": SIDECAR_VALUATION_SCHEMA,
+            "read_only": True,
+            "mode": "valuation_analysis_only",
+            "data": {"evaluation": evaluation, "indicators": indicators},
+        }
     def alerts_response(self, definitions_payload: Any, session_state: Any, now: str | None) -> tuple[int, dict[str, Any]]:
         """Evaluate P6 in-app alerts over the admitted read models; in-app events only."""
         admitted = {str(item["symbol"]) for item in self.instruments}
@@ -374,6 +432,27 @@ def _request_handler(runtime: dict[str, Any]) -> type[BaseHTTPRequestHandler]:
                 )
                 _json_response(self, alert_status, alert_payload)
                 return
+            if parsed.path == "/valuation":
+                if len(parsed.query) > 32768:
+                    _json_response(self, 400, {"error": "valuation_query_too_large"})
+                    return
+                valuation_query = parse_qs(parsed.query, keep_blank_values=True)
+                if (
+                    not set(valuation_query) <= {"worksheets", "indicators"}
+                    or not valuation_query
+                    or any(len(values) != 1 or not values[0] for values in valuation_query.values())
+                ):
+                    _json_response(self, 400, {"error": "worksheets_or_indicators_required"})
+                    return
+                try:
+                    worksheets_payload = json.loads(valuation_query["worksheets"][0]) if "worksheets" in valuation_query else None
+                    indicators_payload = json.loads(valuation_query["indicators"][0]) if "indicators" in valuation_query else None
+                except json.JSONDecodeError:
+                    _json_response(self, 400, {"error": "invalid_json"})
+                    return
+                valuation_status, valuation_payload = runtime["catalog"].valuation_response(worksheets_payload, indicators_payload)
+                _json_response(self, valuation_status, valuation_payload)
+                return
             if parsed.path != "/kline":
                 _json_response(self, 404, {"error": "unknown_route"})
                 return
@@ -412,7 +491,7 @@ __all__ = [
     "LOOPBACK_HOSTS",
     "SIDECAR_ALERTS_SCHEMA",
     "SIDECAR_INSTRUMENTS_SCHEMA",
-    "SIDECAR_KLINE_SCHEMA",
+    "SIDECAR_VALUATION_SCHEMA",
     "SidecarContractError",
     "create_server",
     "load_catalog",

@@ -47,7 +47,7 @@ explicitly not part of this proposal.
 | 2 | Delayed provider feed | deferred (same P4 row, split for separate approval) | data-source contract + runtime amendment | `approved_next` (3rd in sequence) |
 | 3 | Alerts / notifications | deferred (P4) | event + delivery contract | `approved_contract_defined` (1st in sequence; in-app only) |
 | 4 | News / social / cloud workspace | deferred (P4) | source, privacy, persistence approval | `deferred_not_approved` |
-| 5 | Paper trading / broker connector | deferred (P4) | credential + order-authority gate | `approved_next` (2nd in sequence; simulation only) |
+| 5 | Paper trading / broker connector → **valuation & analysis** (reshaped 2026-07-22) | deferred (P4) | credential + order-authority gate | `contract_defined_pending_digest_approval` (2nd in sequence; valuation & analysis; paper trading returned to `deferred_not_approved`) |
 | 6 | 7B general provider runtime | `provider_capability_not_active` (P5 amendment) | separate contract, capability matrix, acceptance package | `deferred_not_approved` |
 
 Realtime and delayed feeds are one row in the P4 capability matrix but are
@@ -179,16 +179,32 @@ contracts; approval of one must not imply approval of the other.
   approvals. Cloud sync additionally requires the privacy contract to be
   human-approved before any endpoint is contacted.
 
-## 5. Paper trading / broker connector
+## 5. Paper trading / broker connector → reshaped: valuation & analysis
 
-- Activation status (2026-07-22 human gate): `approved_next`, second in the
-  approved sequence (after capability 3), simulation only. Its contract is not
-  drafted yet; drafting begins only after capability 3 completes its evidence
-  chain. The broker read-only connector remains a separate, independent
-  approval and is not covered by this one.
-- Capability description: simulated order execution against admitted market
-  data for strategy evaluation, and/or a read-capable broker connector for
-  positions and balances. This is simulation and read-only inspection only.
+- Activation status (2026-07-22 human gate, updated same day):
+  `contract_defined_pending_digest_approval` as **valuation & analysis**,
+  second in the approved sequence (after capability 3). The owner decided on
+  2026-07-22: 「同意能力 5，但我不需要模擬下單，我要算的是分析和股票價值。」
+  - Active contract:
+    [`docs/tqe-p6-valuation-analysis-contract.md`](tqe-p6-valuation-analysis-contract.md)
+    (fair value worksheet with explicit user-supplied assumptions +
+    price/volume indicators over admitted EOD data).
+  - Active work-unit draft: `workflow/tqe-p6-valuation-analysis.work-unit.draft.json`.
+  - **Paper trading / simulated order matching is returned to
+    `deferred_not_approved`.** The earlier draft
+    [`docs/tqe-p6-paper-trading-simulation-contract.md`](tqe-p6-paper-trading-simulation-contract.md)
+    is marked `superseded_by_user_decision_2026_07_22` and retained for audit
+    history only.
+  - The broker read-only connector remains a separate, independent approval
+    and is not covered by either contract.
+- Capability description (reshaped): deterministic valuation and analysis
+  computation over admitted EOD price/volume data — a fair value worksheet
+  driven by explicit user-supplied assumptions (labelled `draft`, never
+  official data or consensus) plus price/volume indicators (z-score,
+  percentile, MA deviation). Original P4 description, retained for the
+  record: simulated order execution against admitted market data for strategy
+  evaluation, and/or a read-capable broker connector for positions and
+  balances. This is simulation and read-only inspection only.
 - Why deferred today: P4 requires a separate credential and order-authority
   gate; no credential boundary exists, and the StrategySpec remains
   `not_admitted` with no execution semantics.

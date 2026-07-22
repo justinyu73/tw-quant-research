@@ -21,7 +21,11 @@
 
   var WATCHLIST_SCHEMA = "tw-quant-engine-watchlist/v1";
   var ALERT_STORE_SCHEMA = "tqe-in-app-alerts/v1";
+  var VALUATION_STORE_SCHEMA = "tqe-fair-value-worksheets/v1";
   var MAX_ALERTS = 50;
+  var MAX_WORKSHEETS = 50;
+  var VALUATION_MODEL_TYPES = ["pe_multiple", "dividend_discount_simple", "growth_adjusted_pe"];
+  var VALUATION_INDICATOR_TYPES = ["zscore", "price_percentile", "ma_deviation"];
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -88,7 +92,15 @@
         status: "idle",
         message: ""
       },
-      alertSessionState: {}
+      alertSessionState: {},
+      valuation: {
+        worksheets: [],
+        results: [],
+        indicators: [],
+        status: "idle",
+        message: ""
+      },
+      valuationIndicatorPeriods: { zscore: 20, price_percentile: 60, ma_deviation: 20 }
     };
   }
 
@@ -207,6 +219,40 @@
     return merged.slice(0, 200);
   }
 
+  function normalizeValuationWorksheets(definitions) {
+    if (!Array.isArray(definitions)) return [];
+    var seen = {};
+    return definitions.filter(function (definition) {
+      if (!definition || typeof definition !== "object") return false;
+      if (definition.schema !== "tqe-fair-value-worksheet/v1") return false;
+      var id = definition.worksheet_id;
+      if (typeof id !== "string" || !id || id.length > 64 || !/^[A-Za-z0-9:_.-]+$/.test(id) || seen[id]) return false;
+      if (!definition.target || typeof definition.target.security_id !== "string") return false;
+      if (!definition.model || VALUATION_MODEL_TYPES.indexOf(definition.model.type) < 0) return false;
+      if (typeof definition.safety_margin !== "number" || !(definition.safety_margin >= 0 && definition.safety_margin < 1)) return false;
+      seen[id] = true;
+      return true;
+    }).map(function (definition) { return clone(definition); }).slice(0, MAX_WORKSHEETS);
+  }
+
+  function normalizeValuationResults(results) {
+    if (!Array.isArray(results)) return [];
+    return results.filter(function (result) {
+      return result && typeof result === "object" && typeof result.worksheet_id === "string" &&
+        result.formula_version === "tqe-fair-value/v1" && result.research_only === true &&
+        (result.status === "ok" || result.status === "insufficient_data");
+    }).map(function (result) { return clone(result); }).slice(0, MAX_WORKSHEETS);
+  }
+
+  function normalizeValuationIndicators(indicators) {
+    if (!Array.isArray(indicators)) return [];
+    return indicators.filter(function (indicator) {
+      return indicator && typeof indicator === "object" && indicator.schema === "tqe-price-volume-indicator/v1" &&
+        VALUATION_INDICATOR_TYPES.indexOf(indicator.type) >= 0 && typeof indicator.security_id === "string" &&
+        Number.isInteger(indicator.period) && (indicator.status === "ok" || indicator.status === "insufficient_data");
+    }).map(function (indicator) { return clone(indicator); }).slice(0, 50);
+  }
+
   function reduce(state, action) {
     var current = state || createInitialState({});
     var event = action || {};
@@ -312,6 +358,52 @@
       return Object.assign({}, current, {
         alerts: Object.assign({}, current.alerts, { events: [] }),
         alertSessionState: {}
+      });
+    }
+    if (event.type === "SET_VALUATION_WORKSHEETS") {
+      return Object.assign({}, current, {
+        valuation: Object.assign({}, current.valuation, {
+          worksheets: normalizeValuationWorksheets(event.worksheets),
+          status: "ready",
+          message: ""
+        })
+      });
+    }
+    if (event.type === "ADD_VALUATION_WORKSHEET" && event.worksheet && typeof event.worksheet === "object") {
+      var worksheetList = normalizeValuationWorksheets((current.valuation ? current.valuation.worksheets : []).concat([event.worksheet]));
+      if (worksheetList.length === (current.valuation ? current.valuation.worksheets.length : 0)) return current;
+      return Object.assign({}, current, {
+        valuation: Object.assign({}, current.valuation, { worksheets: worksheetList, status: "ready", message: "" })
+      });
+    }
+    if (event.type === "DELETE_VALUATION_WORKSHEET" && typeof event.worksheetId === "string") {
+      return Object.assign({}, current, {
+        valuation: Object.assign({}, current.valuation, {
+          worksheets: (current.valuation ? current.valuation.worksheets : []).filter(function (definition) { return definition.worksheet_id !== event.worksheetId; }),
+          results: (current.valuation && Array.isArray(current.valuation.results) ? current.valuation.results : []).filter(function (result) { return result.worksheet_id !== event.worksheetId; })
+        })
+      });
+    }
+    if (event.type === "VALUATION_EVALUATED") {
+      return Object.assign({}, current, {
+        valuation: Object.assign({}, current.valuation, {
+          results: normalizeValuationResults(event.results),
+          indicators: normalizeValuationIndicators(event.indicators),
+          status: "ready",
+          message: ""
+        })
+      });
+    }
+    if (event.type === "VALUATION_ERROR") {
+      return Object.assign({}, current, {
+        valuation: Object.assign({}, current.valuation, { status: "error", message: event.message || "valuation_evaluation_failed" })
+      });
+    }
+    if (event.type === "SET_VALUATION_INDICATOR_PERIOD" && VALUATION_INDICATOR_TYPES.indexOf(event.indicator) >= 0) {
+      var requestedPeriod = Math.round(Number(event.period));
+      if (!Number.isInteger(requestedPeriod) || requestedPeriod < 1 || requestedPeriod > 250) return current;
+      return Object.assign({}, current, {
+        valuationIndicatorPeriods: Object.assign({}, current.valuationIndicatorPeriods, { [event.indicator]: requestedPeriod })
       });
     }
     if (event.type === "SET_WATCHLIST") {
@@ -454,6 +546,10 @@
         events: (current.alerts && Array.isArray(current.alerts.events) ? current.alerts.events : []).slice()
       });
       reset.alertSessionState = clone(current.alertSessionState || {});
+      reset.valuation = Object.assign({}, current.valuation, {
+        worksheets: (current.valuation && Array.isArray(current.valuation.worksheets) ? current.valuation.worksheets : []).slice()
+      });
+      reset.valuationIndicatorPeriods = Object.assign({}, current.valuationIndicatorPeriods);
       return reset;
     }
     if (event.type === "KLINE_LOADING") {
@@ -573,10 +669,99 @@
     };
   }
 
+  function valuationStorePayload(state) {
+    return {
+      schema: VALUATION_STORE_SCHEMA,
+      version: 1,
+      worksheets: normalizeValuationWorksheets(state && state.valuation ? state.valuation.worksheets : [])
+    };
+  }
+
   function dropSessionAlertDefinitions(definitions) {
     return normalizeAlertDefinitions(definitions).filter(function (definition) {
       return !(definition.expiry && definition.expiry.policy === "session");
     });
+  }
+
+  // Field-level form rejection feedback (TQR-FORM-FEEDBACK): every rule below
+  // mirrors the engine fail-closed validators (alerts.py validate_alert /
+  // valuation.py validate_worksheet) or the reducer guards, translated to a
+  // Chinese message that names the field and the expected format. The UI only
+  // displays these; the engine remains the final fail-closed gate.
+  function issue(field, message) {
+    return { field: field, message: message };
+  }
+
+  function numberTextIsFinite(value) {
+    var raw = String(value === null || value === undefined ? "" : value).trim();
+    return raw !== "" && Number.isFinite(Number(raw));
+  }
+
+  function numberText(value) {
+    return Number(String(value).trim());
+  }
+
+  function alertFormIssues(draft, context) {
+    var data = draft || {};
+    var symbol = context && context.symbol;
+    var issues = [];
+    if (!symbol) issues.push(issue("target", "尚未選擇標的；請先在上方行情區選擇商品"));
+    if (!String(data.label || "").trim()) issues.push(issue("label", "名稱不可空白（120 字以內）"));
+    if (!numberTextIsFinite(data.value)) issues.push(issue("value", "門檻值需為數字，例如 950 或 12.5"));
+    if (data.dedupPolicy === "cooldown_seconds") {
+      var seconds = String(data.cooldownSeconds === null || data.cooldownSeconds === undefined ? "" : data.cooldownSeconds).trim();
+      if (!/^\d+$/.test(seconds) || Number(seconds) < 1) issues.push(issue("cooldownSeconds", "冷卻秒數需為大於 0 的整數，例如 3600"));
+    }
+    if (data.expiryPolicy === "until") {
+      var until = String(data.until || "").trim();
+      if (!until || isNaN(new Date(until).getTime())) issues.push(issue("until", "到期時間需為有效的日期時間，例如 2026-12-31T18:00"));
+    }
+    return issues;
+  }
+
+  function valuationFormIssues(draft, context) {
+    var data = draft || {};
+    var symbol = context && context.symbol;
+    var issues = [];
+    if (!symbol) issues.push(issue("target", "尚未選擇標的；請先在上方行情區選擇商品"));
+    if (!String(data.label || "").trim()) issues.push(issue("label", "工作表名稱不可空白（120 字以內）"));
+    var model = data.model || "pe_multiple";
+    if (model === "pe_multiple") {
+      if (!numberTextIsFinite(data.eps) || numberText(data.eps) <= 0) issues.push(issue("eps", "預估 EPS 需為大於 0 的數字，例如 10"));
+      if (!numberTextIsFinite(data.targetPe) || numberText(data.targetPe) <= 0) issues.push(issue("targetPe", "目標本益比需為大於 0 的數字，例如 15"));
+    } else if (model === "dividend_discount_simple") {
+      if (!numberTextIsFinite(data.dps) || numberText(data.dps) <= 0) issues.push(issue("dps", "預估每股股利需為大於 0 的數字，例如 5"));
+      if (!numberTextIsFinite(data.growthRate)) issues.push(issue("growthRate", "股利成長率 g 需為數字（小數），例如 0.03"));
+      else if (numberText(data.growthRate) <= -1) issues.push(issue("growthRate", "股利成長率 g 需大於 -1"));
+      if (!numberTextIsFinite(data.discountRate) || numberText(data.discountRate) <= 0) issues.push(issue("discountRate", "折現率 r 需為大於 0 的數字（小數），例如 0.08"));
+      else if (numberTextIsFinite(data.growthRate) && numberText(data.discountRate) <= numberText(data.growthRate)) issues.push(issue("discountRate", "折現率 r 必須大於股利成長率 g"));
+    } else if (model === "growth_adjusted_pe") {
+      if (!numberTextIsFinite(data.eps) || numberText(data.eps) <= 0) issues.push(issue("eps", "預估 EPS 需為大於 0 的數字，例如 10"));
+      if (!numberTextIsFinite(data.growthPct)) issues.push(issue("growthPct", "預估成長率需為數字（%），例如 12"));
+      if (!numberTextIsFinite(data.peg)) issues.push(issue("peg", "PEG 倍數需為數字，例如 1.0"));
+      if (numberTextIsFinite(data.growthPct) && numberTextIsFinite(data.peg) && numberText(data.growthPct) * numberText(data.peg) <= 0) {
+        issues.push(issue("growthPct", "預估成長率與 PEG 倍數的乘積需為正數"));
+      }
+    }
+    if (!numberTextIsFinite(data.safetyMargin) || numberText(data.safetyMargin) < 0 || numberText(data.safetyMargin) >= 100) {
+      issues.push(issue("safetyMargin", "安全邊際需為 0 以上、小於 100 的數字（%），例如 15"));
+    }
+    return issues;
+  }
+
+  function watchlistGroupNameIssues(name) {
+    return String(name || "").trim() ? [] : [issue("name", "群組名稱不可空白（32 字以內）")];
+  }
+
+  function watchlistAddIssues(context) {
+    var data = context || {};
+    var query = String(data.query || "").trim();
+    var selected = data.selected || null;
+    var items = Array.isArray(data.items) ? data.items : [];
+    if (!query) return [issue("query", "請先輸入代號或名稱搜尋商品，例如 2330")];
+    if (!selected) return [issue("query", "找不到完全相符的商品；請輸入完整代號（例如 2330）或從搜尋結果點選")];
+    if (items.indexOf(selected.instrument_id) >= 0) return [issue("selection", "此商品已在目前群組")];
+    return [];
   }
 
   function watchlistItemsForActiveGroup(state) {
@@ -598,6 +783,7 @@
   return Object.freeze({
     SECTIONS: SECTIONS,
     ALERT_STORE_SCHEMA: ALERT_STORE_SCHEMA,
+    VALUATION_STORE_SCHEMA: VALUATION_STORE_SCHEMA,
     createInitialState: createInitialState,
     reduce: reduce,
     selectedProduct: selectedProduct,
@@ -610,9 +796,17 @@
     klineModel: klineModel,
     watchlistPayload: watchlistPayload,
     alertStorePayload: alertStorePayload,
+    valuationStorePayload: valuationStorePayload,
+    normalizeValuationWorksheets: normalizeValuationWorksheets,
+    normalizeValuationResults: normalizeValuationResults,
+    normalizeValuationIndicators: normalizeValuationIndicators,
     dropSessionAlertDefinitions: dropSessionAlertDefinitions,
     normalizeAlertDefinitions: normalizeAlertDefinitions,
     mergeAlertEvents: mergeAlertEvents,
+    alertFormIssues: alertFormIssues,
+    valuationFormIssues: valuationFormIssues,
+    watchlistGroupNameIssues: watchlistGroupNameIssues,
+    watchlistAddIssues: watchlistAddIssues,
     watchlistItemsForActiveGroup: watchlistItemsForActiveGroup,
     screenProducts: screenProducts,
     klineModels: klineModels,

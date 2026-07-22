@@ -1,0 +1,184 @@
+{
+  "schema": "tw-quant-engine-p6-valuation-analysis-evidence/v1",
+  "stage_id": "P6-valuation-analysis",
+  "status": "pass",
+  "approval": {
+    "approved_by": "user",
+    "work_unit": "workflow/tqe-p6-valuation-analysis.work-unit.draft.json",
+    "work_unit_approval_evidence": "workflow/evidence/p6-valuation-analysis-work-unit-approval.acceptance.json",
+    "approved_digest": "sha256:27c1bbb99101052e8bc31ad8f4e5d0a2497e7dc8832692d516bbf1a94c5a80e6",
+    "contract": "docs/tqe-p6-valuation-analysis-contract.md",
+    "network_enabled": false,
+    "provider_calls": 0,
+    "credentials": false,
+    "mode": "valuation_analysis_only"
+  },
+  "implementation_slices": [
+    {
+      "slice": "fair value worksheet schema validation (tqe-fair-value-worksheet/v1) with fail-closed domain checks",
+      "location": "src/tw_quant_engine/valuation.py (validate_worksheet, _validate_model; r>g, positive params, admitted target)"
+    },
+    {
+      "slice": "valuation models with exact formulas and formula_version echo",
+      "location": "src/tw_quant_engine/valuation.py (compute_fair_value; FORMULA_VERSION tqe-fair-value/v1)"
+    },
+    {
+      "slice": "derived outputs: fair_value, buy_zone_ceiling, current_price with as_of, comparison",
+      "location": "src/tw_quant_engine/valuation.py (evaluate_worksheet, evaluate_worksheets, _comparison)"
+    },
+    {
+      "slice": "price/volume indicators: zscore (population std, close basis), price_percentile, ma_deviation",
+      "location": "src/tw_quant_engine/valuation.py (compute_indicator, closes_from_bars, validate_indicator_request)"
+    },
+    {
+      "slice": "user-supplied assumption labelling enforced at schema, storage, and render layers",
+      "location": "engine result fields assumption_source=user_supplied_assumption + data_status=draft; ui/dashboard/app.js valuationMarkup badges and note copy"
+    },
+    {
+      "slice": "session-local persistence (flat versioned JSON, watchlist/alerts style)",
+      "location": "ui/dashboard/app.js ensureValuationRuntime/persistValuation via localStorage key tqe-fair-value-worksheets.v1; ui/dashboard/dashboard-core.js valuationStorePayload"
+    },
+    {
+      "slice": "research-only in-app presentation, no order-like or advice surface",
+      "location": "ui/dashboard/app.js valuationMarkup (market/行情分析 view, replacing the former 未計算 placeholder panel); ui/dashboard/styles.css valuation-* classes"
+    },
+    {
+      "slice": "deterministic fixture tests; no order/credential/provider code path assertions",
+      "location": "tests/test_p6_valuation_analysis.py (21 tests) + tests/fixtures/p6/valuation.json; tests/dashboard-core.test.cjs valuation-analysis checks"
+    },
+    {
+      "slice": "acceptance evidence JSON recording valuation_analysis_only scope",
+      "location": "workflow/evidence/p6-valuation-analysis.acceptance.json (this file)"
+    }
+  ],
+  "sidecar_route": {
+    "route": "GET /valuation?worksheets=<json>&indicators=<json>",
+    "schema": "tw-quant-engine-sidecar-valuation/v1",
+    "read_only": true,
+    "location": "src/tw_quant_engine/desktop_sidecar.py (KlineCatalog.valuation_response, do_GET /valuation)"
+  },
+  "panel_placement": {
+    "view": "market (行情分析)",
+    "rationale": "The kline card already carried the designated 個人合理區間試算 placeholder seam (status 未計算); both the worksheet (current-price comparison) and the price/volume indicators need the admitted-price context of the selected instrument, so the market view is the minimal-intrusion placement. 財務追蹤 stays untouched because official fundamentals remain unavailable pending C1 source admission."
+  },
+  "trade_offs": [
+    "Tauri command pair for worksheet persistence deliberately not added (no Rust change; keeps the p4 Tauri audit surface untouched); localStorage path only. Follow-up: desktop load/save commands mirroring load_alerts/save_alerts.",
+    "tests/test_k4_kline_ui_contract.py tokens updated from the retired placeholder panel (valuation-eps/pe-low/pe-high/safety-margin, 尚未套用個人計算規則) to the approved panel tokens (valuation-form/valuation-ws-model/valuation-indicators/valuation-evaluate, 使用者假設, 不構成投資建議); the placeholder was explicitly a 未計算 stub that this work-unit replaces.",
+    "Market pixel baselines updated after screenshot self-review (1440 crop of the new panel and 390px capture reviewed); model select options shortened to plain model names to fix container-overflow at 1280/1024 found by the RWD audit.",
+    "valuationInputs state and SET_VALUATION_INPUT reducer action kept for backward compatibility though the new panel does not use them."
+  ],
+  "offline_verification": {
+    "full_tests": {
+      "argv": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests"
+      ],
+      "exit_code": 0,
+      "result": "173 tests passed, 1 skipped"
+    },
+    "dashboard_core_tests": {
+      "argv": [
+        "node",
+        "tests/dashboard-core.test.cjs"
+      ],
+      "exit_code": 0,
+      "result": "pass, checks include valuation-analysis and form-issues"
+    },
+    "p4_closure": {
+      "argv": [
+        "python3",
+        "scripts/p4_research_closure.py"
+      ],
+      "exit_code": 0,
+      "status": "pass",
+      "network": false,
+      "provider_calls": 0
+    },
+    "lh_preflight": {
+      "argv": [
+        "python3",
+        "scripts/lh_preflight.py"
+      ],
+      "exit_code": 0,
+      "status": "pass"
+    },
+    "alerts_smoke": {
+      "argv": [
+        "node",
+        "scripts/dashboard-alerts-smoke.cjs"
+      ],
+      "exit_code": 0,
+      "status": "pass",
+      "external_requests": [],
+      "form_feedback_checks": "added 2026-07-22: watchlist_form_issues_visible_when_disabled, watchlist_group_issues_hidden_when_valid, watchlist_add_issues_hidden_when_selected, alert_form_issues_visible_when_disabled, alert_form_issues_narrow_as_fields_fix, alert_form_issues_hidden_when_valid, valuation_form_issues_visible_when_disabled, terminal_watchlist_add_issues_visible, engine_rejection_shown_verbatim"
+    },
+    "browser_smoke": {
+      "argv": [
+        "node",
+        "scripts/dashboard-browser-smoke.cjs"
+      ],
+      "exit_code": 0,
+      "status": "pass",
+      "pixel_baselines_updated": [
+        "overview",
+        "market_valid",
+        "market_partial",
+        "market_future",
+        "products",
+        "detail_dialog"
+      ],
+      "screenshot_self_review": "2026-07-22: every PNG in outputs/dashboard-browser/ reviewed; the only diffs are the intended amber .form-issues hint lists under the disabled form buttons (alerts, valuation, watchlist toolbars on market/products/overview, plus the detail-dialog backdrop page). financial_tracker and formula_builder hashes unchanged."
+    },
+    "rwd_audit": {
+      "argv": [
+        "node",
+        "scripts/dashboard-rwd-audit.cjs"
+      ],
+      "exit_code": 0,
+      "result": "0 failures across all nine views x six breakpoints; worst_top10 carries only the 9 intentional 720px breadcrumb clips; re-audited 2026-07-22 after the .form-issues addition with no new failures"
+    }
+  },
+  "form_feedback": {
+    "follow_up": "User requirement recorded below under human_acceptance.follow_up_requirement: every button disabled (or submission rejected) because an input fails a rule must show a visible field-level hint naming the field and the expected format/range.",
+    "status": "completed",
+    "completed_at": "2026-07-22",
+    "pattern": "Shared issue-list pattern: pure functions in ui/dashboard/dashboard-core.js (alertFormIssues, valuationFormIssues, watchlistGroupNameIssues, watchlistAddIssues) return [{field, message}] with Chinese messages mirroring the engine fail-closed validators (alerts.py validate_alert, valuation.py validate_worksheet) and reducer guards; app.js renders them via formIssuesMarkup into a shared .form-issues list next to the button and refreshes them live via refreshFormIssues in the input/change handlers (no full re-render while typing); add-button disabled state is driven by issues.length.",
+    "covered_forms": [
+      "alerts panel add form (market view): target/label/value/cooldownSeconds/until",
+      "valuation worksheet add form (market view): target/label/eps/targetPe/dps/growthRate/discountRate/growthPct/peg/safetyMargin, including the r > g rule",
+      "watchlist create-group (products view): non-blank group name",
+      "watchlist add-to-list (products view + market terminal compact watchlist): search query, exact-match selection, already-in-group"
+    ],
+    "engine_rejection_passthrough": "Engine/sidecar rejections discovered only at evaluation time (e.g. r<=g reaching the sidecar from a stored worksheet) are shown verbatim in the existing status line via engineErrorMessage; engine messages already name field and rule and the fail-closed 400 path is unchanged. Click-path rejections in addAlertFromDraft/addWorksheetFromDraft now dispatch the field-level issue summary to the status line instead of failing silently or with one generic message.",
+    "style": "styles.css .form-issues: var(--type-helper) 12px, var(--warning) text, no background/border, grid-spanning, hidden when the button is enabled; rule recorded in .agents/skills/uiux-review/SKILL.md (Form rejection feedback, TQR-FORM-FEEDBACK).",
+    "verification": "tests/dashboard-core.test.cjs form-issues cases (valid -> empty list; each invalid class -> field-specific message); scripts/dashboard-alerts-smoke.cjs nine new browser checks (hints visible while disabled, narrow as fields fix, hidden when valid, verbatim engine rejection); full offline_verification suite re-run green on 2026-07-22."
+  },
+  "acceptance_notes": [
+    "All nine work-unit slices implemented; no order, simulated-order, credential, or provider code path exists in the new module (source-scan test included).",
+    "All valuation inputs are user-supplied assumptions labelled draft/user_supplied_assumption at schema, storage, and render layers; official fundamentals are not auto-populated.",
+    "Comparison output is a research note only (research_comparison_only=true), with no investment-advice or solicitation language in the UI copy.",
+    "Indicators use admitted EOD data only: raw close basis, z-score with population standard deviation and explicit recorded period.",
+    "Follow-up completed 2026-07-22: field-level form rejection feedback (form_feedback block above) — every rule-disabled button on the alerts, valuation, and watchlist forms now shows which field is wrong and the expected format; engine rejections surface verbatim. status stays pass per the user's instruction; human spot-check of the new hints is at the user's discretion.",
+    "Human acceptance is still required before this capability can be considered activated; capability 2 (delayed feed) remains approved_next."
+  ],
+  "human_acceptance": {
+    "accepted_by": "user",
+    "accepted_at": "2026-07-22",
+    "environment": "browser dev preview via scripts/serve_dashboard_app.py, sidecar 127.0.0.1:8767",
+    "checks": {
+      "1_pe_multiple_fv": "pass (FV 800, buy-zone ceiling, price comparison)",
+      "2_gordon_and_r_le_g_rejection": "pass (FV 103; r<=g rejected)",
+      "3_assumption_labeling": "pass",
+      "4_price_volume_indicators": "pass",
+      "5_persistence": "pass",
+      "6_no_order_surface_no_external_egress": "pass"
+    },
+    "follow_up_requirement": "User requires visible field-level validation feedback on every form rejection (which field is wrong and the expected format), across all pages. Tracked as a new work item before capability 5 is considered fully polished.",
+    "follow_up_form_feedback": "Completed 2026-07-22; see the form_feedback block above. Covers alerts/valuation/watchlist forms, engine rejection verbatim passthrough, smoke + unit coverage, and the uiux-review skill rule."
+  }
+}

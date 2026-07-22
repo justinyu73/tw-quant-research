@@ -1,0 +1,92 @@
+{
+  "schema": "loop-hybrid-work-unit/v2",
+  "status": "approved_pending_implementation",
+  "work_unit_id": "tw-quant-engine-p6-valuation-analysis-001",
+  "target_repo": "/absolute/path/to/tw-quant-engine",
+  "goal": "Implement the valuation & analysis slice per the P6 contract: fair value worksheet (pe_multiple, dividend_discount_simple, growth_adjusted_pe with explicit user-supplied assumptions labelled draft) plus price/volume indicators (z-score, price percentile, MA deviation) computed deterministically from admitted EOD data, session-local persistence, and research-only presentation. No simulated orders, no official fundamentals auto-population, no investment advice.",
+  "contract": "docs/tqe-p6-valuation-analysis-contract.md",
+  "activation_proposal": "docs/tqe-p6-deferred-capability-activation-proposal.md",
+  "supersedes": "workflow/tqe-p6-paper-trading.work-unit.draft.json",
+  "network": false,
+  "provider_calls": false,
+  "credentials": false,
+  "host_egress": "not_applicable_zero_network",
+  "mode": "valuation_analysis_only",
+  "implementation_slices": [
+    "fair value worksheet schema validation (tqe-fair-value-worksheet/v1) with fail-closed domain checks (r > g, positive parameters, admitted target)",
+    "valuation models: pe_multiple, dividend_discount_simple, growth_adjusted_pe with exact formula implementations and formula_version echo",
+    "derived outputs: fair_value, buy_zone_ceiling, current_price with as_of, comparison vs current price",
+    "price/volume indicators: zscore (population std, close basis, explicit period), price_percentile, ma_deviation over admitted EOD data",
+    "user-supplied assumption labelling (draft / user_supplied_assumption) enforced at schema, storage, and render layers",
+    "session-local persistence of worksheets and indicator settings (flat versioned JSON, watchlist/alerts style)",
+    "research-only in-app presentation with assumption source and data status visible; no order-like or advice surface",
+    "deterministic fixture tests asserting exact indicator values and worksheet arithmetic; tests asserting no order/credential/provider code path",
+    "acceptance evidence JSON recording valuation_analysis_only scope"
+  ],
+  "activation_requirements": [
+    "human approval of this exact work-unit digest",
+    "p4_research_closure.py passing before and after implementation",
+    "offline replay of deterministic fixture tests",
+    "acceptance JSON with mode recorded as valuation_analysis_only; paper trading and broker connector recorded as unapproved",
+    "human acceptance after implementation"
+  ],
+  "verification": [
+    {
+      "id": "offline-tests",
+      "argv": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "timeout_seconds": 180,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "engine-preflight",
+      "argv": [
+        "python3",
+        "scripts/lh_preflight.py"
+      ],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "p4-closure",
+      "argv": [
+        "python3",
+        "scripts/p4_research_closure.py"
+      ],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    }
+  ],
+  "cannot_claim": [
+    "simulated order matching or paper trading of any kind",
+    "order route, order command, or order UI control",
+    "official fundamental fields auto-populated",
+    "forward EPS or forward PE from any estimate or consensus source",
+    "investment advice, recommendation, solicitation, or performance promise",
+    "user-supplied assumptions presented as official data or market consensus",
+    "provider invoked or credentials used",
+    "StrategySpec admitted or executed",
+    "worksheets or settings leaving the local machine",
+    "capability 1, 2, 4, or 6 activated",
+    "product acceptance",
+    "automatic promotion"
+  ],
+  "approval": {
+    "approved_by": "user",
+    "approved_at": "2026-07-22",
+    "approval_note": "User approved the valuation-analysis work-unit digest after the capability 5 reshape (valuation and analysis, no simulated orders).",
+    "approved_digest": "sha256:27c1bbb99101052e8bc31ad8f4e5d0a2497e7dc8832692d516bbf1a94c5a80e6",
+    "approved_digest_note": "Digest of the exact draft content (status draft_not_runnable) at approval time, computed with the p5_work_unit_digest canonicalization. Only the status flip and this approval block are post-approval changes."
+  }
+}

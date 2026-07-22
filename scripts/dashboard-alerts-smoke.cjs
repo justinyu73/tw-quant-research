@@ -138,6 +138,36 @@ async function main() {
     const response = await page.goto(`${baseUrl}/index.html`, { waitUntil: "networkidle" });
     assert.equal(response.status(), 200);
 
+    // TQR-FORM-FEEDBACK (products page): disabled watchlist buttons must show
+    // field-level hints naming the field and the expected format.
+    await page.locator('[data-action="section"][data-section="products"]').first().click();
+    await page.locator('[data-testid="watchlist-toolbar"]').waitFor();
+
+    await record("watchlist_form_issues_visible_when_disabled", async () => {
+      const groupIssues = page.locator('[data-testid="watchlist-group-issues"]');
+      assert.equal(await groupIssues.isVisible(), true);
+      assert.match(await groupIssues.innerText(), /群組名稱不可空白/);
+      assert.equal(await page.locator('[data-testid="watchlist-group-create"]').isDisabled(), true);
+      const addIssues = page.locator('[data-testid="watchlist-add-issues"]');
+      assert.equal(await addIssues.isVisible(), true);
+      assert.match(await addIssues.innerText(), /請先輸入代號或名稱/);
+      assert.equal(await page.locator('[data-testid="watchlist-add"]').isDisabled(), true);
+    });
+
+    await page.locator('[data-testid="watchlist-group-name"]').fill("半導體");
+    await record("watchlist_group_issues_hidden_when_valid", async () => {
+      assert.equal(await page.locator('[data-testid="watchlist-group-issues"]').isVisible(), false);
+      assert.equal(await page.locator('[data-testid="watchlist-group-create"]').isDisabled(), false);
+    });
+    await page.locator('[data-testid="watchlist-group-name"]').fill("");
+
+    await page.locator('[data-testid="watchlist-picker"]').fill("2330");
+    await record("watchlist_add_issues_hidden_when_selected", async () => {
+      assert.equal(await page.locator('[data-testid="watchlist-add-issues"]').isVisible(), false);
+      assert.equal(await page.locator('[data-testid="watchlist-add"]').isDisabled(), false);
+    });
+    await page.locator('[data-testid="watchlist-picker"]').fill("");
+
     // Navigate to the market section where the alerts panel lives.
     await page.locator('[data-action="section"][data-section="market"]').first().click();
     await page.locator('[data-testid="kline-chart"]').waitFor();
@@ -167,6 +197,49 @@ async function main() {
       });
       assert.deepEqual(scan.text_hits, []);
       assert.equal(scan.control_hits, 0);
+    });
+
+    // TQR-FORM-FEEDBACK (market page): disabled alert/valuation/watchlist
+    // buttons must show field-level hints; hints clear as fields become valid.
+    await record("alert_form_issues_visible_when_disabled", async () => {
+      assert.equal(await page.locator('[data-testid="alert-add"]').isDisabled(), true);
+      const issues = page.locator('[data-testid="alert-form-issues"]');
+      assert.equal(await issues.isVisible(), true);
+      const issueText = await issues.innerText();
+      assert.match(issueText, /名稱不可空白/);
+      assert.match(issueText, /門檻值需為數字/);
+      const fields = await issues.locator("li").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-field")));
+      assert.ok(fields.includes("label") && fields.includes("value"), `issue items must carry data-field, got ${fields}`);
+    });
+
+    await page.locator('[data-testid="alert-label"]').fill("2330 收盤站上 1");
+    await record("alert_form_issues_narrow_as_fields_fix", async () => {
+      assert.equal(await page.locator('[data-testid="alert-add"]').isDisabled(), true);
+      const issueText = await page.locator('[data-testid="alert-form-issues"]').innerText();
+      assert.match(issueText, /門檻值需為數字/);
+      assert.equal(/名稱不可空白/.test(issueText), false, "fixed field must drop out of the issue list");
+    });
+
+    await page.locator('[data-testid="alert-value"]').fill("1");
+    await record("alert_form_issues_hidden_when_valid", async () => {
+      assert.equal(await page.locator('[data-testid="alert-add"]').isDisabled(), false);
+      assert.equal(await page.locator('[data-testid="alert-form-issues"]').isVisible(), false);
+    });
+
+    await record("valuation_form_issues_visible_when_disabled", async () => {
+      assert.equal(await page.locator('[data-testid="valuation-add"]').isDisabled(), true);
+      const issues = page.locator('[data-testid="valuation-form-issues"]');
+      assert.equal(await issues.isVisible(), true);
+      const issueText = await issues.innerText();
+      assert.match(issueText, /工作表名稱不可空白/);
+      assert.match(issueText, /預估 EPS 需為大於 0/);
+    });
+
+    await record("terminal_watchlist_add_issues_visible", async () => {
+      assert.equal(await page.locator('[data-testid="terminal-watchlist-add"]').isDisabled(), true);
+      const issues = page.locator('[data-testid="terminal-watchlist-add-issues"]');
+      assert.equal(await issues.isVisible(), true);
+      assert.match(await issues.innerText(), /請先輸入代號或名稱/);
     });
 
     // Add a valid alert definition through the panel form.
@@ -251,6 +324,38 @@ async function main() {
     await record("only_expected_400_console_message", async () => {
       const unexpected = browserErrors.filter((message) => !/status of 400/.test(message));
       assert.deepEqual(unexpected, []);
+    });
+
+    // TQR-FORM-FEEDBACK: an engine-side rejection discovered only at evaluation
+    // time (r <= g slips past the store normalizer) must surface verbatim in the
+    // panel status line, naming the field and the rule.
+    await record("engine_rejection_shown_verbatim", async () => {
+      await page.evaluate(() => {
+        const store = {
+          schema: "tqe-fair-value-worksheets/v1",
+          version: 1,
+          worksheets: [{
+            schema: "tqe-fair-value-worksheet/v1",
+            worksheet_id: "ws-bad-r-g",
+            label: "r<=g 測試",
+            target: { security_id: "2330" },
+            model: { type: "dividend_discount_simple", dps: 5, growth_rate: 0.08, discount_rate: 0.03 },
+            safety_margin: 0.1,
+            assumption_notes: "測試",
+            created_at: "2026-07-22T00:00:00Z",
+          }],
+        };
+        window.localStorage.setItem("tqe-fair-value-worksheets.v1", JSON.stringify(store));
+      });
+      await page.reload({ waitUntil: "networkidle" });
+      await page.locator('[data-action="section"][data-section="market"]').first().click();
+      await page.locator('[data-testid="valuation-panel"]').waitFor();
+      await page.locator('[data-testid="valuation-evaluate"]').click();
+      const status = page.locator('[data-testid="valuation-status"]');
+      await status.waitFor();
+      assert.match(await status.innerText(), /model\.discount_rate must be greater than model\.growth_rate/);
+      await page.evaluate(() => window.localStorage.removeItem("tqe-fair-value-worksheets.v1"));
+      return "status line shows the engine field+rule message verbatim";
     });
 
     // New browser session (new tab in the same profile): sessionStorage starts

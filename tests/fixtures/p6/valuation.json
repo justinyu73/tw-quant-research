@@ -1,0 +1,100 @@
+{
+  "admitted_security_ids": ["2330", "2317"],
+  "worksheets": [
+    {
+      "schema": "tqe-fair-value-worksheet/v1",
+      "worksheet_id": "p6-pe-2330",
+      "label": "2330 本益比合理價",
+      "target": {"security_id": "2330"},
+      "model": {"type": "pe_multiple", "eps": 10, "target_pe": 15},
+      "safety_margin": 0.2,
+      "assumption_notes": "假設明年 EPS 10 元、給 15 倍本益比",
+      "created_at": "2026-07-22T00:00:00Z"
+    },
+    {
+      "schema": "tqe-fair-value-worksheet/v1",
+      "worksheet_id": "p6-ddm-2317",
+      "label": "2317 股利折價",
+      "target": {"security_id": "2317"},
+      "model": {"type": "dividend_discount_simple", "dps": 5, "growth_rate": 0.03, "discount_rate": 0.08},
+      "safety_margin": 0.1,
+      "assumption_notes": "",
+      "created_at": "2026-07-22T00:00:00Z"
+    },
+    {
+      "schema": "tqe-fair-value-worksheet/v1",
+      "worksheet_id": "p6-peg-2330",
+      "label": "2330 成長調整",
+      "target": {"security_id": "2330"},
+      "model": {"type": "growth_adjusted_pe", "eps": 10, "growth_pct": 12, "peg": 1},
+      "safety_margin": 0,
+      "assumption_notes": "PEG 簡式驗算",
+      "created_at": "2026-07-22T00:00:00Z"
+    }
+  ],
+  "invalid_worksheets": [
+    {
+      "case": "bad_schema",
+      "definition": {"schema": "tqe-fair-value-worksheet/v0", "worksheet_id": "x1", "label": "x", "target": {"security_id": "2330"}, "model": {"type": "pe_multiple", "eps": 10, "target_pe": 15}, "safety_margin": 0.1, "assumption_notes": "", "created_at": "2026-07-22T00:00:00Z"}
+    },
+    {
+      "case": "unknown_model_type",
+      "definition": {"schema": "tqe-fair-value-worksheet/v1", "worksheet_id": "x2", "label": "x", "target": {"security_id": "2330"}, "model": {"type": "dcf_full", "eps": 10}, "safety_margin": 0.1, "assumption_notes": "", "created_at": "2026-07-22T00:00:00Z"}
+    },
+    {
+      "case": "missing_model_field",
+      "definition": {"schema": "tqe-fair-value-worksheet/v1", "worksheet_id": "x3", "label": "x", "target": {"security_id": "2330"}, "model": {"type": "pe_multiple", "eps": 10}, "safety_margin": 0.1, "assumption_notes": "", "created_at": "2026-07-22T00:00:00Z"}
+    },
+    {
+      "case": "discount_not_greater_than_growth",
+      "definition": {"schema": "tqe-fair-value-worksheet/v1", "worksheet_id": "x4", "label": "x", "target": {"security_id": "2330"}, "model": {"type": "dividend_discount_simple", "dps": 5, "growth_rate": 0.08, "discount_rate": 0.08}, "safety_margin": 0.1, "assumption_notes": "", "created_at": "2026-07-22T00:00:00Z"}
+    },
+    {
+      "case": "growth_not_above_minus_one",
+      "definition": {"schema": "tqe-fair-value-worksheet/v1", "worksheet_id": "x5", "label": "x", "target": {"security_id": "2330"}, "model": {"type": "dividend_discount_simple", "dps": 5, "growth_rate": -1.5, "discount_rate": 0.08}, "safety_margin": 0.1, "assumption_notes": "", "created_at": "2026-07-22T00:00:00Z"}
+    },
+    {
+      "case": "non_positive_eps",
+      "definition": {"schema": "tqe-fair-value-worksheet/v1", "worksheet_id": "x6", "label": "x", "target": {"security_id": "2330"}, "model": {"type": "pe_multiple", "eps": 0, "target_pe": 15}, "safety_margin": 0.1, "assumption_notes": "", "created_at": "2026-07-22T00:00:00Z"}
+    },
+    {
+      "case": "safety_margin_out_of_range",
+      "definition": {"schema": "tqe-fair-value-worksheet/v1", "worksheet_id": "x7", "label": "x", "target": {"security_id": "2330"}, "model": {"type": "pe_multiple", "eps": 10, "target_pe": 15}, "safety_margin": 1.0, "assumption_notes": "", "created_at": "2026-07-22T00:00:00Z"}
+    },
+    {
+      "case": "target_outside_universe",
+      "definition": {"schema": "tqe-fair-value-worksheet/v1", "worksheet_id": "x8", "label": "x", "target": {"security_id": "9999"}, "model": {"type": "pe_multiple", "eps": 10, "target_pe": 15}, "safety_margin": 0.1, "assumption_notes": "", "created_at": "2026-07-22T00:00:00Z"}
+    },
+    {
+      "case": "peg_growth_product_non_positive",
+      "definition": {"schema": "tqe-fair-value-worksheet/v1", "worksheet_id": "x9", "label": "x", "target": {"security_id": "2330"}, "model": {"type": "growth_adjusted_pe", "eps": 10, "growth_pct": -5, "peg": 1}, "safety_margin": 0.1, "assumption_notes": "", "created_at": "2026-07-22T00:00:00Z"}
+    },
+    {
+      "case": "external_fetch_field",
+      "definition": {"schema": "tqe-fair-value-worksheet/v1", "worksheet_id": "x10", "label": "x", "target": {"security_id": "2330"}, "model": {"type": "pe_multiple", "eps": 10, "target_pe": 15}, "safety_margin": 0.1, "assumption_notes": "", "created_at": "2026-07-22T00:00:00Z", "auto_fetch_eps": true}
+    }
+  ],
+  "market_data": {
+    "2330": [
+      {"trading_date": "2026-07-16", "close": 96},
+      {"trading_date": "2026-07-17", "close": 98},
+      {"trading_date": "2026-07-18", "close": 100},
+      {"trading_date": "2026-07-21", "close": 100}
+    ],
+    "2317": []
+  },
+  "indicator_closes": [100, 102, 104, 106, 108],
+  "expected": {
+    "fair_values": {"p6-pe-2330": 150.0, "p6-ddm-2317": 103.0, "p6-peg-2330": 120.0},
+    "buy_zone_ceilings": {"p6-pe-2330": 120.0, "p6-ddm-2317": 92.7, "p6-peg-2330": 120.0},
+    "pe_2330_comparison": {
+      "vs_fair_value": "below",
+      "vs_buy_zone_ceiling": "below",
+      "gap_to_fair_value_pct": -0.3333333333333333,
+      "gap_to_buy_zone_ceiling_pct": -0.16666666666666669
+    },
+    "zscore_period5": 1.414213562373095,
+    "price_percentile_period5": 100.0,
+    "ma_deviation_period5": 0.038461538461538436
+  }
+}
