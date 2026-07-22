@@ -978,3 +978,41 @@ input, select, textarea, button { font-family: inherit; }
 .form-issues[hidden] { display: none; }
 .form-issues li { overflow-wrap: anywhere; }
 .form-issues li::before { content: "• "; }
+
+/* Settings view (update + theme) */
+.settings-grid { display: grid; max-width: 780px; gap: 16px; }
+.settings-block { display: grid; gap: 12px; }
+.settings-facts { display: grid; gap: 6px; margin: 0; }
+.settings-facts div { display: flex; align-items: baseline; gap: 12px; }
+.settings-facts dt { min-width: 72px; color: var(--text-muted); font-size: 11px; }
+.settings-facts dd { margin: 0; color: var(--text); font-size: var(--type-helper); font-weight: 600; }
+.settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.settings-status { color: var(--text-secondary); font-size: var(--type-helper); }
+.settings-status.success { color: var(--success); font-weight: 700; }
+.settings-status.info { color: var(--primary-dk); font-weight: 700; }
+.settings-status.error { color: var(--danger); }
+.settings-note { margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.6; }
+
+/* Dark theme: token overrides over the canonical light theme. The sidebar is
+   already dark; the K-line canvas keeps its default palette. */
+[data-theme="dark"] {
+  --body-bg: #151a22;
+  --surface: #1e242e;
+  --surface-secondary: #242b36;
+  --border: #333c48;
+  --border-light: #2a323d;
+  --text: #e4eaf1;
+  --text-secondary: #a7b2c0;
+  --text-muted: #7d8896;
+  --primary-lt: rgba(41, 98, 255, 0.22);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+[data-theme="dark"] .topbar { background: rgba(30, 36, 46, 0.94); }
+[data-theme="dark"] .system-topbar,
+[data-theme="dark"] .kline-chart-wrap,
+[data-theme="dark"] .terminal-quote-bar,
+[data-theme="dark"] .data-update-panel,
+[data-theme="dark"] .kline-tooltip { color: var(--text-secondary); background: var(--surface); }
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea { color: var(--text); background: var(--surface-secondary); border-color: var(--border); }

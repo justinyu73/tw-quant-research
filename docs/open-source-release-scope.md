@@ -12,7 +12,10 @@ local watchlist file. The desktop sidecar also exposes one explicit user action:
 download the explicit watchlist scope, or one selected TWSE listed equity, for
 1, 2, or 3 trailing years into the user application-data directory. The app does not provide live quotes, broker
 access, order placement, automatic execution, credentials, or background
-provider refresh.
+provider refresh. Since 0.2.0 the desktop shell also offers an explicit,
+user-triggered in-app update check; it runs in the Rust shell as an anonymous
+read-only request to the public GitHub release and never touches the
+loopback-only browser surface (see `docs/desktop-release.md`).
 
 The Windows and macOS artifacts are built from the target-specific sidecar
 outputs listed in `config/open-source-release.json`. The sidecar contains the

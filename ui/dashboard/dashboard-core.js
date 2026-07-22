@@ -16,7 +16,8 @@
     { id: "fundamentals", label: "財務追蹤" },
     { id: "stories", label: "研究筆記" },
     { id: "backtest", label: "驗證報告" },
-    { id: "evidence", label: "資料來源" }
+    { id: "evidence", label: "資料來源" },
+    { id: "settings", label: "設定" }
   ]);
 
   var WATCHLIST_SCHEMA = "tw-quant-engine-watchlist/v1";

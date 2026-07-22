@@ -44,6 +44,79 @@
   var alertsLoadStarted = false;
   var alertsPersistenceAvailable = null;
   var alertEvaluateInFlight = false;
+  var THEME_LOCAL_STORAGE_KEY = "tw-quant-engine-theme.v1";
+  var appVersion = "";
+  var updateStatus = { state: "idle", version: "", message: "" };
+  var updateCheckInFlight = false;
+  var updateInstallInFlight = false;
+
+  function currentTheme() {
+    try {
+      var raw = window.localStorage ? window.localStorage.getItem(THEME_LOCAL_STORAGE_KEY) : null;
+      return raw === "dark" ? "dark" : "light";
+    } catch (error) {
+      return "light";
+    }
+  }
+
+  function applyTheme(theme) {
+    var normalized = theme === "dark" ? "dark" : "light";
+    if (normalized === "dark") document.documentElement.setAttribute("data-theme", "dark");
+    else document.documentElement.removeAttribute("data-theme");
+    try {
+      if (window.localStorage) window.localStorage.setItem(THEME_LOCAL_STORAGE_KEY, normalized);
+    } catch (error) {
+      // localStorage unavailable: theme stays session-local only.
+    }
+  }
+
+  function ensureAppVersion() {
+    var tauriApp = window.__TAURI__ && window.__TAURI__.app;
+    if (tauriApp && typeof tauriApp.getVersion === "function") {
+      tauriApp.getVersion()
+        .then(function (version) {
+          appVersion = String(version || "");
+          if (state.activeSection === "settings") render();
+        })
+        .catch(function () {});
+    }
+  }
+
+  function checkAppUpdate() {
+    if (updateCheckInFlight || updateInstallInFlight) return;
+    updateCheckInFlight = true;
+    updateStatus = { state: "checking", version: "", message: "" };
+    render();
+    tauriInvoke("check_app_update", {})
+      .then(function (payload) {
+        if (payload && payload.update_available) {
+          updateStatus = { state: "available", version: String(payload.version || ""), message: "" };
+        } else {
+          updateStatus = { state: "latest", version: "", message: "" };
+        }
+      })
+      .catch(function (error) {
+        updateStatus = { state: "error", version: "", message: error && error.message ? String(error.message) : "update_check_failed" };
+      })
+      .then(function () {
+        updateCheckInFlight = false;
+        render();
+      });
+  }
+
+  function installAppUpdate() {
+    if (updateInstallInFlight) return;
+    updateInstallInFlight = true;
+    updateStatus = { state: "installing", version: updateStatus.version, message: "" };
+    render();
+    // A successful install restarts the app, so only the failure path returns.
+    tauriInvoke("install_app_update", {})
+      .catch(function (error) {
+        updateStatus = { state: "error", version: "", message: error && error.message ? String(error.message) : "update_install_failed" };
+        updateInstallInFlight = false;
+        render();
+      });
+  }
   var alertDraft = defaultAlertDraft();
   var valuationLoadStarted = false;
   var valuationEvaluateInFlight = false;
@@ -229,9 +302,10 @@
     var groups = [
       { label: "行情", ids: ["overview", "market", "products", "features"] },
       { label: "研究計畫", ids: ["research", "fundamentals", "backtest"] },
-      { label: "記錄", ids: ["stories", "evidence"] }
+      { label: "記錄", ids: ["stories", "evidence"] },
+      { label: "系統", ids: ["settings"] }
     ];
-    var symbols = { overview: "⌂", market: "⌁", products: "▦", features: "▤", research: "◈", fundamentals: "▥", backtest: "↗", stories: "✦", evidence: "≡" };
+    var symbols = { overview: "⌂", market: "⌁", products: "▦", features: "▤", research: "◈", fundamentals: "▥", backtest: "↗", stories: "✦", evidence: "≡", settings: "⚙" };
     return groups.map(function (group) {
       return '<div class="nav-section"><div class="nav-label">' + text(group.label) + '</div><div class="nav-group">' + group.ids.map(function (id) {
         var item = core.SECTIONS.find(function (section) { return section.id === id; });
@@ -418,6 +492,45 @@
       '<button class="btn btn-outline btn-sm" type="button" data-action="alert-clear-events" data-testid="alert-clear-events"' + (events.length ? "" : " disabled") + '>清除事件</button></div>' +
       '<div class="alert-event-list" data-testid="alert-event-list">' + eventRows + '</div>' +
       '<p class="alert-note">提醒定義只保存在本機（tqe-in-app-alerts/v1），由本機引擎對已納入資料評估；結果僅在此工作階段顯示，沒有任何外部遞送，也不提供任何下單或執行功能。</p></div>', "");
+  }
+
+  function updateCardMarkup() {
+    var desktop = desktopDataUpdateAvailable();
+    if (!desktop) {
+      return card("應用程式更新", "簽章驗證 · 使用者主動觸發", '<div class="settings-block" data-testid="update-panel">' +
+        '<dl class="settings-facts"><div><dt>目前版本</dt><dd data-testid="update-current-version">瀏覽器預覽</dd></div></dl>' +
+        '<p class="settings-note">瀏覽器預覽不提供更新；請使用桌面版 TQR。桌面版的更新檢查由本機端對 GitHub 公開 release 發出唯讀請求，下載的更新以 minisign 簽章驗證後才會安裝。</p></div>', "");
+    }
+    var status = updateStatus || { state: "idle", version: "", message: "" };
+    var statusLine = "";
+    if (status.state === "checking") statusLine = '<span class="settings-status" data-testid="update-status">正在檢查更新…</span>';
+    else if (status.state === "latest") statusLine = '<span class="settings-status success" data-testid="update-status">已是最新版本</span>';
+    else if (status.state === "available") statusLine = '<span class="settings-status info" data-testid="update-status">有新版本 ' + text(status.version) + ' 可更新</span>';
+    else if (status.state === "installing") statusLine = '<span class="settings-status" data-testid="update-status">正在下載並安裝，完成後會自動重新啟動…</span>';
+    else if (status.state === "error") statusLine = '<span class="settings-status error" data-testid="update-status">更新失敗：' + text(status.message || "未知錯誤") + '</span>';
+    else statusLine = '<span class="settings-status" data-testid="update-status">尚未檢查</span>';
+    var busy = updateCheckInFlight || updateInstallInFlight;
+    var installButton = status.state === "available"
+      ? '<button class="btn btn-primary" type="button" data-action="update-install" data-testid="update-install"' + (busy ? " disabled" : "") + '>下載並安裝更新</button>'
+      : "";
+    return card("應用程式更新", "簽章驗證 · 使用者主動觸發", '<div class="settings-block" data-testid="update-panel">' +
+      '<dl class="settings-facts"><div><dt>目前版本</dt><dd data-testid="update-current-version">' + text(appVersion || "讀取中…") + '</dd></div><div><dt>更新狀態</dt><dd>' + statusLine + '</dd></div></dl>' +
+      '<div class="settings-actions"><button class="btn btn-outline" type="button" data-action="update-check" data-testid="update-check"' + (busy ? " disabled" : "") + '>' + (updateCheckInFlight ? "檢查中…" : "檢查更新") + '</button>' + installButton + '</div>' +
+      '<p class="settings-note">更新檢查由本機端對 GitHub 公開 release 發出唯讀請求；下載的更新以 minisign 簽章驗證後才會安裝。安裝期間本機資料服務會短暫停止，失敗時自動恢復。</p></div>', "");
+  }
+
+  function themeCardMarkup() {
+    var theme = currentTheme();
+    return card("外觀主題", "淺色 / 深色 · 本機保存", '<div class="settings-block" data-testid="theme-panel">' +
+      '<div class="settings-actions" data-testid="theme-switch">' +
+      '<button class="btn ' + (theme === "light" ? "btn-primary" : "btn-outline") + '" type="button" data-action="theme-set" data-theme="light" data-testid="theme-light"' + (theme === "light" ? ' aria-pressed="true"' : "") + '>淺色</button>' +
+      '<button class="btn ' + (theme === "dark" ? "btn-primary" : "btn-outline") + '" type="button" data-action="theme-set" data-theme="dark" data-testid="theme-dark"' + (theme === "dark" ? ' aria-pressed="true"' : "") + '>深色</button></div>' +
+      '<p class="settings-note">選擇會即時套用並保存在本機瀏覽器儲存；K 線圖配色維持預設。</p></div>', "");
+  }
+
+  function settingsMarkup() {
+    return pageHeader("設定", "版本 · 更新 · 主題") +
+      '<div class="settings-grid" data-testid="settings-view">' + updateCardMarkup() + themeCardMarkup() + '</div>';
   }
 
   function marketTerminalMarkup() {
@@ -1774,6 +1887,7 @@
     if (section === "research") return researchMarkup();
     if (section === "fundamentals") return fundamentalsMarkup();
     if (section === "stories") return storiesMarkup();
+    if (section === "settings") return settingsMarkup();
     if (section === "backtest") return pageHeader("驗證報告", "回測設定 · 研究結果 · 資料品質") + backtestSettingsMarkup() + '<div class="report-command-bar"><div><strong>研究報告快照</strong><span>只讀取已保存的回測結果；不自動執行。</span></div><div class="report-tabs"><button class="report-tab active" type="button">績效</button><button class="report-tab" type="button">風險</button><button class="report-tab" type="button">持倉</button><button class="report-tab" type="button">交易</button></div></div><div class="calculation-boundary"><strong>這裡只保存人為啟動的研究計算結果。</strong><span>不代表即時策略、不會送單，也不會自動升格為投資決策。</span></div>' + card("回測報告快照", "可重播的研究結果，不是交易執行", backtestMarkup());
     if (section === "evidence") return pageHeader("資料與證據", "資料脈絡與可重現性") + card("證據登錄表", "資料快照識別與來源連結", '<div class="lineage-grid"><div><span class="detail-label">資料格式</span><p>' + text(view.schema) +
       '</p></div><div><span class="detail-label">視圖摘要雜湊</span><p class="mono">' + text(view.view_digest || "未記錄") +
@@ -1822,6 +1936,15 @@
       persistValuation();
     }
     if (action === "valuation-evaluate") evaluateValuation();
+    if (action === "theme-set") applyTheme(target.getAttribute("data-theme"));
+    if (action === "update-check") {
+      checkAppUpdate();
+      return;
+    }
+    if (action === "update-install") {
+      installAppUpdate();
+      return;
+    }
     if (action === "screen-condition") {
       var conditionId = target.getAttribute("data-condition-id");
       var conditionIndex = screenConditions.indexOf(conditionId);
@@ -2132,6 +2255,8 @@
   ensureNotesRuntime();
   ensureAlertsRuntime();
   ensureValuationRuntime();
+  applyTheme(currentTheme());
+  ensureAppVersion();
   ensureSidecarUrl().then(function () {
     render();
   });

@@ -1,0 +1,51 @@
+{
+  "schema": "tw-quant-engine-app-updater-settings/v1",
+  "stage_id": "app-updater-settings",
+  "status": "implemented_pending_human_acceptance",
+  "recorded_at": "2026-07-22",
+  "branch": "feat/app-updater-settings",
+  "approved_by": "user",
+  "approved_at": "2026-07-22",
+  "approval_note": "User approved implementing Zibaldone-style in-app updates plus a general settings view (update/theme) for the TQR desktop app, with the TQR-specific constraint that the browser bundle stays loopback-only (all update traffic is Rust-side), and the version bump 0.1.9 -> 0.2.0.",
+  "version": "0.2.0",
+  "changes": {
+    "updater_core": "frontend/src-tauri/Cargo.toml adds tauri-plugin-updater = \"2\"; frontend/src-tauri/tauri.conf.json adds plugins.updater (minisign pubkey + anonymous https://api.github.com/repos/justinyu73/tw-quant-research/releases/latest endpoint); frontend/src-tauri/src/lib.rs registers the plugin and adds check_app_update (returns update availability/version/notes as JSON) and install_app_update (stops the bundled sidecar first so the installer can replace it on Windows, revives the sidecar on failure, app.restart() on success). Sidecar spawn/kill logic refactored into spawn_sidecar/stop_sidecar/revive_sidecar with SidecarConfig state.",
+    "settings_view": "ui/dashboard/dashboard-core.js adds the settings section; ui/dashboard/app.js adds the settings view — update card (current version via __TAURI__.app.getVersion, check/install buttons, browser preview shows 瀏覽器預覽不提供更新) and theme card (light/dark via [data-theme=\"dark\"] token overrides in ui/dashboard/styles.css, choice persisted in localStorage tw-quant-engine-theme.v1, applied at startup). scripts/dashboard-rwd-audit.cjs covers the settings view.",
+    "release_workflow": ".github/workflows/desktop-release.yml — build step passes TAURI_SIGNING_PRIVATE_KEY/PASSWORD secrets so nsis .exe.sig and .app.tar.gz.sig are emitted; release asset collection keeps updater payloads and .sig sidecars with per-platform friendly names; new step assembles latest.json (windows-x86_64, darwin-x86_64, darwin-aarch64 asset API URLs + signatures) and uploads it to the draft release; release notes document the updater. audit/strict/public-tree/export gates untouched.",
+    "docs": "docs/desktop-release.md gains an In-app updates section (mechanism, signing secrets, latest.json, desktop-only); docs/open-source-release-scope.md notes the update check does not change the loopback-only boundary.",
+    "smoke_baselines": "scripts/dashboard-browser-smoke.cjs EXPECTED_SCREENSHOTS updated after manual review of all affected PNGs (new settings nav entry changed every view) plus settings light/dark 1440px/390px captures."
+  },
+  "zibaldone_differences": [
+    "Zibaldone resolves the GitHub release in the frontend and passes endpoint+token into Rust; TQR does everything Rust-side via tauri.conf.json endpoints because the TQR browser bundle must stay loopback-only (p4_research_closure browser_loopback_only). No token: the repo is public and access is anonymous.",
+    "Zibaldone kills a differently-named sidecar before install; TQR stops/revives its own managed tqe-sidecar child via the existing SidecarProcess state.",
+    "No Zibaldone comment text was copied; all Rust sources remain free of the forbidden order substring."
+  ],
+  "signing": {
+    "keypair_generated_with": "npx tauri signer generate (minisign)",
+    "private_key_path": "~/.config/tqr/tqr-updater.key (outside the repository; never committed)",
+    "public_key_path": "~/.config/tqr/tqr-updater.key.pub (content embedded in frontend/src-tauri/tauri.conf.json plugins.updater.pubkey)",
+    "github_secrets_todo": [
+      "TAURI_SIGNING_PRIVATE_KEY = private key file content",
+      "TAURI_SIGNING_PRIVATE_KEY_PASSWORD = key password (handed to the repo owner out of band)"
+    ]
+  },
+  "offline_verification": {
+    "cargo_check": {"argv": ["cargo", "check"], "cwd": "frontend/src-tauri", "exit_code": 0, "result": "Finished dev profile; tauri-plugin-updater compiles clean"},
+    "cargo_test": {"argv": ["cargo", "test", "--lib"], "cwd": "frontend/src-tauri", "exit_code": 0, "result": "6 passed, 0 failed"},
+    "full_tests": {"argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests"], "exit_code": 0, "result": "152 tests OK, 1 skipped"},
+    "dashboard_core_node": {"argv": ["node", "tests/dashboard-core.test.cjs"], "exit_code": 0, "result": "status pass"},
+    "p4_closure": {"argv": ["python3", "scripts/p4_research_closure.py"], "exit_code": 0, "status": "pass"},
+    "lh_preflight": {"argv": ["python3", "scripts/lh_preflight.py"], "exit_code": 0, "status": "pass"},
+    "open_source_audit_strict": {"argv": ["python3", "scripts/open_source_audit.py", "--strict"], "exit_code": 0, "result": "status pass, strict true; no secret leakage (pubkey only)"},
+    "workflow_yaml": {"argv": ["python3", "-c", "yaml.safe_load(.github/workflows/desktop-release.yml)"], "exit_code": 0, "result": "parses; release job has the latest.json step; build step carries both signing env vars"},
+    "dashboard_rwd_audit": {"argv": ["node", "scripts/dashboard-rwd-audit.cjs"], "exit_code": 0, "result": "10 views (settings included) x 6 breakpoints, 0 errors; only the intentional 720px breadcrumb clip per view; no non-breadcrumb offenders"},
+    "dashboard_browser_smoke": {"argv": ["node", "scripts/dashboard-browser-smoke.cjs"], "exit_code": 0, "result": "status pass; pixel_mismatches []; external_requests []"},
+    "dashboard_alerts_smoke": {"argv": ["node", "scripts/dashboard-alerts-smoke.cjs"], "exit_code": 0, "result": "status pass; 12/12 checks; external_requests []"}
+  },
+  "acceptance_notes": [
+    "Done: updater core (Rust-side check/install against the public GitHub release), settings view with update and theme cards, dark theme token overrides, 0.2.0 version alignment (tauri.conf.json + Cargo.toml; the two package.json files carry no version field), signing keypair generated with the private key outside the repo, release workflow signing + latest.json assembly, docs.",
+    "Not done: real-machine update verification — it needs a signed v0.2.0+ release published with the new GitHub secrets, then installing an older build and updating through Settings; that is the human acceptance gate, so this stays implemented_pending_human_acceptance.",
+    "Known limits: the K-line canvas keeps its default palette in dark mode (noted in the theme card copy); the dark theme is a token-level override of the terminal surfaces, not a full re-skin.",
+    "Boundary unchanged: the browser bundle never contacts GitHub; update traffic is Rust-side, anonymous, user-triggered; no provider calls, no order surface, loopback-only research surface; open_source_audit --strict passes."
+  ]
+}
