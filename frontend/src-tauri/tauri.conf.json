@@ -37,10 +37,16 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": ["icons/icon.png", "icons/icon.ico"],
-    "externalBin": ["binaries/tqe-sidecar"],
+    "icon": [
+      "icons/icon.png",
+      "icons/icon.ico"
+    ],
+    "externalBin": [
+      "binaries/tqe-sidecar"
+    ],
     "category": "DeveloperTool",
     "shortDescription": "Taiwan quantitative research viewer",
-    "longDescription": "Local EOD K-line research viewer with explicit user-triggered TWSE local data capture."
+    "longDescription": "Local EOD K-line research viewer with explicit user-triggered TWSE local data capture.",
+    "createUpdaterArtifacts": true
   }
 }

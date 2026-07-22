@@ -214,7 +214,11 @@ jobs:
           tag = os.environ['GITHUB_REF_NAME']
 
           def fetch_assets():
-              rel = json.loads(subprocess.check_output(['gh', 'api', f'repos/{repo}/releases/tags/{tag}']))
+              # The by-tag endpoint only returns published releases; the
+              # freshly created release here is a draft, so list and match.
+              rels = json.loads(subprocess.check_output(
+                  ['gh', 'api', f'repos/{repo}/releases?per_page=20']))
+              rel = next(r for r in rels if r['tag_name'] == tag)
               return rel, {a['name']: a for a in rel['assets']}
 
           def have_updater_assets(names):
