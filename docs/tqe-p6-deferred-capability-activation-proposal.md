@@ -44,7 +44,7 @@ explicitly not part of this proposal.
 | # | Capability | P4/P5 recorded status | Proposed next gate | Approval status (2026-07-22) |
 | --- | --- | --- | --- | --- |
 | 1 | Realtime provider feed | deferred (P4: "Realtime or delayed provider feed") | data-source contract + runtime amendment | `deferred_not_approved` |
-| 2 | Delayed provider feed | deferred (same P4 row, split for separate approval) | data-source contract + runtime amendment | `approved_next` (3rd in sequence) |
+| 2 | Delayed provider feed | deferred (same P4 row, split for separate approval) | data-source contract + runtime amendment | `contract_defined_pending_digest_approval` (3rd in sequence) |
 | 3 | Alerts / notifications | deferred (P4) | event + delivery contract | `approved_contract_defined` (1st in sequence; in-app only) |
 | 4 | News / social / cloud workspace | deferred (P4) | source, privacy, persistence approval | `deferred_not_approved` |
 | 5 | Paper trading / broker connector → **valuation & analysis** (reshaped 2026-07-22) | deferred (P4) | credential + order-authority gate | `contract_defined_pending_digest_approval` (2nd in sequence; valuation & analysis; paper trading returned to `deferred_not_approved`) |
@@ -89,9 +89,15 @@ contracts; approval of one must not imply approval of the other.
 
 ## 2. Delayed provider feed
 
-- Activation status (2026-07-22 human gate): `approved_next`, third in the
-  approved sequence (after capabilities 3 and 5). Its contract is not drafted
-  yet; drafting begins only after capability 3 completes its evidence chain.
+- Activation status (2026-07-22 human gate): `contract_defined_pending_digest_approval`,
+  third in the approved sequence (after capabilities 3 and 5). The activation
+  contract is
+  [`docs/tqe-p6-delayed-feed-contract.md`](tqe-p6-delayed-feed-contract.md)
+  with work-unit draft `workflow/tqe-p6-delayed-feed.work-unit.draft.json`;
+  capture begins only after human approval of the source contract digest and
+  the work-unit digest, with host-egress admission. Approval remains
+  independent of the realtime feed (capability 1 stays
+  `deferred_not_approved`).
 - Capability description: scheduled pull of delayed (e.g. 15-20 minute) quotes
   or end-of-interval snapshots, materially the same shape as realtime but with
   a contractual delay and no streaming session.

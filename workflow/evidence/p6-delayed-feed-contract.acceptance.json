@@ -1,0 +1,117 @@
+{
+  "schema": "tw-quant-engine-p6-delayed-feed-contract/v1",
+  "stage_id": "P6-delayed-feed-contract",
+  "status": "contract_defined_pending_digest_approval",
+  "approval": {
+    "approved_by": "user",
+    "approval_date": "2026-07-22",
+    "activation_order": [3, 5, 2],
+    "capability": 2,
+    "scope": "delayed_provider_feed_bounded_capture_only",
+    "independent_of_realtime": true,
+    "network_enabled": false,
+    "provider_calls": 0,
+    "provider_calls_note": "Repository provider-call counter remains 0. The endpoint verification below used a small number of read-only curl/web verification requests by the drafting agent, recorded item by item; no capture is activated."
+  },
+  "contract": "docs/tqe-p6-delayed-feed-contract.md",
+  "work_unit_draft": "workflow/tqe-p6-delayed-feed.work-unit.draft.json",
+  "proposal_section": "docs/tqe-p6-deferred-capability-activation-proposal.md#2-delayed-provider-feed",
+  "prerequisite_alignment": [
+    {
+      "prerequisite": "Data-source contract: exact endpoint, delay definition, update cadence, schema, coverage, terms, and digest (P5.1 style)",
+      "aligned": true,
+      "contract_section": "Data-source contract requirements",
+      "note": "All seven elements enumerated as pre-activation requirements; candidate table records exact endpoints with per-candidate verification status."
+    },
+    {
+      "prerequisite": "Runtime boundary amendment: delay label propagation into UI and read model so delayed data is never presented as current; cutoff and available_at semantics consistent with the P5.2 point-in-time convention",
+      "aligned": true,
+      "contract_section": "Runtime boundary amendment requirements",
+      "note": "Delay label is part of the data; available_at <= as_of PIT; staleness threshold and cutoff defined as amendment requirements."
+    },
+    {
+      "prerequisite": "Test and evidence: same evidence chain as realtime (raw caller-owned, normalized repository-owned, offline replay, work-unit digest approval)",
+      "aligned": true,
+      "contract_section": "Test and evidence requirements",
+      "note": "Trial capture with caller-owned raw evidence, deterministic normalization, offline P1-P4 replay, acceptance JSON with provider_calls accounted per approved request."
+    },
+    {
+      "prerequisite": "Approval independent of realtime; own contract digest and amendment",
+      "aligned": true,
+      "contract_section": "Preamble + Cannot-claim list",
+      "note": "Capability 1 stays deferred_not_approved; a feed fresher than its contractual delay is realtime-class and out of this contract's scope."
+    },
+    {
+      "prerequisite": "Risk handling: delayed licence terms differ from EOD bulk; delayed quotes must not feed anything resembling an order decision surface",
+      "aligned": true,
+      "contract_section": "Risks and mitigations",
+      "note": "Independent licence review required; research-only boundary and P4 audit invariants enforced; cannot-claim records both."
+    }
+  ],
+  "endpoint_verification": {
+    "verified_at": "2026-07-22",
+    "method": "read_only_web_verification_no_capture_activated",
+    "delay_definition_anchor": {
+      "url": "https://twse-regulation.twse.com.tw/m/LawContent.aspx?FID=FL007129",
+      "finding": "TWSE 交易資訊使用管理辦法: 延遲資訊 is transaction information delayed twenty minutes or more relative to realtime; located 2026-07-22 via web search."
+    },
+    "candidates": [
+      {
+        "candidate_id": "twse_mis_getstockinfo",
+        "url": "https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_2330.tw",
+        "verification": "HTTP 200 JSON via read-only curl on 2026-07-22 (2 requests). Observed fields: o/h/l/z (open/high/low/last), y (previous close), v (volume), d/t (quote date/time), a/b/f/g (five-level book), userDelay field present. Exact delay and per-field freshness semantics NOT proven; must be established by first human trial capture during market hours."
+      },
+      {
+        "candidate_id": "twse_openapi_catalogue",
+        "url": "https://openapi.twse.com.tw/v1/swagger.json",
+        "verification": "Fetched 2026-07-22: 143 paths; no delayed-quote endpoint exists. exchangeReport/MI_INDEX20 is the daily top-20-by-volume report, not a delay feed."
+      },
+      {
+        "candidate_id": "twse_mis_fibest_retired",
+        "url": "https://mis.twse.com.tw/stock/fibest.jsp?stock=2330",
+        "verification": "HTTP 404 on 2026-07-22 (2 requests); legacy endpoint retired, recorded to prevent resurrection."
+      },
+      {
+        "candidate_id": "twse_legacy_mi_index_csv",
+        "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX",
+        "verification": "Already assessed in workflow/tqe-p5-twse-source-contract.json option_c_endpoint_assessment with trial capture; post-close snapshot only, no intraday freshness."
+      },
+      {
+        "candidate_id": "tpex_delayed_info",
+        "url": "https://www.tpex.org.tw/zh-tw/service/data/product/delay.html",
+        "verification": "Located via web search 2026-07-22: licensing/product page for TPEx delayed information; no free public endpoint; not admitted."
+      }
+    ]
+  },
+  "offline_verification": {
+    "p4_closure": {
+      "argv": ["python3", "scripts/p4_research_closure.py"],
+      "exit_code": 0,
+      "status": "pass",
+      "network": false,
+      "provider_calls": 0
+    },
+    "full_tests": {
+      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests"],
+      "exit_code": 0,
+      "result": "173 tests passed, 1 skipped"
+    },
+    "json_load": {
+      "argv": ["python3", "-c", "json.load on new/modified JSON files"],
+      "files": [
+        "workflow/tqe-p6-delayed-feed.work-unit.draft.json",
+        "workflow/evidence/p6-delayed-feed-contract.acceptance.json"
+      ],
+      "exit_code": 0
+    }
+  },
+  "acceptance_notes": [
+    "Capability 2 contract is drafted per the 2026-07-22 approval order 3 -> 5 -> 2; capabilities 3 and 5 are implemented and human-accepted.",
+    "Feed capture is defined as human-initiated bounded capture (P5.1 option C pattern): exact endpoint, request budget, per-run digest; not a persistent connection, not streaming, not an unattended poller.",
+    "Delay labelling is mandatory end-to-end: delayed data must never be presented as current, and the label must survive into any consumer surface (alerts, valuation).",
+    "The primary candidate endpoint (twse_mis_getstockinfo) is verified reachable with an observed schema, but its delay semantics are unproven; the contract makes trial-capture proof a pre-activation requirement and treats a fresher-than-labelled feed as realtime-class, out of scope.",
+    "Automatic order placement remains prohibited; no order route, command, UI control, or order-decision surface is created or authorized.",
+    "This evidence records a contract and a work-unit draft only; no feed functionality is implemented and no capture is activated. Capabilities 1, 4, and 6 remain deferred_not_approved.",
+    "The approved P4 boundary is unchanged and p4_research_closure.py passes."
+  ]
+}
