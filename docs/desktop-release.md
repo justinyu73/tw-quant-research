@@ -137,7 +137,12 @@ background refresh are not enabled by this button.
 
 ## Product boundary
 
-The app reads the committed offline fixtures through a loopback sidecar. It
+The app reads the committed offline fixtures through a loopback sidecar. At
+startup the desktop shell binds `127.0.0.1:0` to reserve a free port, passes it
+to the sidecar via `TQE_SIDECAR_PORT`, and the front end discovers the actual
+URL through the `sidecar_url` command, so a fixed port clash with another
+local app cannot break the desktop build (dev/preview flows still pin the port
+via `TQE_SIDECAR_URL`). It
 does not refresh providers in the background, place orders, connect to a broker,
 or execute an automatic strategy. In the desktop app, a human can explicitly
 download the selected TWSE listed equity for 1, 2, or 3 trailing years; raw

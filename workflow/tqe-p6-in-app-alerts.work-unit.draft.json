@@ -1,6 +1,11 @@
 {
   "schema": "loop-hybrid-work-unit/v2",
-  "status": "approved_pending_implementation",
+  "status": "accepted",
+  "implementation": {
+    "completed_at": "2026-07-22",
+    "evidence": "workflow/evidence/p6-in-app-alerts.acceptance.json",
+    "note": "All seven implementation slices are implemented and verified offline per the verification commands in this work unit; see the acceptance evidence for commands, exit codes, and results. This status flip and this implementation block are drift alignment with the recorded evidence, not a re-approval: the approval block and approved_digest below are unchanged and still describe the draft content approved on 2026-07-22. Human acceptance remains pending."
+  },
   "approval": {
     "approved_by": "user",
     "approved_at": "2026-07-22",
@@ -17,7 +22,9 @@
   "provider_calls": false,
   "credentials": false,
   "host_egress": "not_applicable_zero_network",
-  "channels": ["in_app"],
+  "channels": [
+    "in_app"
+  ],
   "implementation_slices": [
     "alert definition schema validation (tqe-in-app-alert/v1) with fail-closed rejection",
     "local-engine deterministic evaluator over admitted fixture/read-model data (price_threshold, indicator_threshold)",
@@ -37,21 +44,36 @@
   "verification": [
     {
       "id": "offline-tests",
-      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
+      "argv": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
       "timeout_seconds": 180,
       "read_only": true,
       "network": false
     },
     {
       "id": "engine-preflight",
-      "argv": ["python3", "scripts/lh_preflight.py"],
+      "argv": [
+        "python3",
+        "scripts/lh_preflight.py"
+      ],
       "timeout_seconds": 60,
       "read_only": true,
       "network": false
     },
     {
       "id": "p4-closure",
-      "argv": ["python3", "scripts/p4_research_closure.py"],
+      "argv": [
+        "python3",
+        "scripts/p4_research_closure.py"
+      ],
       "timeout_seconds": 60,
       "read_only": true,
       "network": false
@@ -66,5 +88,10 @@
     "capability 1, 2, 4, 5, or 6 activated",
     "product acceptance",
     "automatic promotion"
-  ]
+  ],
+  "human_acceptance": {
+    "accepted_by": "user",
+    "accepted_at": "2026-07-22",
+    "evidence": "workflow/evidence/p6-in-app-alerts.acceptance.json"
+  }
 }

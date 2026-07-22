@@ -103,10 +103,14 @@ state = core.reduce(state, { type: "ADD_ALERT", alert: alertDef });
 assert.equal(state.alerts.definitions.length, 1);
 state = core.reduce(state, { type: "ADD_ALERT", alert: alertDef });
 assert.equal(state.alerts.definitions.length, 1);
-assert.deepEqual(core.alertStorePayload(state), { schema: "tqe-in-app-alerts/v1", version: 1, alerts: [] });
+// Session-expiry definitions persist within the session so a reload (F5) keeps them...
+assert.deepEqual(core.alertStorePayload(state), { schema: "tqe-in-app-alerts/v1", version: 1, alerts: [alertDef] });
+// ...and a new session drops them at load time.
+assert.deepEqual(core.dropSessionAlertDefinitions(core.alertStorePayload(state).alerts), []);
 const untilAlert = Object.assign({}, alertDef, { alert_id: "alert-test-2", expiry: { policy: "until", until: "2026-12-31T00:00:00Z" } });
 state = core.reduce(state, { type: "ADD_ALERT", alert: untilAlert });
-assert.deepEqual(core.alertStorePayload(state).alerts.map((alert) => alert.alert_id), ["alert-test-2"]);
+assert.deepEqual(core.alertStorePayload(state).alerts.map((alert) => alert.alert_id), ["alert-test-1", "alert-test-2"]);
+assert.deepEqual(core.dropSessionAlertDefinitions(core.alertStorePayload(state).alerts).map((alert) => alert.alert_id), ["alert-test-2"]);
 const firedEvent = { schema: "tqe-in-app-alert-event/v1", alert_id: "alert-test-1", label: "2330 收盤門檻", security_id: "2330", condition_type: "price_threshold", observed_value: 101, op: ">=", threshold: 100, fired_at: "2026-07-22T01:00:00Z", channel: "in_app", research_only: true };
 state = core.reduce(state, { type: "ALERTS_EVALUATED", fired: [firedEvent, firedEvent], sessionState: { "alert-test-1": { fired_count: 1, last_fired_at: "2026-07-22T01:00:00Z" } } });
 assert.equal(state.alerts.events.length, 1);

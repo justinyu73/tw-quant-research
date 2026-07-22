@@ -25,7 +25,7 @@ class DashboardPreviewTests(unittest.TestCase):
         self.assertIn("tw-quant-engine-read-only-product-view/v1", html)
         self.assertIn('href="./tqr-logo.svg"', html)
         self.assertIn("tqr-logo.svg", summary["files"])
-        self.assertIn('window.__TW_QUANT_SIDECAR_URL__ = "http://127.0.0.1:8766";', html)
+        self.assertIn('window.__TW_QUANT_SIDECAR_URL__ = "http://127.0.0.1:8767";', html)
         lower = html.lower()
         self.assertIn("fetch(", browser_code.lower())
         self.assertIn("http://127.0.0.1", browser_code.lower())

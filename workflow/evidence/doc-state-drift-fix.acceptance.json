@@ -26,6 +26,88 @@
       "reason": "The final_review block (reviewed_by JY, decision accepted_for_user_k6_review, reviewed_at 2026-07-16T01:13:22Z) already records the human decision; the top-level status lagged behind it. The final_review record itself is unchanged, and an acceptance_notes entry dated 2026-07-22 documents this status alignment."
     }
   ],
+  "follow_up_2026_07_22": {
+    "status": "pass",
+    "fixed_at": "2026-07-22",
+    "scope": "Second batch of doc-state drift fixes (E1-E5), user-approved for direct fixing on 2026-07-22.",
+    "changes": [
+      {
+        "id": "E1",
+        "file": "docs/tqe-p6-in-app-alerts-contract.md",
+        "field": "Status line",
+        "before": "contract_defined_pending_implementation",
+        "after": "implemented_pending_human_acceptance",
+        "reason": "workflow/evidence/p6-in-app-alerts.acceptance.json (recorded 2026-07-22) records status implemented_pending_human_acceptance with all seven implementation slices verified offline; the contract header lagged behind. An evidence pointer line was added under the status."
+      },
+      {
+        "id": "E2",
+        "file": "workflow/tqe-p6-in-app-alerts.work-unit.draft.json",
+        "field": "status",
+        "before": "approved_pending_implementation",
+        "after": "implemented_pending_human_acceptance",
+        "reason": "Aligned with the same acceptance evidence. The approval block and approved_digest are unchanged; a new implementation block (completed_at 2026-07-22, evidence pointer) records that the flip is drift alignment, not a re-approval."
+      },
+      {
+        "id": "E3",
+        "file": "docs/tqe-optimization-acceptance-review.md",
+        "field": "table rows 1 and 4 status cells",
+        "before": "row 1: blocked（decision recorded，decision_options A/B/C/D 待人工擇一）; row 4: proposal_complete_pending_human_gate（6 項能力，待人工批准）",
+        "after": "row 1: blocked（2026-07-22 人工選定選項 C；啟動前證據 2/7 完成，p5.1-trial-capture-2308 pass；fresh P5.1 pass pending）; row 4: approved_activation_order_3_5_2（能力 3 implemented_pending_human_acceptance；能力 5、2 approved_next；1、4、6 暫緩）",
+        "reason": "The file's own 人工決議 section (2026-07-22) records option C selected for item 1 and activation order 3→5→2 approved for item 4; workflow/evidence/p5.1-trial-capture-2308.acceptance.json records 2 of 7 pre-activation evidence items satisfied with 5 still pending; p6-in-app-alerts.acceptance.json records capability 3 implemented_pending_human_acceptance. Updated per the file's 驗收方式 rule 4."
+      },
+      {
+        "id": "E4",
+        "file": "workflow/s4-approval-package.json",
+        "field": "status and approval block",
+        "before": "status approval_pending; approval decision pending, approved_by null, approved_at null",
+        "after": "status approved_executed; approval decision approved, approved_by user, approved_at null (not recorded in evidence), aligned_at 2026-07-22, basis workflow/evidence/s4-ingestion-product-alignment.acceptance.json, note marking this as drift alignment not re-approval",
+        "reason": "The S4 acceptance evidence records status pass with approval.approved=true, approved_by=user and this package as execution_boundary (captured 2026-07-15); the package lagged behind. execution_authorized intentionally remains false so no new execution authority is granted."
+      },
+      {
+        "id": "E5",
+        "file": "docs/lh-driver-contract.md",
+        "field": "Workflow states trailing paragraph",
+        "before": "claimed the repository is intentionally stopped at framework_selection_pending",
+        "after": "paragraph marked as a historical pre-S1 note; current state recorded: all S1-S9 and K2-K6 acceptance evidence pass, engine-manifest current_phase p5_history_admission, transitions human-gated",
+        "reason": "S1-S9 and K2-K6 acceptance evidence all record status pass and workflow/engine-manifest.json records current_phase p5_history_admission; the paragraph described a pre-S1 stop that has long been cleared. History kept and labelled, not rewritten."
+      }
+    ],
+    "e4_dependency_check": {
+      "grep": "s4-approval-package across scripts/, tests/, workflow/",
+      "result": "scripts/run_s4_acceptance.py:102 only writes the package path as the execution_boundary string in generated evidence (never reads its status); workflow/lh-work-unit.s4.example.json:6 references the path as approval_package without parsing it; tests/ has no reference to this file (tests/test_s9_release_hardening.py reads workflow/s5-s9-approval-package.json, a different file); scripts/lh_preflight.py reads only workflow/engine-manifest.json. No consumer depends on the old status value."
+    },
+    "offline_verification": {
+      "full_tests": {
+        "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests"],
+        "exit_code": 0,
+        "result": "152 tests OK, 1 skipped"
+      },
+      "lh_preflight": {
+        "argv": ["python3", "scripts/lh_preflight.py"],
+        "exit_code": 0,
+        "status": "pass"
+      },
+      "p4_research_closure": {
+        "argv": ["python3", "scripts/p4_research_closure.py"],
+        "exit_code": 0,
+        "status": "pass"
+      },
+      "json_parse_check": {
+        "files": [
+          "workflow/tqe-p6-in-app-alerts.work-unit.draft.json",
+          "workflow/s4-approval-package.json",
+          "workflow/evidence/doc-state-drift-fix.acceptance.json"
+        ],
+        "exit_code": 0
+      }
+    },
+    "acceptance_notes": [
+      "No git mutations were performed; only the five documentation/status files were edited.",
+      "E2: the P6 work-unit approval block and approved_digest were intentionally left unchanged; the digest still describes the draft content approved on 2026-07-22.",
+      "E4: approved_at stays null because the evidence does not record the original approval date; the edit grants no new approval and execution_authorized remains false.",
+      "Human acceptance for the P6 in-app alerts capability remains pending; this batch only aligns recorded state."
+    ]
+  },
   "offline_verification": {
     "full_tests": {
       "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests"],

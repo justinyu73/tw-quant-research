@@ -392,7 +392,7 @@ def create_server(
     catalog: KlineCatalog,
     *,
     host: str = "127.0.0.1",
-    port: int = 8766,
+    port: int = 8767,
     fixture_root: str | Path | None = None,
     data_dir: str | Path | None = None,
 ) -> ThreadingHTTPServer:

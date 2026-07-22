@@ -25,7 +25,7 @@ def _default_fixture_dir() -> Path:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default=os.getenv("TQE_SIDECAR_HOST", "127.0.0.1"))
-    parser.add_argument("--port", type=int, default=int(os.getenv("TQE_SIDECAR_PORT", "8766")))
+    parser.add_argument("--port", type=int, default=int(os.getenv("TQE_SIDECAR_PORT", "8767")))
     parser.add_argument("--fixture-dir", type=Path, default=Path(os.getenv("TQE_FIXTURE_DIR", _default_fixture_dir())))
     parser.add_argument("--data-dir", type=Path, default=None, help="optional writable local data directory for explicit user updates")
     return parser
