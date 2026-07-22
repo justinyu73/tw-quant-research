@@ -10,12 +10,14 @@ const ROOT = path.resolve(__dirname, "..");
 const PREVIEW_DIR = path.join(ROOT, "outputs", "dashboard-preview");
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
-  overview: "e82bbdabe73bfbbf92eeddae4ec8d709fd6f74bdbe6838ccf3c46f84b7d1430e",
-  market_valid: "c335de291acfcaddf3dc0cc45cc2660c5029891bba02c8234264946adb2690ea",
-  market_partial: "0ac7099d8f0e519b8005bf67bdaa08e654191c58f6857e4e206eaafab032c4a7",
-  market_future: "cf83d1d4da7afc5cd9942eece480b4167c1ef90e6c3929ba0fa527b1f9764b09",
-  products: "a1d4f602f6d1a05e8786bb7a7905b1990d3167996e7bfd6231c890022ae354ce",
-  detail_dialog: "df2fa0d2e261a5d286ebe3ce34dc248c4f7419fe73330bd5af4783b4b2b0ff24",
+  overview: "58ef8f55291112b48b0d8a7f85e38ef62c944930a4b6fe75ae0910bbd735595a",
+  market_valid: "c042cbe10e0debbaf1b8dcf62b0ac0a14641513520ddaaaaf6c56bc0f2ec4438",
+  market_partial: "33981d86d51ed5099e214483e2d430dc348098c83880106ac3fa7ed7428203a4",
+  market_future: "5ccac732b3cfd6fa62756101e7953b5e8172b8fa871230b8322c52bbeaf003f5",
+  products: "af79d07eeacddcf8ad14c2867451f5603a3f9e71778093dac61f1a68ba5dea20",
+  detail_dialog: "8e580c573538d311ac4153fff9ab0afcbfb39a94d49c0df3b4d419c3ed698a66",
+  financial_tracker: "2cba18feec4484f71fcf94bb4e525d3f30d05b2658e9e2dccd4003d7fccdec77",
+  formula_builder: "096f51b19f8c28cebbb63335b6837f06fbd3f87ebe4fcfbd71a50e1d5f705ce9",
 };
 
 function freePort() {
@@ -107,6 +109,24 @@ function screenshotHash(buffer) {
 async function settle(page) {
   await page.evaluate(() => document.fonts.ready);
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+async function assertNoOverlap(page, selectors, label) {
+  const rectangles = await page.evaluate((items) => items.map((selector) => {
+    const element = document.querySelector(selector);
+    if (!element) return { selector, missing: true };
+    const box = element.getBoundingClientRect();
+    return { selector, left: box.left, top: box.top, right: box.right, bottom: box.bottom, width: box.width, height: box.height };
+  }), selectors);
+  rectangles.forEach((box) => assert.equal(Boolean(box.missing), false, `${label}: ${box.selector} missing`));
+  for (let left = 0; left < rectangles.length; left += 1) {
+    for (let right = left + 1; right < rectangles.length; right += 1) {
+      const a = rectangles[left];
+      const b = rectangles[right];
+      const overlaps = a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+      assert.equal(overlaps, false, `${label}: ${a.selector} overlaps ${b.selector}`);
+    }
+  }
 }
 
 async function main() {
@@ -291,7 +311,8 @@ async function main() {
 
     await page.locator('[data-testid="watchlist-group-name"]').fill("半導體");
     await page.locator('[data-testid="watchlist-group-create"]').click();
-    assert.notEqual(await page.locator('[data-testid="watchlist-group-select"]').inputValue(), "default");
+    const createdGroupId = await page.locator('[data-testid="watchlist-group-select"]').inputValue();
+    assert.notEqual(createdGroupId, "default");
     const watchlistGroupDelete = page.locator('[data-testid="watchlist-toolbar"] [data-testid="watchlist-group-delete"]');
     assert.equal(await watchlistGroupDelete.isDisabled(), false);
     page.once("dialog", (dialog) => dialog.accept());
@@ -303,6 +324,19 @@ async function main() {
     assert.notEqual(await page.locator('[data-testid="watchlist-group-select"]').inputValue(), "default");
     await page.locator('[data-action="section"][data-section="research"]').first().click();
     await page.locator('[data-testid="research-results"]').waitFor();
+    await page.locator('[data-testid="formula-builder"]').waitFor();
+    assert.equal(await page.locator('[data-testid="formula-rule"]').count(), 1);
+    await page.locator('[data-testid="formula-add"]').click();
+    assert.equal(await page.locator('[data-testid="formula-rule"]').count(), 2);
+    await page.locator('[data-testid="formula-rule"]').nth(1).locator('[data-field="category"]').selectOption("估值");
+    await page.locator('[data-testid="formula-rule"]').nth(1).locator('[data-field="value"]').fill("30%");
+    assert.equal(await page.locator('[data-testid="formula-rule"]').nth(1).locator('[data-field="value"]').inputValue(), "30%");
+    await settle(page);
+    screenshots.formula_builder = screenshotHash(await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, "formula-builder.png"),
+      fullPage: true,
+      animations: "disabled",
+    }));
     await page.locator('[data-testid="screen-builder"]').waitFor();
     await page.locator('[data-testid="screen-builder"] .screen-condition').first().click();
     assert.match(await page.locator('[data-testid="screen-builder"]').innerText(), /已選 1/);
@@ -322,6 +356,20 @@ async function main() {
     await page.locator('[data-testid="note-submit"]').click();
     assert.equal(await page.locator('[data-testid="note-card"]').count(), 1, `note count=${await page.locator('[data-testid="note-count"]').innerText()} title=${await page.locator('[data-testid="note-title"]').inputValue()}`);
     assert.match(await page.locator('[data-testid="note-card"]').innerText(), /2330 研究觀察/);
+
+    await page.locator('[data-action="section"][data-section="fundamentals"]').first().click();
+    await page.locator('[data-testid="financial-tracker"]').waitFor();
+    await page.locator('[data-testid="financial-review-industry"]').selectOption("Memory");
+    await page.locator('[data-testid="financial-review-score"]').selectOption("4");
+    await page.locator('[data-testid="financial-review-note"]').fill("等待下一次公告，確認毛利率與庫存。 ");
+    await page.locator('[data-testid="financial-review-save"]').click();
+    assert.match(await page.locator('[data-testid="financial-review-status"]').innerText(), /已儲存/);
+    await settle(page);
+    screenshots.financial_tracker = screenshotHash(await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, "financial-tracker.png"),
+      fullPage: true,
+      animations: "disabled",
+    }));
 
     await page.locator('[data-action="section"][data-section="products"]').first().click();
     await page.locator(".page-title").waitFor();
@@ -349,14 +397,26 @@ async function main() {
     await page.locator('[role="dialog"]').waitFor({ state: "detached" });
     assert.equal(await page.locator('[role="dialog"]').count(), 0);
     await page.locator('[data-action="section"][data-section="backtest"]').first().click();
+    await page.locator('[data-testid="backtest-settings"]').waitFor();
+    await page.locator('[data-testid="backtest-fill-time"]').selectOption("次日 VWAP");
+    await page.locator('[data-testid="backtest-max-positions"]').fill("12");
+    await page.locator('[data-testid="backtest-settings-save"]').click();
+    assert.match(await page.locator('[data-testid="backtest-settings-status"]').innerText(), /已儲存/);
     const firstEquityDate = await page.locator(".subsection .table tbody tr").first().locator("td").first().innerText();
     assert.notEqual(firstEquityDate, "—", "equity curve date must be rendered from the read model");
     page.once("dialog", (dialog) => dialog.accept());
     await page.locator('[data-action="reset"]').click();
     assert.equal(await page.locator(".page-title").innerText(), "市場首頁");
+    await page.locator('[data-testid="watchlist-toolbar"]').waitFor();
     const responsive = [];
-    for (const size of [{ width: 1024, height: 768 }, { width: 820, height: 768 }, { width: 720, height: 768 }, { width: 390, height: 844 }]) {
+    for (const size of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 1024, height: 768 }, { width: 820, height: 768 }, { width: 720, height: 768 }, { width: 390, height: 844 }]) {
       await page.setViewportSize(size);
+      await assertNoOverlap(page, [
+        '[data-testid="watchlist-toolbar"] .watchlist-toolbar-grouping',
+        '[data-testid="watchlist-toolbar"] .watchlist-toolbar-search',
+        '[data-testid="watchlist-toolbar"] .watchlist-toolbar-actions',
+        '[data-testid="watchlist-state"]',
+      ], `watchlist toolbar at ${size.width}px`);
       responsive.push({
         width: size.width,
         height: size.height,

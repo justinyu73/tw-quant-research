@@ -16,6 +16,9 @@
   var watchlistSaveInFlight = false;
   var WATCHLIST_LOCAL_STORAGE_KEY = "tw-quant-engine-watchlist.v1";
   var NOTES_LOCAL_STORAGE_KEY = "tw-quant-engine-research-notes.v1";
+  var ALERTS_LOCAL_STORAGE_KEY = "tqe-in-app-alerts.v1";
+  var FINANCIAL_REVIEW_LOCAL_STORAGE_KEY = "tw-quant-engine-financial-review.prototype-v1";
+  var BACKTEST_SETTINGS_LOCAL_STORAGE_KEY = "tw-quant-engine-backtest-settings.prototype-v1";
   var watchlistModelRequests = {};
   var notesLoadStarted = false;
   var notesPersistenceAvailable = null;
@@ -30,7 +33,30 @@
   var chartDrawingModelKey = null;
   var chartTemplateName = "default";
   var screenConditions = [];
+  var formulaRows = [defaultFormulaRow("rule-1")];
+  var financialReviewDraft = defaultFinancialReviewDraft();
+  var financialReviewSaved = false;
+  var backtestSettingsDraft = defaultBacktestSettingsDraft();
+  var backtestSettingsSaved = false;
   var dataUpdateInFlight = false;
+  var alertsLoadStarted = false;
+  var alertsPersistenceAvailable = null;
+  var alertEvaluateInFlight = false;
+  var alertDraft = defaultAlertDraft();
+
+  function defaultAlertDraft() {
+    return {
+      label: "",
+      conditionType: "price_threshold",
+      indicator: "ma",
+      op: ">=",
+      value: "",
+      dedupPolicy: "once_per_session",
+      cooldownSeconds: "3600",
+      expiryPolicy: "session",
+      until: ""
+    };
+  }
 
   function chartTemplateLabel(name) {
     return name === "research" ? "研究模板" : "預設模板";
@@ -98,10 +124,72 @@
     return '<span class="status status-' + safe + '"><span class="status-dot"></span>' + text(STATUS_LABELS[status] || status || "invalid") + "</span>";
   }
 
+  function defaultFormulaRow(id) {
+    return {
+      id: id,
+      enabled: true,
+      category: "基本面",
+      field: "毛利率 QoQ",
+      operator: ">=",
+      value_type: "固定數值",
+      value: "0%",
+      period: "最近一季"
+    };
+  }
+
+  function defaultFinancialReviewDraft() {
+    return {
+      industry: "Other",
+      watch_status: "基本面待確認",
+      score: "",
+      note: ""
+    };
+  }
+
+  function defaultBacktestSettingsDraft() {
+    return {
+      universe: "目前自選",
+      signal_time: "收盤後",
+      fill_time: "次日開盤",
+      rebalance: "每月",
+      max_positions: "10"
+    };
+  }
+
+  function loadPrototypeDraft(key, defaults) {
+    try {
+      if (!window.localStorage) return defaults;
+      var raw = window.localStorage.getItem(key);
+      var parsed = raw ? JSON.parse(raw) : null;
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return defaults;
+      return Object.keys(defaults).reduce(function (next, field) {
+        next[field] = typeof parsed[field] === "string" ? parsed[field] : defaults[field];
+        return next;
+      }, {});
+    } catch (error) {
+      return defaults;
+    }
+  }
+
+  function savePrototypeDraft(key, draft) {
+    try {
+      if (!window.localStorage) return false;
+      window.localStorage.setItem(key, JSON.stringify(draft));
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function loadPrototypeDrafts() {
+    financialReviewDraft = loadPrototypeDraft(FINANCIAL_REVIEW_LOCAL_STORAGE_KEY, defaultFinancialReviewDraft());
+    backtestSettingsDraft = loadPrototypeDraft(BACKTEST_SETTINGS_LOCAL_STORAGE_KEY, defaultBacktestSettingsDraft());
+  }
+
   function navMarkup() {
     var groups = [
       { label: "行情", ids: ["overview", "market", "products", "features"] },
-      { label: "研究", ids: ["research", "fundamentals", "backtest"] },
+      { label: "研究計畫", ids: ["research", "fundamentals", "backtest"] },
       { label: "記錄", ids: ["stories", "evidence"] }
     ];
     var symbols = { overview: "⌂", market: "⌁", products: "▦", features: "▤", research: "◈", fundamentals: "▥", backtest: "↗", stories: "✦", evidence: "≡" };
@@ -190,17 +278,25 @@
 
   function researchModulesMarkup() {
     return '<div class="research-module-grid"><button class="research-module" type="button" data-action="section" data-section="market"><span class="module-icon module-chart">⌁</span><span><strong>技術面</strong><small>K 線、成交量、指標、標記</small></span><span class="module-arrow">→</span></button>' +
-      '<button class="research-module" type="button" data-action="section" data-section="fundamentals"><span class="module-icon module-finance">▤</span><span><strong>財報基本面</strong><small>期間、來源、衝突與不可用狀態</small></span><span class="module-arrow">→</span></button>' +
-      '<button class="research-module" type="button" data-action="section" data-section="research"><span class="module-icon module-screen">◈</span><span><strong>市場篩選</strong><small>TWSE／TPEx 條件與人工審查</small></span><span class="module-arrow">→</span></button>' +
+      '<button class="research-module" type="button" data-action="section" data-section="fundamentals"><span class="module-icon module-finance">▤</span><span><strong>財務追蹤</strong><small>統計、人工覆核與資料可用性</small></span><span class="module-arrow">→</span></button>' +
+      '<button class="research-module" type="button" data-action="section" data-section="research"><span class="module-icon module-screen">◈</span><span><strong>因子與公式</strong><small>條件、篩選與人工審查</small></span><span class="module-arrow">→</span></button>' +
       '<button class="research-module" type="button" data-action="section" data-section="stories"><span class="module-icon module-story">✦</span><span><strong>故事與證據</strong><small>事件、假說、支持與反證</small></span><span class="module-arrow">→</span></button></div>';
   }
 
   function cockpitMarkup() {
     var summary = core.summary(view);
     return pageHeader("市場首頁", "我的自選 · 個股行情 · 研究工具") +
-      '<section class="system-command-bar" data-testid="system-command-bar"><div><span class="eyebrow">TQR MARKET SYSTEM</span><strong>我的市場</strong><span>本機 EOD · 截止 ' + text(view.as_of || "—") + '</span></div><div class="system-command-actions"><button class="btn btn-primary" type="button" data-action="section" data-section="market">開啟行情</button><button class="btn btn-outline" type="button" data-action="section" data-section="research">建立選股條件</button><button class="btn btn-outline" type="button" data-action="section" data-section="stories">新增筆記</button></div></section>' +
+      '<section class="system-command-bar" data-testid="system-command-bar"><div><span class="eyebrow">TQR MARKET SYSTEM</span><strong>我的市場</strong><span>本機 EOD · 截止 ' + text(view.as_of || "—") + '</span></div><div class="system-command-actions"><button class="btn btn-primary" type="button" data-action="section" data-section="market">開啟行情</button><button class="btn btn-outline" type="button" data-action="section" data-section="research">設定研究規則</button><button class="btn btn-outline" type="button" data-action="section" data-section="stories">新增筆記</button></div></section>' +
       '<div class="system-metric-strip" data-testid="cockpit-stats"><article><span>自選</span><strong>' + text((state.watchlist && state.watchlist.items || []).length) + '</strong><small>我的行情</small></article><article><span>可用資料</span><strong>' + text(summary.admitted) + '</strong><small>已納入資料列</small></article><article><span>筆記</span><strong>' + text((state.notes || []).length) + '</strong><small>本機保存</small></article><article><span>資料狀態</span><strong>唯讀</strong><small>' + text((view.as_of || "—").slice(0, 10)) + '</small></article></div>' +
       dataUpdateMarkup() + '<div class="terminal-home-grid"><section class="terminal-home-main">' + card("我的行情", "XQ 式自選報價與快速切換", watchlistMarkup(), "") + card("研究工具列", "TradingView 圖表 · XQ 選股 · FinLab 報告 · MultiCharts 指標", researchModulesMarkup(), "") + '</section><aside class="terminal-home-side">' + card("目前標的", "價格、K 線與自選連動", stockQuoteMarkup(), "") + card("研究捷徑", "從一個標的開始", '<div class="analysis-check-list"><button type="button" class="analysis-check" data-action="section" data-section="market"><span>01</span><strong>看 K 線與技術線</strong><small>價格、成交量、指標</small></button><button type="button" class="analysis-check" data-action="section" data-section="stories"><span>02</span><strong>記錄研究筆記</strong><small>支持、反證、待確認</small></button><button type="button" class="analysis-check" data-action="section" data-section="fundamentals"><span>03</span><strong>核對財報</strong><small>期間、來源、可用性</small></button></div>', "") + '</aside></div>';
+  }
+
+  function financialTrackerMarkup() {
+    var quote = selectedQuoteSnapshot();
+    var instrument = quote.instrument || {};
+    var instrumentLabel = (instrument.symbol || state.selectedKlineInstrumentId || "尚未選取") + " " + (instrument.display_name || "");
+    var reviewStatus = financialReviewSaved ? "已儲存至本機 prototype 草稿" : "尚未儲存；不會寫入官方資料";
+    return '<section class="financial-tracker" data-testid="financial-tracker"><header class="financial-tracker-header"><div><span class="eyebrow">PERSONAL FUNDAMENTAL TRACKER</span><h2>財務追蹤統計表</h2><p>目前標的：' + text(instrumentLabel) + '。數值欄位只顯示已接入、可追溯的資料；其餘維持未接入。</p></div><span class="status status-' + (financialReviewSaved ? "saved" : "draft") + '" data-testid="financial-review-status">' + text(reviewStatus) + '</span></header><div class="table-responsive"><table class="table financial-tracker-table"><thead><tr><th>營運成長</th><th>獲利品質</th><th>財務品質</th><th>估值</th><th>資料狀態</th></tr></thead><tbody><tr><td><strong>月營收 YoY</strong><small>未接入</small></td><td><strong>毛利率／ROE</strong><small>未接入</small></td><td><strong>自由現金流／負債比</strong><small>未接入</small></td><td><strong>PIT TTM PE／PB</strong><small>未接入</small></td><td>' + statusBadge("unavailable") + '<small>等待免費官方來源與 PIT 契約</small></td></tr></tbody></table></div><div class="financial-review-form" data-testid="financial-review-form"><label><span>產業主線</span><select data-action="financial-review-input" data-field="industry" data-testid="financial-review-industry">' + selectOptionMarkup(["Power Infrastructure", "Server Interconnect", "Passive Components", "Memory", "Edge AI", "Other"], financialReviewDraft.industry) + '</select></label><label><span>觀察狀態</span><select data-action="financial-review-input" data-field="watch_status" data-testid="financial-review-status-select">' + selectOptionMarkup(["核心持續追蹤", "等待合理估值", "等待止跌", "基本面待確認", "暫停觀察", "排除"], financialReviewDraft.watch_status) + '</select></label><label><span>人工基本面評分</span><select data-action="financial-review-input" data-field="score" data-testid="financial-review-score">' + selectOptionMarkup(["", "1", "2", "3", "4", "5"], financialReviewDraft.score) + '</select></label><label class="financial-review-note"><span>人工備註</span><textarea rows="3" maxlength="500" placeholder="支持、反證、一次性收益與下次財報檢查點" data-action="financial-review-input" data-field="note" data-testid="financial-review-note">' + escapeHtml(financialReviewDraft.note) + '</textarea></label><div class="financial-review-actions"><span>這是本機研究草稿，不會改寫官方資料或觸發計算。</span><button class="btn btn-primary" type="button" data-action="financial-review-save" data-testid="financial-review-save">儲存追蹤草稿</button></div></div></section>';
   }
 
   function fundamentalsMarkup() {
@@ -209,11 +305,12 @@
       var metric = row.fundamental || {};
       return '<tr><td class="cell-strong">' + text((row.instrument || {}).market + ":" + (row.instrument || {}).security_id) + '</td><td>' + text(metric.metric) + '</td><td class="cell-mono">' + core.formatNumber(metric.monthly_revenue) + '</td><td>' + text(metric.unit) + '</td><td>' + statusBadge(core.qualityLabel(row)) + '</td><td class="mono">' + text((row.provenance || {}).source_id) + '</td></tr>';
     }).join("") : '<tr><td colspan="6">目前沒有已接入的財報觀測資料；不以價格推估。</td></tr>';
-    return pageHeader("財報基本面", "期間化資料 · 來源優先 · 可回溯") +
-      '<div class="fundamental-banner"><strong>財報資料只接受有期間與來源的觀測。</strong><span>目前本地資料只有一筆月營收衝突案例，狀態維持未納入；這是品質訊號，不是可用數值。</span></div>' +
-      '<div class="fundamental-metric-grid"><article class="fundamental-metric"><span>EPS</span><strong>—</strong><small>尚未接入免費官方來源</small></article><article class="fundamental-metric"><span>ROE</span><strong>—</strong><small>尚未接入免費官方來源</small></article><article class="fundamental-metric"><span>營收 YoY</span><strong>—</strong><small>衝突資料不推估</small></article><article class="fundamental-metric"><span>現金流</span><strong>—</strong><small>等待期間化資料</small></article></div>' +
-      card("基本面觀測表", "每一列都要能回到 source / period / as-of", '<div class="table-responsive"><table class="table fundamental-table"><thead><tr><th>標的</th><th>指標</th><th>數值</th><th>單位</th><th>品質</th><th>來源</th></tr></thead><tbody>' + body + '</tbody></table></div>', "") +
-      card("人工評估欄", "協助整理下一次人工檢查", '<div class="review-prompt-grid"><div><strong>支持故事</strong><span>哪些財報欄位支持目前假說？</span></div><div><strong>反證</strong><span>哪些期間或來源衝突需要暫停結論？</span></div><div><strong>下次檢查</strong><span>下一個財報／營收公布後再更新。</span></div></div>', "");
+    return pageHeader("財務追蹤", "財報統計 · 人工覆核 · 來源與期間") +
+      '<div class="fundamental-banner"><strong>財報資料只接受有期間、公告時間與來源的觀測。</strong><span>目前月營收案例未通過品質門檻，維持未納入；這是品質訊號，不是可用數值。</span></div>' +
+      '<div class="fundamental-metric-grid"><article class="fundamental-metric"><span>EPS</span><strong>—</strong><small>尚未接入免費官方來源</small></article><article class="fundamental-metric"><span>ROE</span><strong>—</strong><small>等待季報 PIT 資料</small></article><article class="fundamental-metric"><span>營收 YoY</span><strong>—</strong><small>衝突資料不推估</small></article><article class="fundamental-metric"><span>現金流</span><strong>—</strong><small>等待期間化資料</small></article></div>' +
+      card("個股財務追蹤", "統計欄位與人工覆核分開保存", financialTrackerMarkup(), "") +
+      card("基本面觀測表", "每一列都要能回到 source / period / available_at", '<div class="table-responsive"><table class="table fundamental-table"><thead><tr><th>標的</th><th>指標</th><th>數值</th><th>單位</th><th>品質</th><th>來源</th></tr></thead><tbody>' + body + '</tbody></table></div>', "") +
+      card("人工檢查規則", "每次資料更新後由人為覆核", '<div class="review-prompt-grid"><div><strong>支持故事</strong><span>哪些數據支持目前產業假說？</span></div><div><strong>反證與異常</strong><span>一次性收益、財報更正與來源衝突都需列出。</span></div><div><strong>下次檢查</strong><span>記錄下個財報／月營收公告後的覆核時間。</span></div></div>', "");
   }
 
   function notesMarkup() {
@@ -231,11 +328,62 @@
       '<div class="story-board"><section class="story-board-main">' + card("我的研究記錄", "像 XQ 的自訂追蹤欄位，也保留 FinLab 的研究脈絡", notesMarkup(), "") + card("事件時間線", "公告／財報／除權息／產業變化", '<div class="timeline"><div><span class="timeline-dot"></span><div><strong>等待免費官方事件來源</strong><small>尚未抓取；不以新聞摘要代替原始證據。</small></div></div><div><span class="timeline-dot muted-dot"></span><div><strong>人為新增下一個檢查點</strong><small>保存日期、來源、觀察與結論。</small></div></div></div>', "") + '</section><aside class="story-board-rail">' + card("筆記欄位", "個人研究工具", '<div class="story-field-list"><div><span>標的</span><strong>目前行情標的</strong></div><div><span>支持</span><strong>財報與公開公告</strong></div><div><span>反證</span><strong>數據衰退或來源衝突</strong></div><div><span>狀態</span><strong>本機草稿 · 人工審查</strong></div></div>', "") + card("資料規則", "免費資料本地保存", '<p class="research-boundary">行情、財報與筆記分開保存；筆記不會改寫官方資料，也不會被當成回測輸入。每一筆記錄都保留建立時間與目前標的。</p>', "") + '</aside></div>';
   }
 
+  function alertSelectOptions(pairs, selected) {
+    return pairs.map(function (pair) {
+      return '<option value="' + escapeHtml(pair[0]) + '"' + (pair[0] === selected ? ' selected' : '') + '>' + text(pair[1]) + '</option>';
+    }).join("");
+  }
+
+  function alertDedupLabel(dedup) {
+    if (dedup && dedup.policy === "cooldown_seconds") return "冷卻 " + text(dedup.cooldown_seconds) + " 秒";
+    return "每工作階段一次";
+  }
+
+  function alertExpiryLabel(expiry) {
+    if (expiry && expiry.policy === "until") return "有效至 " + text(expiry.until);
+    return "本工作階段";
+  }
+
+  function alertsMarkup() {
+    var alerts = state.alerts || { definitions: [], events: [], status: "idle", message: "" };
+    var definitions = Array.isArray(alerts.definitions) ? alerts.definitions : [];
+    var events = Array.isArray(alerts.events) ? alerts.events : [];
+    var instrument = selectedKlineInstrument();
+    var symbol = instrument && instrument.symbol;
+    var definitionRows = definitions.length ? definitions.map(function (definition) {
+      return '<article class="alert-definition" data-testid="alert-definition"><div><strong>' + text(definition.label) + '</strong><small>' + text(definition.target && definition.target.security_id) + ' · ' + alertConditionSummary(definition) + ' · ' + alertDedupLabel(definition.dedup) + ' · ' + alertExpiryLabel(definition.expiry) + '</small></div><button class="icon-button" type="button" data-action="alert-delete" data-alert-id="' + escapeHtml(definition.alert_id) + '" aria-label="刪除研究提醒">×</button></article>';
+    }).join("") : '<div class="alert-empty" data-testid="alert-empty">尚未建立研究提醒。</div>';
+    var eventRows = events.length ? events.map(function (item) {
+      return '<article class="alert-event" data-testid="alert-event"><span class="alert-event-badge">研究註記</span><div><strong>' + text(item.label) + '</strong><small>' + text(item.security_id) + ' 觀察值 ' + core.formatNumber(item.observed_value) + ' ' + text(item.op) + ' 門檻 ' + core.formatNumber(item.threshold) + ' · ' + text(item.fired_at) + '</small></div></article>';
+    }).join("") : '<div class="alert-empty" data-testid="alert-event-empty">本工作階段尚無觸發事件。</div>';
+    var statusLine = alerts.status === "error"
+      ? '<p class="alert-status error" data-testid="alert-status">' + text(alerts.message || "研究提醒評估失敗") + '</p>'
+      : "";
+    var form = '<div class="alert-form" data-testid="alert-form">' +
+      '<label><span>名稱</span><input type="text" maxlength="120" placeholder="例如：收盤突破近期高點" value="' + escapeHtml(alertDraft.label) + '" data-action="alert-input" data-field="label" data-testid="alert-label"></label>' +
+      '<label><span>條件</span><select data-action="alert-input" data-field="conditionType" data-testid="alert-condition-type">' + alertSelectOptions([["price_threshold", "收盤價門檻"], ["indicator_threshold", "指標門檻"]], alertDraft.conditionType) + '</select></label>' +
+      '<label><span>指標</span><select data-action="alert-input" data-field="indicator" data-testid="alert-indicator">' + selectOptionMarkup(["ma", "ema", "rsi", "macd", "kd", "atr"], alertDraft.indicator) + '</select></label>' +
+      '<label><span>比較</span><select data-action="alert-input" data-field="op" data-testid="alert-op">' + alertSelectOptions([[">=", ">="], ["<=", "<="]], alertDraft.op) + '</select></label>' +
+      '<label><span>門檻值</span><input type="number" step="any" placeholder="數值" value="' + escapeHtml(alertDraft.value) + '" data-action="alert-input" data-field="value" data-testid="alert-value"></label>' +
+      '<label><span>重複觸發</span><select data-action="alert-input" data-field="dedupPolicy" data-testid="alert-dedup">' + alertSelectOptions([["once_per_session", "每工作階段一次"], ["cooldown_seconds", "冷卻秒數"]], alertDraft.dedupPolicy) + '</select></label>' +
+      '<label><span>冷卻秒數</span><input type="number" min="1" step="1" value="' + escapeHtml(alertDraft.cooldownSeconds) + '" data-action="alert-input" data-field="cooldownSeconds" data-testid="alert-cooldown"></label>' +
+      '<label><span>有效期限</span><select data-action="alert-input" data-field="expiryPolicy" data-testid="alert-expiry">' + alertSelectOptions([["session", "本工作階段"], ["until", "直到指定時間"]], alertDraft.expiryPolicy) + '</select></label>' +
+      '<label><span>到期時間</span><input type="datetime-local" value="' + escapeHtml(alertDraft.until) + '" data-action="alert-input" data-field="until" data-testid="alert-until"></label>' +
+      '<button class="btn btn-outline btn-sm" type="button" data-action="alert-add" data-testid="alert-add"' + (symbol && String(alertDraft.label || "").trim() && alertDraft.value !== "" ? "" : " disabled") + '>新增提醒（' + text(symbol || "未選標的") + '）</button></div>';
+    return card("研究提醒", "本機引擎評估 · 僅研究用途 · 非交易指示", '<div class="alerts-panel" data-testid="alerts-panel">' +
+      form + statusLine +
+      '<div class="alert-definition-list" data-testid="alert-definition-list">' + definitionRows + '</div>' +
+      '<div class="alert-toolbar"><button class="btn btn-primary btn-sm" type="button" data-action="alert-evaluate" data-testid="alert-evaluate"' + (definitions.length && !alertEvaluateInFlight ? "" : " disabled") + '>' + (alertEvaluateInFlight ? "評估中…" : "立即評估") + '</button>' +
+      '<button class="btn btn-outline btn-sm" type="button" data-action="alert-clear-events" data-testid="alert-clear-events"' + (events.length ? "" : " disabled") + '>清除事件</button></div>' +
+      '<div class="alert-event-list" data-testid="alert-event-list">' + eventRows + '</div>' +
+      '<p class="alert-note">提醒定義只保存在本機（tqe-in-app-alerts/v1），由本機引擎對已納入資料評估；結果僅在此工作階段顯示，沒有任何外部遞送，也不提供任何下單或執行功能。</p></div>', "");
+  }
+
   function marketTerminalMarkup() {
     return pageHeader("行情分析", "TradingView / MultiCharts 型個人市場終端") +
       quoteHeaderMarkup() +
       '<nav class="terminal-tabs" aria-label="標的分析分頁"><button class="terminal-tab active" type="button" data-action="section" data-section="market">行情</button><button class="terminal-tab" type="button" data-action="section" data-section="features">技術指標</button><button class="terminal-tab" type="button" data-action="section" data-section="fundamentals">財報</button><button class="terminal-tab" type="button" data-action="section" data-section="stories">研究筆記</button></nav>' +
-      '<div class="market-terminal-layout"><main class="market-terminal-chart">' + klineMarkup() + '</main><aside class="market-terminal-side">' + compactWatchlistMarkup() + card("快速記錄", "把目前畫面留下來", '<div class="quick-record"><p>看完價格、成交量與技術線後，直接留下你的觀察。</p><button class="btn btn-primary" type="button" data-action="section" data-section="stories">新增研究筆記</button></div>', "") + '</aside></div>';
+      '<div class="market-terminal-layout"><main class="market-terminal-chart">' + klineMarkup() + '</main><aside class="market-terminal-side">' + compactWatchlistMarkup() + alertsMarkup() + card("快速記錄", "把目前畫面留下來", '<div class="quick-record"><p>看完價格、成交量與技術線後，直接留下你的觀察。</p><button class="btn btn-primary" type="button" data-action="section" data-section="stories">新增研究筆記</button></div>', "") + '</aside></div>';
   }
 
   function analysisRailMarkup() {
@@ -459,6 +607,142 @@
   function persistNotes() {
     if (notesPersistenceAvailable !== "browser") return false;
     return saveLocalNotes(state.notes || []);
+  }
+
+  function parseAlertStore(raw) {
+    var payload = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!payload || payload.schema !== core.ALERT_STORE_SCHEMA || payload.version !== 1 || !Array.isArray(payload.alerts)) {
+      throw new Error("alert store schema mismatch");
+    }
+    return payload.alerts;
+  }
+
+  function localAlertDefinitions() {
+    try {
+      if (!window.localStorage) return [];
+      var raw = window.localStorage.getItem(ALERTS_LOCAL_STORAGE_KEY);
+      return raw ? parseAlertStore(raw) : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function saveLocalAlerts(payload) {
+    try {
+      if (!window.localStorage) return false;
+      window.localStorage.setItem(ALERTS_LOCAL_STORAGE_KEY, JSON.stringify(payload));
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function ensureAlertsRuntime() {
+    if (alertsLoadStarted) return;
+    alertsLoadStarted = true;
+    // Session-local store owned by the local app: the desktop shell keeps the
+    // tqe-in-app-alerts/v1 flat JSON via Tauri commands; the browser preview
+    // uses the same format in localStorage (watchlist-style dual path).
+    tauriInvoke("load_alerts", {})
+      .then(function (raw) {
+        alertsPersistenceAvailable = true;
+        state = core.reduce(state, { type: "SET_ALERTS", definitions: parseAlertStore(raw) });
+        render();
+      })
+      .catch(function () {
+        alertsPersistenceAvailable = "browser";
+        state = core.reduce(state, { type: "SET_ALERTS", definitions: localAlertDefinitions() });
+        render();
+      });
+  }
+
+  function persistAlerts() {
+    var payload = core.alertStorePayload(state);
+    if (alertsPersistenceAvailable === true) {
+      tauriInvoke("save_alerts", { content: JSON.stringify(payload) }).catch(function () {
+        alertsPersistenceAvailable = "browser";
+        saveLocalAlerts(payload);
+      });
+      return true;
+    }
+    return saveLocalAlerts(payload);
+  }
+
+  function alertConditionSummary(definition) {
+    var condition = definition && definition.condition ? definition.condition : {};
+    if (condition.type === "price_threshold") return "收盤價 " + text(condition.op) + " " + core.formatNumber(condition.value);
+    if (condition.type === "indicator_threshold") {
+      var params = condition.params && condition.params.period ? "(" + condition.params.period + ")" : "";
+      return text(String(condition.indicator || "").toUpperCase() + params) + " " + text(condition.op) + " " + core.formatNumber(condition.value);
+    }
+    return "未知條件";
+  }
+
+  function buildAlertFromDraft() {
+    var instrument = selectedKlineInstrument();
+    var symbol = instrument && instrument.symbol;
+    var value = Number(alertDraft.value);
+    if (!symbol || !String(alertDraft.label || "").trim() || !Number.isFinite(value)) return null;
+    var condition = alertDraft.conditionType === "indicator_threshold"
+      ? { type: "indicator_threshold", indicator: alertDraft.indicator, params: {}, op: alertDraft.op, value: value }
+      : { type: "price_threshold", field: "close", op: alertDraft.op, value: value };
+    var dedup = alertDraft.dedupPolicy === "cooldown_seconds"
+      ? { policy: "cooldown_seconds", cooldown_seconds: Math.max(1, Math.round(Number(alertDraft.cooldownSeconds) || 3600)) }
+      : { policy: "once_per_session" };
+    var expiry = { policy: "session" };
+    if (alertDraft.expiryPolicy === "until" && alertDraft.until) {
+      var until = new Date(alertDraft.until);
+      if (isNaN(until.getTime())) return null;
+      expiry = { policy: "until", until: until.toISOString() };
+    }
+    return {
+      schema: "tqe-in-app-alert/v1",
+      alert_id: "alert-" + Date.now(),
+      label: String(alertDraft.label).trim().slice(0, 120),
+      enabled: true,
+      target: { security_id: symbol },
+      condition: condition,
+      dedup: dedup,
+      expiry: expiry,
+      created_at: new Date().toISOString()
+    };
+  }
+
+  function addAlertFromDraft() {
+    var definition = buildAlertFromDraft();
+    if (!definition) return;
+    state = core.reduce(state, { type: "ADD_ALERT", alert: definition });
+    alertDraft = defaultAlertDraft();
+    persistAlerts();
+  }
+
+  function evaluateAlerts() {
+    var definitions = state.alerts && Array.isArray(state.alerts.definitions) ? state.alerts.definitions : [];
+    if (alertEvaluateInFlight) return;
+    if (!definitions.length) {
+      state = core.reduce(state, { type: "ALERTS_ERROR", message: "尚無研究提醒可評估" });
+      render();
+      return;
+    }
+    alertEvaluateInFlight = true;
+    var query = "definitions=" + encodeURIComponent(JSON.stringify(definitions)) +
+      "&state=" + encodeURIComponent(JSON.stringify(state.alertSessionState || {}));
+    sidecarFetch("/alerts?" + query)
+      .then(function (payload) {
+        if (!payload || !payload.data) throw new Error("sidecar returned no alerts data");
+        state = core.reduce(state, {
+          type: "ALERTS_EVALUATED",
+          fired: payload.data.fired,
+          sessionState: payload.data.session_state
+        });
+      })
+      .catch(function (error) {
+        state = core.reduce(state, { type: "ALERTS_ERROR", message: sidecarErrorMessage(error) });
+      })
+      .then(function () {
+        alertEvaluateInFlight = false;
+        render();
+      });
   }
 
   function noteStatus() {
@@ -768,18 +1052,17 @@
     var canSave = state.watchlist && state.watchlist.dirty && !saving && watchlistPersistenceAvailable !== false;
     var activeGroup = groups.find(function (group) { return group.id === state.activeWatchlistGroupId; }) || groups[0];
     var canDeleteGroup = activeGroup && activeGroup.id !== "default";
-    return card("自選清單", "本機保存 · 明確儲存 · 資料唯讀", '<div class="watchlist-toolbar" data-testid="watchlist-toolbar">' +
-      '<div class="watchlist-group-control"><label class="watchlist-group-picker"><span>群組</span><select data-action="watchlist-group-select" data-testid="watchlist-group-select">' + groups.map(function (group) {
+    return card("自選清單", "本機保存 · 明確儲存 · 資料唯讀", '<div class="watchlist-toolbar-shell"><div class="watchlist-toolbar" data-testid="watchlist-toolbar">' +
+      '<section class="watchlist-toolbar-grouping" aria-label="自選群組管理"><div class="watchlist-group-control"><label class="watchlist-group-picker"><span>目前群組</span><select data-action="watchlist-group-select" data-testid="watchlist-group-select">' + groups.map(function (group) {
         return '<option value="' + escapeHtml(group.id) + '"' + (group.id === state.activeWatchlistGroupId ? ' selected' : '') + '>' + text(group.name) + ' · ' + group.items.length + '</option>';
       }).join("") + '</select></label><button class="btn btn-outline btn-sm watchlist-group-delete" type="button" data-action="watchlist-group-delete" data-group-id="' + escapeHtml(activeGroup && activeGroup.id || "default") + '" data-testid="watchlist-group-delete"' + (canDeleteGroup ? '' : ' disabled') + '>刪除群組</button></div>' +
       '<div class="watchlist-group-new-control"><label class="watchlist-group-new"><span>新增群組</span><input type="text" maxlength="32" placeholder="例如 半導體" value="' + escapeHtml(watchlistGroupNameQuery) + '" data-action="watchlist-group-name" data-testid="watchlist-group-name"></label>' +
-      '<button class="btn btn-outline" type="button" data-action="watchlist-group-create" data-testid="watchlist-group-create"' + (watchlistGroupNameQuery.trim() ? '' : ' disabled') + '>建立群組</button></div>' +
-      '<div class="watchlist-picker symbol-search' + (watchlistSearchFocused ? " search-open" : "") + '"><label><span>搜尋商品</span><input type="search" autocomplete="off" placeholder="代號、名稱或市場，例如 2330 / 台積電" value="' + escapeHtml(watchlistSearchQuery) + '" data-action="watchlist-search" data-testid="watchlist-picker" aria-controls="watchlist-symbol-results"></label>' +
-      symbolSearchResults(instruments, watchlistSearchQuery, items, watchlistSearchSelection, "watchlist-symbol-results", "watchlist-search-pick") + '</div>' +
-      '<button class="btn btn-primary" type="button" data-action="watchlist-add" data-testid="watchlist-add"' + (canAdd ? '' : ' disabled') + '>加入自選</button>' +
-      '<button class="btn btn-outline" type="button" data-action="watchlist-clear" data-testid="watchlist-clear"' + (items.length ? '' : ' disabled') + '>清除草稿</button>' +
-      '<button class="btn btn-primary" type="button" data-action="watchlist-save" data-testid="watchlist-save"' + (canSave ? '' : ' disabled') + '>儲存自選清單</button>' +
-      '<span class="watchlist-state" data-testid="watchlist-state">' + text(watchlistStatus()) + '</span></div>' +
+      '<button class="btn btn-outline" type="button" data-action="watchlist-group-create" data-testid="watchlist-group-create"' + (watchlistGroupNameQuery.trim() ? '' : ' disabled') + '>建立群組</button></div></section>' +
+      '<section class="watchlist-toolbar-search" aria-label="搜尋並加入商品"><div class="watchlist-picker symbol-search' + (watchlistSearchFocused ? " search-open" : "") + '"><label><span>搜尋商品</span><input type="search" autocomplete="off" placeholder="代號、名稱或市場，例如 2330 / 台積電" value="' + escapeHtml(watchlistSearchQuery) + '" data-action="watchlist-search" data-testid="watchlist-picker" aria-controls="watchlist-symbol-results"></label>' +
+      symbolSearchResults(instruments, watchlistSearchQuery, items, watchlistSearchSelection, "watchlist-symbol-results", "watchlist-search-pick") + '</div><button class="btn btn-primary" type="button" data-action="watchlist-add" data-testid="watchlist-add"' + (canAdd ? '' : ' disabled') + '>加入自選</button></section>' +
+      '<section class="watchlist-toolbar-actions" aria-label="自選清單操作"><button class="btn btn-outline" type="button" data-action="watchlist-clear" data-testid="watchlist-clear"' + (items.length ? '' : ' disabled') + '>清除草稿</button>' +
+      '<button class="btn btn-primary" type="button" data-action="watchlist-save" data-testid="watchlist-save"' + (canSave ? '' : ' disabled') + '>儲存自選清單</button></section>' +
+      '<span class="watchlist-state" data-testid="watchlist-state">' + text(watchlistStatus()) + '</span></div></div>' +
       watchlistRows() + '<p class="watchlist-note">桌面開發版使用本機 JSON；瀏覽器預覽使用同一資料格式的瀏覽器本機儲存備援。群組目前是本機工作階段資料；PE、EPS、月營收年增與最新財報期目前顯示「—」，代表基本面快照尚未接入；不以 K 線資料推估。成交量取自來源資料欄位。</p>', "");
   }
 
@@ -805,6 +1088,23 @@
     }).join('') + '</div><div class="screen-selected">' + (selected.length ? selected.map(function (item) { return '<span class="screen-chip">' + text(item[1]) + '<button type="button" data-action="screen-condition" data-condition-id="' + item[0] + '" aria-label="移除條件">×</button></span>'; }).join('') : '<span>尚未選擇條件；可以先用市場與資料品質快速篩選。</span>') + '</div></section>';
   }
 
+  function selectOptionMarkup(values, selected) {
+    return values.map(function (value) {
+      return '<option value="' + escapeHtml(value) + '"' + (value === selected ? ' selected' : '') + '>' + text(value) + '</option>';
+    }).join('');
+  }
+
+  function formulaBuilderMarkup() {
+    var categories = ["價格", "報酬", "均線", "動能", "波動", "成交量", "基本面", "估值", "市場", "Regime", "人工欄位"];
+    var fields = ["毛利率 QoQ", "PE 5年百分位", "Z-score", "市場 Regime", "人工基本面評分"];
+    var operators = [">", ">=", "<", "<=", "=", "!=", "Between", "Cross Above", "Cross Below", "Is True", "Is False", "Is Null"];
+    var valueTypes = ["固定數值", "另一個欄位", "歷史平均", "歷史中位數", "歷史百分位", "產業平均", "大盤數值", "前一期數值"];
+    var periods = ["最近一季", "最近一月", "20日", "60日", "120日", "自訂"];
+    return '<section class="formula-builder" data-testid="formula-builder"><header class="formula-builder-header"><div><span class="eyebrow">TRADINGVIEW STYLE SETTINGS</span><h2>公式與條件草稿</h2><p>每列是人為設定，不會自動執行、下單或把未接入資料補成數值。</p></div><button class="btn btn-outline" type="button" data-action="formula-add" data-testid="formula-add">新增條件</button></header><div class="formula-rule-list">' + formulaRows.map(function (rule, index) {
+      return '<article class="formula-rule" data-testid="formula-rule" data-rule-id="' + escapeHtml(rule.id) + '"><div class="formula-rule-number">' + String(index + 1).padStart(2, "0") + '</div><label class="formula-switch"><span>啟用</span><input type="checkbox" data-action="formula-input" data-rule-id="' + escapeHtml(rule.id) + '" data-field="enabled"' + (rule.enabled ? ' checked' : '') + '></label><label><span>資料分類</span><select data-action="formula-input" data-rule-id="' + escapeHtml(rule.id) + '" data-field="category">' + selectOptionMarkup(categories, rule.category) + '</select></label><label><span>欄位</span><select data-action="formula-input" data-rule-id="' + escapeHtml(rule.id) + '" data-field="field">' + selectOptionMarkup(fields, rule.field) + '</select></label><label><span>運算子</span><select data-action="formula-input" data-rule-id="' + escapeHtml(rule.id) + '" data-field="operator">' + selectOptionMarkup(operators, rule.operator) + '</select></label><label><span>比較值</span><select data-action="formula-input" data-rule-id="' + escapeHtml(rule.id) + '" data-field="value_type">' + selectOptionMarkup(valueTypes, rule.value_type) + '</select></label><label><span>輸入值</span><input type="text" data-action="formula-input" data-rule-id="' + escapeHtml(rule.id) + '" data-field="value" value="' + escapeHtml(rule.value) + '"></label><label><span>期間</span><select data-action="formula-input" data-rule-id="' + escapeHtml(rule.id) + '" data-field="period">' + selectOptionMarkup(periods, rule.period) + '</select></label><button class="icon-button formula-remove" type="button" data-action="formula-remove" data-rule-id="' + escapeHtml(rule.id) + '" aria-label="移除第 ' + (index + 1) + ' 個條件"' + (formulaRows.length === 1 ? ' disabled' : '') + '>×</button></article>';
+    }).join('') + '</div><footer class="formula-builder-footer"><span>邏輯群組：AND / OR / NOT 與巢狀群組已納入規格，計算引擎仍需 PIT 資料與人為啟動。</span><span class="status status-draft">設定草稿</span></footer></section>';
+  }
+
   function researchMarkup() {
     var spec = state.screenSpec || {};
     var groupItems = core.watchlistItemsForActiveGroup(state);
@@ -816,7 +1116,7 @@
       var alreadyAdded = instrumentId && groupItems.indexOf(instrumentId) >= 0;
       return '<tr><td><span class="cell-strong">' + text(core.productLabel(row)) + '</span><small>' + text(recordTypeLabel(row.record_type)) + '</small></td><td>' + text(row.bar && row.bar.trading_date) + '</td><td class="cell-mono">' + core.formatNumber(row.bar && row.bar.close_raw) + '</td><td>' + statusBadge(core.qualityLabel(row)) + '</td><td class="table-action"><button class="btn btn-outline btn-sm" type="button" data-action="research-add-group" data-instrument-id="' + escapeHtml(instrumentId) + '"' + (alreadyAdded ? ' disabled' : '') + '>' + (alreadyAdded ? '已在群組' : '加入群組') + '</button></td></tr>';
     }).join("") + '</tbody></table></div>' : '<div class="empty-state" data-testid="research-results-empty"><strong>' + (state.screenSpecStatus === "applied" ? "沒有符合的已納入商品。" : "尚未套用篩選規格。") + '</strong><span>篩選只讀取目前已核准的市場資料快照；不補佔位值，也不從 K 線推估。</span></div>';
-    return pageHeader("選股中心", "XQ 式條件選股 · 結果加入自選 · 人工確認") + screenConditionBuilderMarkup() +
+    return pageHeader("因子與公式", "條件設定 · 人工篩選 · 結果加入觀察池") + formulaBuilderMarkup() + screenConditionBuilderMarkup() +
       '<div class="row col-8-4"><div>' + card("連動篩選器", "目前資料快照的篩選結果", '<div class="research-toolbar"><label><span>品質</span><select data-action="screen-input" data-field="quality" data-testid="research-quality"><option value="admitted"' + (spec.quality === "admitted" ? ' selected' : '') + '>已納入</option><option value="unadmitted"' + (spec.quality === "unadmitted" ? ' selected' : '') + '>未納入</option><option value="invalid"' + (spec.quality === "invalid" ? ' selected' : '') + '>無效</option><option value=""' + (!spec.quality ? ' selected' : '') + '>全部</option></select></label><label><span>市場</span><input type="text" placeholder="TWSE / TPEx / US" value="' + escapeHtml(spec.market) + '" data-action="screen-input" data-field="market" data-testid="research-market"></label><label><span>最多筆數</span><input type="number" min="1" max="100" value="' + text(spec.max_rows) + '" data-action="screen-input" data-field="max_rows" data-testid="research-max-rows"></label><button class="btn btn-primary" type="button" data-action="screen-apply" data-testid="research-apply">套用篩選</button><span class="research-status" data-testid="research-status">' + (state.screenSpecStatus === "applied" ? '目前顯示 ' + rows.length + ' 筆已納入資料' : '篩選草稿；尚未套用') + '</span></div>' + resultBody, "") + '</div>' +
       '<div>' + card("篩選規格", "可檢查的選股條件", '<pre class="spec-block" data-testid="screen-spec">' + escapeHtml(specJson) + '</pre>' + card("策略規格", "僅供研究交接", '<pre class="spec-block" data-testid="strategy-spec">' + escapeHtml(strategyJson) + '</pre>', ""), "") + '</div></div>' +
       card("研究邊界", "選股不等於執行", '<p class="research-boundary">結果可以加入目前工作階段群組，並可供人工審查；策略規格的進出場條件尚未納入，沒有回測提交、即時警示、券商連線或自動下單。</p>', "");
@@ -1083,6 +1383,11 @@
       card("技術因子快照", "同一份 K 線資料的可追溯計算結果", featureMarkup());
   }
 
+  function backtestSettingsMarkup() {
+    var savedLabel = backtestSettingsSaved ? "已儲存至本機 prototype 草稿" : "尚未儲存；不會啟動回測";
+    return '<section class="backtest-settings" data-testid="backtest-settings"><header class="backtest-settings-header"><div><span class="eyebrow">RESEARCH VALIDATION SETTINGS</span><h2>驗證設定草稿</h2><p>先固定資料、訊號與成交時間，再由人為決定是否執行可重播研究。</p></div><span class="status status-' + (backtestSettingsSaved ? "saved" : "draft") + '" data-testid="backtest-settings-status">' + text(savedLabel) + '</span></header><div class="backtest-settings-grid"><label><span>股票母體</span><select data-action="backtest-setting-input" data-field="universe" data-testid="backtest-universe">' + selectOptionMarkup(["目前自選", "目前群組", "人工指定清單"], backtestSettingsDraft.universe) + '</select></label><label><span>訊號計算時間</span><select data-action="backtest-setting-input" data-field="signal_time" data-testid="backtest-signal-time">' + selectOptionMarkup(["收盤後"], backtestSettingsDraft.signal_time) + '</select></label><label><span>成交時間</span><select data-action="backtest-setting-input" data-field="fill_time" data-testid="backtest-fill-time">' + selectOptionMarkup(["次日開盤", "次日 VWAP", "次日收盤"], backtestSettingsDraft.fill_time) + '</select></label><label><span>再平衡頻率</span><select data-action="backtest-setting-input" data-field="rebalance" data-testid="backtest-rebalance">' + selectOptionMarkup(["每週", "每月", "每季"], backtestSettingsDraft.rebalance) + '</select></label><label><span>最大持股數</span><input type="number" min="1" max="100" data-action="backtest-setting-input" data-field="max_positions" data-testid="backtest-max-positions" value="' + escapeHtml(backtestSettingsDraft.max_positions) + '"></label></div><div class="backtest-settings-footer"><span>禁止使用今日收盤資料、又以今日收盤成交；所有正式結果仍需 PIT、成本與資料品質檢查。</span><button class="btn btn-primary" type="button" data-action="backtest-settings-save" data-testid="backtest-settings-save">儲存設定草稿</button></div></section>';
+  }
+
   function backtestMarkup() {
     var backtest = view.backtest || {};
     if (backtest.status !== "available" || !backtest.result) {
@@ -1137,7 +1442,7 @@
     if (section === "research") return researchMarkup();
     if (section === "fundamentals") return fundamentalsMarkup();
     if (section === "stories") return storiesMarkup();
-    if (section === "backtest") return pageHeader("回測報告", "FinLab 式研究結果 · 報酬 · 風險 · 交易明細") + '<div class="report-command-bar"><div><strong>研究報告快照</strong><span>只讀取已保存的回測結果；不自動執行。</span></div><div class="report-tabs"><button class="report-tab active" type="button">績效</button><button class="report-tab" type="button">風險</button><button class="report-tab" type="button">持倉</button><button class="report-tab" type="button">交易</button></div></div><div class="calculation-boundary"><strong>這裡只保存人為啟動的研究計算結果。</strong><span>不代表即時策略、不會送單，也不會自動升格為投資決策。</span></div>' + card("回測報告快照", "可重播的研究結果，不是交易執行", backtestMarkup());
+    if (section === "backtest") return pageHeader("驗證報告", "回測設定 · 研究結果 · 資料品質") + backtestSettingsMarkup() + '<div class="report-command-bar"><div><strong>研究報告快照</strong><span>只讀取已保存的回測結果；不自動執行。</span></div><div class="report-tabs"><button class="report-tab active" type="button">績效</button><button class="report-tab" type="button">風險</button><button class="report-tab" type="button">持倉</button><button class="report-tab" type="button">交易</button></div></div><div class="calculation-boundary"><strong>這裡只保存人為啟動的研究計算結果。</strong><span>不代表即時策略、不會送單，也不會自動升格為投資決策。</span></div>' + card("回測報告快照", "可重播的研究結果，不是交易執行", backtestMarkup());
     if (section === "evidence") return pageHeader("資料與證據", "資料脈絡與可重現性") + card("證據登錄表", "資料快照識別與來源連結", '<div class="lineage-grid"><div><span class="detail-label">資料格式</span><p>' + text(view.schema) +
       '</p></div><div><span class="detail-label">視圖摘要雜湊</span><p class="mono">' + text(view.view_digest || "未記錄") +
       '</p></div><div><span class="detail-label">資料截至</span><p>' + text(view.as_of) + '</p></div><div><span class="detail-label">證據連結</span>' + evidenceMarkup(view.evidence_links) + '</div></div>');
@@ -1146,7 +1451,7 @@
 
   function systemTopbarMarkup() {
     var active = state.activeSection;
-    var links = [{ id: "market", label: "行情" }, { id: "products", label: "自選" }, { id: "research", label: "選股" }, { id: "backtest", label: "報表" }, { id: "stories", label: "筆記" }];
+    var links = [{ id: "market", label: "行情" }, { id: "products", label: "自選" }, { id: "research", label: "因子" }, { id: "backtest", label: "驗證" }, { id: "stories", label: "筆記" }];
     var instruments = core.klineInstruments(state.view);
     return '<header class="topbar system-topbar"><div class="system-topbar-left"><div class="breadcrumb"><span>TQR / MARKET</span><span class="sep">/</span><span class="current">' + text(core.SECTIONS.find(function (item) { return item.id === active; }).label) + '</span></div><nav class="system-quick-nav" aria-label="快速工具">' + links.map(function (link) { return '<button class="system-quick-link' + (active === link.id ? ' active' : '') + '" type="button" data-action="section" data-section="' + link.id + '">' + text(link.label) + '</button>'; }).join('') + '</nav></div><div class="system-topbar-right"><div class="system-global-search symbol-search"><label><span>搜尋標的</span><input type="search" autocomplete="off" placeholder="代號 / 名稱" value="' + escapeHtml(klineSearchQuery || '') + '" data-action="global-search" data-testid="global-search" aria-controls="global-search-results"></label>' + symbolSearchResults(instruments, klineSearchQuery, [], state.selectedKlineInstrumentId, "global-search-results", "global-search-pick") + '</div><span class="system-feed-status"><i></i>EOD · 本機</span><span class="read-only-pill">研究唯讀</span><button class="btn btn-outline btn-sm" type="button" data-action="reset">重設視圖</button></div></header>';
   }
@@ -1172,11 +1477,31 @@
       }
     }
     if (action === "note-submit") addNoteFromDraft();
+    if (action === "alert-add") addAlertFromDraft();
+    if (action === "alert-delete") {
+      state = core.reduce(state, { type: "DELETE_ALERT", alertId: target.getAttribute("data-alert-id") });
+      persistAlerts();
+    }
+    if (action === "alert-evaluate") evaluateAlerts();
+    if (action === "alert-clear-events") state = core.reduce(state, { type: "CLEAR_ALERT_EVENTS" });
     if (action === "screen-condition") {
       var conditionId = target.getAttribute("data-condition-id");
       var conditionIndex = screenConditions.indexOf(conditionId);
       if (conditionIndex >= 0) screenConditions.splice(conditionIndex, 1);
       else if (conditionId) screenConditions.push(conditionId);
+    }
+    if (action === "formula-add") {
+      formulaRows.push(defaultFormulaRow("rule-" + Date.now()));
+    }
+    if (action === "formula-remove") {
+      var removeRuleId = target.getAttribute("data-rule-id");
+      if (formulaRows.length > 1) formulaRows = formulaRows.filter(function (rule) { return rule.id !== removeRuleId; });
+    }
+    if (action === "financial-review-save") {
+      financialReviewSaved = savePrototypeDraft(FINANCIAL_REVIEW_LOCAL_STORAGE_KEY, financialReviewDraft);
+    }
+    if (action === "backtest-settings-save") {
+      backtestSettingsSaved = savePrototypeDraft(BACKTEST_SETTINGS_LOCAL_STORAGE_KEY, backtestSettingsDraft);
     }
     if (action === "kline-fit" && chartInstance) {
       chartInstance.timeScale().fitContent();
@@ -1310,6 +1635,34 @@
     }
     if (target.getAttribute("data-action") === "screen-input") {
       state = core.reduce(state, { type: "SET_SCREEN_SPEC", field: target.getAttribute("data-field"), value: target.value });
+      return;
+    }
+    if (target.getAttribute("data-action") === "formula-input") {
+      formulaRows = formulaRows.map(function (rule) {
+        if (rule.id !== target.getAttribute("data-rule-id")) return rule;
+        var next = Object.assign({}, rule);
+        next[target.getAttribute("data-field")] = target.type === "checkbox" ? String(target.checked) : target.value;
+        if (target.type === "checkbox") next.enabled = target.checked;
+        return next;
+      });
+      return;
+    }
+    if (target.getAttribute("data-action") === "financial-review-input") {
+      financialReviewDraft[target.getAttribute("data-field")] = target.value;
+      financialReviewSaved = false;
+      return;
+    }
+    if (target.getAttribute("data-action") === "backtest-setting-input") {
+      backtestSettingsDraft[target.getAttribute("data-field")] = target.value;
+      backtestSettingsSaved = false;
+    }
+    if (target.getAttribute("data-action") === "alert-input") {
+      alertDraft[target.getAttribute("data-field")] = target.value;
+      var alertAddButtonOnChange = root.querySelector('[data-testid="alert-add"]');
+      var alertInstrumentOnChange = selectedKlineInstrument();
+      if (alertAddButtonOnChange) {
+        alertAddButtonOnChange.disabled = !(alertInstrumentOnChange && alertInstrumentOnChange.symbol && String(alertDraft.label || "").trim() && alertDraft.value !== "");
+      }
     }
   });
 
@@ -1351,6 +1704,34 @@
       state = core.reduce(state, { type: "SET_NOTE_DRAFT", field: target.getAttribute("data-field"), value: target.value });
       return;
     }
+    if (target.getAttribute("data-action") === "formula-input") {
+      formulaRows = formulaRows.map(function (rule) {
+        if (rule.id !== target.getAttribute("data-rule-id")) return rule;
+        var next = Object.assign({}, rule);
+        next[target.getAttribute("data-field")] = target.value;
+        return next;
+      });
+      return;
+    }
+    if (target.getAttribute("data-action") === "financial-review-input") {
+      financialReviewDraft[target.getAttribute("data-field")] = target.value;
+      financialReviewSaved = false;
+      return;
+    }
+    if (target.getAttribute("data-action") === "backtest-setting-input") {
+      backtestSettingsDraft[target.getAttribute("data-field")] = target.value;
+      backtestSettingsSaved = false;
+      return;
+    }
+    if (target.getAttribute("data-action") === "alert-input") {
+      alertDraft[target.getAttribute("data-field")] = target.value;
+      var alertAddButton = root.querySelector('[data-testid="alert-add"]');
+      var alertInstrument = selectedKlineInstrument();
+      if (alertAddButton) {
+        alertAddButton.disabled = !(alertInstrument && alertInstrument.symbol && String(alertDraft.label || "").trim() && alertDraft.value !== "");
+      }
+      return;
+    }
     if (target.getAttribute("data-action") !== "valuation-input") return;
     state = core.reduce(state, {
       type: "SET_VALUATION_INPUT",
@@ -1388,6 +1769,8 @@
     }
   });
 
+  loadPrototypeDrafts();
   ensureNotesRuntime();
+  ensureAlertsRuntime();
   render();
 }());

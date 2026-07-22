@@ -12,14 +12,16 @@
     { id: "market", label: "行情分析" },
     { id: "products", label: "我的自選" },
     { id: "features", label: "技術指標" },
-    { id: "research", label: "選股中心" },
-    { id: "fundamentals", label: "財報" },
+    { id: "research", label: "因子與公式" },
+    { id: "fundamentals", label: "財務追蹤" },
     { id: "stories", label: "研究筆記" },
-    { id: "backtest", label: "回測報告" },
+    { id: "backtest", label: "驗證報告" },
     { id: "evidence", label: "資料來源" }
   ]);
 
   var WATCHLIST_SCHEMA = "tw-quant-engine-watchlist/v1";
+  var ALERT_STORE_SCHEMA = "tqe-in-app-alerts/v1";
+  var MAX_ALERTS = 50;
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -79,7 +81,14 @@
         safetyMargin: ""
       },
       notes: [],
-      noteDraft: { title: "", body: "", tags: "" }
+      noteDraft: { title: "", body: "", tags: "" },
+      alerts: {
+        definitions: [],
+        events: [],
+        status: "idle",
+        message: ""
+      },
+      alertSessionState: {}
     };
   }
 
@@ -161,6 +170,43 @@
     });
   }
 
+  function normalizeAlertDefinitions(definitions) {
+    if (!Array.isArray(definitions)) return [];
+    var seen = {};
+    return definitions.filter(function (definition) {
+      if (!definition || typeof definition !== "object") return false;
+      if (definition.schema !== "tqe-in-app-alert/v1") return false;
+      var id = definition.alert_id;
+      if (typeof id !== "string" || !id || id.length > 64 || !/^[A-Za-z0-9:_.-]+$/.test(id) || seen[id]) return false;
+      if (!definition.target || typeof definition.target.security_id !== "string") return false;
+      if (!definition.condition || typeof definition.condition !== "object") return false;
+      seen[id] = true;
+      return true;
+    }).map(function (definition) { return clone(definition); }).slice(0, MAX_ALERTS);
+  }
+
+  function normalizeAlertEvents(events) {
+    if (!Array.isArray(events)) return [];
+    return events.filter(function (event) {
+      return event && typeof event === "object" && event.schema === "tqe-in-app-alert-event/v1" &&
+        event.channel === "in_app" && typeof event.alert_id === "string" && typeof event.fired_at === "string";
+    }).map(function (event) { return clone(event); }).slice(0, 200);
+  }
+
+  function mergeAlertEvents(existing, fired) {
+    var merged = normalizeAlertEvents(existing);
+    var keys = {};
+    merged.forEach(function (event) { keys[event.alert_id + "@" + event.fired_at] = true; });
+    normalizeAlertEvents(fired).forEach(function (event) {
+      var key = event.alert_id + "@" + event.fired_at;
+      if (!keys[key]) {
+        keys[key] = true;
+        merged.unshift(event);
+      }
+    });
+    return merged.slice(0, 200);
+  }
+
   function reduce(state, action) {
     var current = state || createInitialState({});
     var event = action || {};
@@ -226,6 +272,46 @@
     if (event.type === "DELETE_NOTE" && typeof event.noteId === "string") {
       return Object.assign({}, current, {
         notes: (Array.isArray(current.notes) ? current.notes : []).filter(function (note) { return note.id !== event.noteId; })
+      });
+    }
+    if (event.type === "SET_ALERTS") {
+      return Object.assign({}, current, {
+        alerts: { definitions: normalizeAlertDefinitions(event.definitions), events: normalizeAlertEvents(current.alerts && current.alerts.events), status: "ready", message: "" }
+      });
+    }
+    if (event.type === "ADD_ALERT" && event.alert && typeof event.alert === "object") {
+      var alertDefinitions = normalizeAlertDefinitions((current.alerts ? current.alerts.definitions : []).concat([event.alert]));
+      if (alertDefinitions.length === (current.alerts ? current.alerts.definitions.length : 0)) return current;
+      return Object.assign({}, current, {
+        alerts: Object.assign({}, current.alerts, { definitions: alertDefinitions, status: "ready", message: "" })
+      });
+    }
+    if (event.type === "DELETE_ALERT" && typeof event.alertId === "string") {
+      return Object.assign({}, current, {
+        alerts: Object.assign({}, current.alerts, {
+          definitions: (current.alerts ? current.alerts.definitions : []).filter(function (definition) { return definition.alert_id !== event.alertId; })
+        })
+      });
+    }
+    if (event.type === "ALERTS_EVALUATED") {
+      return Object.assign({}, current, {
+        alerts: Object.assign({}, current.alerts, {
+          events: mergeAlertEvents(current.alerts && current.alerts.events, event.fired),
+          status: "ready",
+          message: ""
+        }),
+        alertSessionState: event.sessionState && typeof event.sessionState === "object" ? clone(event.sessionState) : {}
+      });
+    }
+    if (event.type === "ALERTS_ERROR") {
+      return Object.assign({}, current, {
+        alerts: Object.assign({}, current.alerts, { status: "error", message: event.message || "alerts_evaluation_failed" })
+      });
+    }
+    if (event.type === "CLEAR_ALERT_EVENTS") {
+      return Object.assign({}, current, {
+        alerts: Object.assign({}, current.alerts, { events: [] }),
+        alertSessionState: {}
       });
     }
     if (event.type === "SET_WATCHLIST") {
@@ -363,6 +449,11 @@
       reset.watchlistGroups = watchlistGroupsFor(current);
       reset.activeWatchlistGroupId = current.activeWatchlistGroupId;
       reset.notes = Array.isArray(current.notes) ? current.notes.slice() : [];
+      reset.alerts = Object.assign({}, current.alerts, {
+        definitions: (current.alerts && Array.isArray(current.alerts.definitions) ? current.alerts.definitions : []).slice(),
+        events: (current.alerts && Array.isArray(current.alerts.events) ? current.alerts.events : []).slice()
+      });
+      reset.alertSessionState = clone(current.alertSessionState || {});
       return reset;
     }
     if (event.type === "KLINE_LOADING") {
@@ -471,6 +562,17 @@
     };
   }
 
+  function alertStorePayload(state) {
+    var definitions = normalizeAlertDefinitions(state && state.alerts ? state.alerts.definitions : []);
+    return {
+      schema: ALERT_STORE_SCHEMA,
+      version: 1,
+      alerts: definitions.filter(function (definition) {
+        return !(definition.expiry && definition.expiry.policy === "session");
+      })
+    };
+  }
+
   function watchlistItemsForActiveGroup(state) {
     var groups = watchlistGroupsFor(state);
     var active = groups.find(function (group) { return group.id === (state && state.activeWatchlistGroupId); }) || groups[0];
@@ -489,6 +591,7 @@
 
   return Object.freeze({
     SECTIONS: SECTIONS,
+    ALERT_STORE_SCHEMA: ALERT_STORE_SCHEMA,
     createInitialState: createInitialState,
     reduce: reduce,
     selectedProduct: selectedProduct,
@@ -500,6 +603,9 @@
     latestKlineClose: latestKlineClose,
     klineModel: klineModel,
     watchlistPayload: watchlistPayload,
+    alertStorePayload: alertStorePayload,
+    normalizeAlertDefinitions: normalizeAlertDefinitions,
+    mergeAlertEvents: mergeAlertEvents,
     watchlistItemsForActiveGroup: watchlistItemsForActiveGroup,
     screenProducts: screenProducts,
     klineModels: klineModels,

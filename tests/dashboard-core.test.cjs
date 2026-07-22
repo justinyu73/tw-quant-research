@@ -87,4 +87,40 @@ assert.equal(state.view.read_only, true);
 assert.deepEqual(state.valuationInputs, { eps: "", peLow: "", peHigh: "", safetyMargin: "" });
 assert.deepEqual(state.watchlist.items, ["TWSE:2330", "TAIFEX:TX:202608", "TPEx:006201"]);
 
-console.log(JSON.stringify({ status: "pass", checks: ["navigation", "detail-dialog", "close-dialog", "valuation-inputs", "watchlist-payload", "personal-notes", "invalid-index-fail-closed", "reset"] }));
+// P6 in-app alerts: session-local definitions, flat store payload, in-app events only
+const alertDef = {
+  schema: "tqe-in-app-alert/v1",
+  alert_id: "alert-test-1",
+  label: "2330 收盤門檻",
+  enabled: true,
+  target: { security_id: "2330" },
+  condition: { type: "price_threshold", field: "close", op: ">=", value: 100 },
+  dedup: { policy: "once_per_session" },
+  expiry: { policy: "session" },
+  created_at: "2026-07-22T00:00:00Z"
+};
+state = core.reduce(state, { type: "ADD_ALERT", alert: alertDef });
+assert.equal(state.alerts.definitions.length, 1);
+state = core.reduce(state, { type: "ADD_ALERT", alert: alertDef });
+assert.equal(state.alerts.definitions.length, 1);
+assert.deepEqual(core.alertStorePayload(state), { schema: "tqe-in-app-alerts/v1", version: 1, alerts: [] });
+const untilAlert = Object.assign({}, alertDef, { alert_id: "alert-test-2", expiry: { policy: "until", until: "2026-12-31T00:00:00Z" } });
+state = core.reduce(state, { type: "ADD_ALERT", alert: untilAlert });
+assert.deepEqual(core.alertStorePayload(state).alerts.map((alert) => alert.alert_id), ["alert-test-2"]);
+const firedEvent = { schema: "tqe-in-app-alert-event/v1", alert_id: "alert-test-1", label: "2330 收盤門檻", security_id: "2330", condition_type: "price_threshold", observed_value: 101, op: ">=", threshold: 100, fired_at: "2026-07-22T01:00:00Z", channel: "in_app", research_only: true };
+state = core.reduce(state, { type: "ALERTS_EVALUATED", fired: [firedEvent, firedEvent], sessionState: { "alert-test-1": { fired_count: 1, last_fired_at: "2026-07-22T01:00:00Z" } } });
+assert.equal(state.alerts.events.length, 1);
+assert.equal(state.alerts.events[0].channel, "in_app");
+assert.equal(state.alertSessionState["alert-test-1"].fired_count, 1);
+const externalEvent = Object.assign({}, firedEvent, { alert_id: "alert-test-2", channel: "webhook", fired_at: "2026-07-22T02:00:00Z" });
+state = core.reduce(state, { type: "ALERTS_EVALUATED", fired: [externalEvent], sessionState: state.alertSessionState });
+assert.equal(state.alerts.events.length, 1);
+state = core.reduce(state, { type: "DELETE_ALERT", alertId: "alert-test-2" });
+assert.deepEqual(state.alerts.definitions.map((alert) => alert.alert_id), ["alert-test-1"]);
+state = core.reduce(state, { type: "CLEAR_ALERT_EVENTS" });
+assert.deepEqual(state.alerts.events, []);
+assert.deepEqual(state.alertSessionState, {});
+state = core.reduce(state, { type: "SET_ALERTS", definitions: [alertDef, { alert_id: "bad" }] });
+assert.equal(state.alerts.definitions.length, 1);
+
+console.log(JSON.stringify({ status: "pass", checks: ["navigation", "detail-dialog", "close-dialog", "valuation-inputs", "watchlist-payload", "personal-notes", "invalid-index-fail-closed", "reset", "in-app-alerts"] }));

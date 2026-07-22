@@ -7,11 +7,13 @@ import hashlib
 import json
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import parse_qs, urlsplit
 
+from .alerts import ALERT_STORE_SCHEMA, AlertValidationError, evaluate_alerts, parse_alert_store, validate_alert
 from .k6a_snapshot import K6A_SNAPSHOT_SCHEMA, load_snapshot as load_k6a_snapshot
 from .k6b_snapshot import K6B_SNAPSHOT_SCHEMA, load_snapshot as load_k6b_snapshot
 from .kline_aggregation import PERIODS, aggregate_dataset
@@ -27,6 +29,7 @@ from .data_update import (
 
 SIDECAR_INSTRUMENTS_SCHEMA = "tw-quant-engine-sidecar-instruments/v1"
 SIDECAR_KLINE_SCHEMA = "tw-quant-engine-sidecar-kline/v1"
+SIDECAR_ALERTS_SCHEMA = "tw-quant-engine-sidecar-alerts/v1"
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 PERIOD_ORDER = ("1D", "1W", "M", "Q")
 
@@ -156,6 +159,37 @@ class KlineCatalog:
             "read_only": True,
             "data": copy.deepcopy(model),
             "digest": model["snapshot_digest"],
+        }
+
+    def alerts_response(self, definitions_payload: Any, session_state: Any, now: str | None) -> tuple[int, dict[str, Any]]:
+        """Evaluate P6 in-app alerts over the admitted read models; in-app events only."""
+        admitted = {str(item["symbol"]) for item in self.instruments}
+        market_data: dict[str, dict[str, Any] | None] = {}
+        for item in self.instruments:
+            symbol = str(item["symbol"])
+            if symbol not in market_data:
+                market_data[symbol] = self.models.get((str(item["instrument_id"]), "1D"))
+        try:
+            if isinstance(definitions_payload, Mapping) and definitions_payload.get("schema") == ALERT_STORE_SCHEMA:
+                definitions = parse_alert_store(definitions_payload, admitted)
+            elif isinstance(definitions_payload, list):
+                definitions = [validate_alert(item, admitted) for item in definitions_payload]
+            else:
+                raise AlertValidationError("definitions must be an alert list or a tqe-in-app-alerts/v1 store")
+            moment = now if now else datetime.now(timezone.utc).isoformat()
+            evaluation = evaluate_alerts(
+                definitions,
+                market_data,
+                now=moment,
+                session_state=session_state if isinstance(session_state, Mapping) else None,
+            )
+        except AlertValidationError as exc:
+            return 400, {"error": str(exc)}
+        return 200, {
+            "schema": SIDECAR_ALERTS_SCHEMA,
+            "read_only": True,
+            "channels": ["in_app"],
+            "data": evaluation,
         }
 
 
@@ -315,6 +349,31 @@ def _request_handler(runtime: dict[str, Any]) -> type[BaseHTTPRequestHandler]:
             if parsed.path == "/health":
                 _json_response(self, 200, {"status": "ok", "data_update_enabled": runtime.get("data_dir") is not None})
                 return
+            if parsed.path == "/alerts":
+                if len(parsed.query) > 32768:
+                    _json_response(self, 400, {"error": "alerts_query_too_large"})
+                    return
+                alert_query = parse_qs(parsed.query, keep_blank_values=True)
+                if (
+                    not set(alert_query) <= {"definitions", "state", "now"}
+                    or "definitions" not in alert_query
+                    or any(len(values) != 1 or not values[0] for values in alert_query.values())
+                ):
+                    _json_response(self, 400, {"error": "definitions_required"})
+                    return
+                try:
+                    alert_definitions = json.loads(alert_query["definitions"][0])
+                    alert_state = json.loads(alert_query["state"][0]) if "state" in alert_query else None
+                except json.JSONDecodeError:
+                    _json_response(self, 400, {"error": "invalid_json"})
+                    return
+                alert_status, alert_payload = runtime["catalog"].alerts_response(
+                    alert_definitions,
+                    alert_state,
+                    alert_query["now"][0] if "now" in alert_query else None,
+                )
+                _json_response(self, alert_status, alert_payload)
+                return
             if parsed.path != "/kline":
                 _json_response(self, 404, {"error": "unknown_route"})
                 return
@@ -351,6 +410,7 @@ def create_server(
 __all__ = [
     "KlineCatalog",
     "LOOPBACK_HOSTS",
+    "SIDECAR_ALERTS_SCHEMA",
     "SIDECAR_INSTRUMENTS_SCHEMA",
     "SIDECAR_KLINE_SCHEMA",
     "SidecarContractError",

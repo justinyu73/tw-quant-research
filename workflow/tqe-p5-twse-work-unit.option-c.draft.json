@@ -1,0 +1,118 @@
+{
+  "schema": "loop-hybrid-work-unit/v2",
+  "status": "draft_not_runnable",
+  "blocked_reason": "fresh_p5_1_contract_pass_pending_option_c_pre_activation_evidence_incomplete",
+  "work_unit_id": "tw-quant-engine-p5-twse-history-option-c-001",
+  "amends": "workflow/tqe-p5-twse-work-unit.draft.json",
+  "amendment_authority": "user_selection option C in workflow/tqe-p5-twse-source-contract.json decision.user_selection, decided 2026-07-22",
+  "target_repo": "/absolute/path/to/tw-quant-engine",
+  "goal": "Admit the approved three-year TWSE EOD history (2023-07-20..2026-07-19) via a bounded per-trading-day capture against the official free MI_INDEX CSV endpoint, with the official calendar bound in the same work-unit and separate corporate-action evidence.",
+  "approval_package": "workflow/tqe-p5-history-admission.json",
+  "source_contract": "workflow/tqe-p5-twse-source-contract.json",
+  "corporate_action_admission": "workflow/tqe-p5-corporate-action-admission.json",
+  "network": false,
+  "provider_calls": false,
+  "credentials": false,
+  "host_egress": "required_before_activation",
+  "bounded_capture_loop": {
+    "kind": "bounded_per_trading_day_capture",
+    "endpoint": "https://www.twse.com.tw/exchangeReport/MI_INDEX",
+    "http_method": "GET",
+    "url_template": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=csv&date={YYYYMMDD}&type=ALL",
+    "session_list_source": {
+      "endpoint": "https://openapi.twse.com.tw/v1/holidaySchedule/holidaySchedule",
+      "coverage_required": "2023-07-20..2026-07-19",
+      "digest_status": "pending_capture_at_activation",
+      "binding": "calendar response sha256 must be recorded in this work-unit digest before any session GET"
+    },
+    "session_count_cap": 750,
+    "session_enumeration": "every trading session in the approved calendar-derived list is enumerated explicitly in the finalized work-unit before host egress; no date arithmetic at run time",
+    "one_get_per_session": true,
+    "request_budget": {
+      "calendar_gets": 1,
+      "session_gets_max": 750,
+      "total_gets_max": 751,
+      "retry_policy": "no automatic retry; a failed session is recorded and the run stops for human review"
+    },
+    "pacing": {
+      "serialized": true,
+      "min_delay_seconds_between_gets": 5,
+      "reason": "TWSE publishes no numeric rate limit; practitioner reports describe throttling/ban on dense crawling"
+    },
+    "fail_closed_rules": [
+      "stop before first GET if calendar sha256 is not recorded in this work-unit",
+      "stop if enumerated session count exceeds session_count_cap",
+      "stop if total issued GETs would exceed total_gets_max",
+      "stop on any non-200 response, empty body, or missing 證券代號 header row",
+      "stop if a session response date does not match the requested date",
+      "stop if csv encoding or column schema differs from the trial-capture probe record",
+      "no date outside 2023-07-20..2026-07-19 may be requested",
+      "no session may be fetched twice; duplicates are a hard error"
+    ],
+    "per_session_record_format": {
+      "session_date": "YYYY-MM-DD",
+      "url": "exact GET URL issued",
+      "retrieval_timestamp": "ISO-8601 with +08:00 offset",
+      "http_status": "integer",
+      "response_bytes": "integer",
+      "response_sha256": "sha256:<hex>",
+      "row_count_full_market_section": "integer",
+      "result": "captured|failed_stop"
+    }
+  },
+  "activation_requirements": [
+    "first_human_trial_capture_sha256_bytes_and_timestamp_for_one_recent_session",
+    "official_calendar_digest_bound_to_this_work_unit",
+    "enumerated_session_list_with_count_at_or_below_cap",
+    "fixture_retention_license_size_and_sha256_policy_approval",
+    "per_session_work_unit_digest_approved_by_human_before_host_egress",
+    "preapproved_corporate_action_fixture_and_factor_provenance",
+    "host_egress_admission"
+  ],
+  "verification": [
+    {
+      "id": "p5-2-corporate-action-validation",
+      "argv": ["python3", "scripts/p5_corporate_action_validation.py"],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "p5-target-preflight",
+      "argv": ["python3", "scripts/p5_execution_target.py"],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "offline-tests",
+      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
+      "timeout_seconds": 180,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "engine-preflight",
+      "argv": ["python3", "scripts/lh_preflight.py"],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "p4-closure",
+      "argv": ["python3", "scripts/p4_research_closure.py"],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    }
+  ],
+  "cannot_claim": [
+    "provider invoked",
+    "data completeness",
+    "adjusted-price correctness before corporate-action evidence",
+    "TPEx admitted",
+    "general provider runtime enabled",
+    "product acceptance",
+    "automatic promotion"
+  ]
+}

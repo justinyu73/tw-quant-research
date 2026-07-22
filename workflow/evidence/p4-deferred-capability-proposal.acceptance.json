@@ -1,0 +1,74 @@
+{
+  "schema": "tw-quant-engine-p4-deferred-capability-proposal/v1",
+  "stage_id": "P6-proposal",
+  "status": "proposal_complete_pending_human_gate",
+  "proposal": {
+    "path": "docs/tqe-p6-deferred-capability-activation-proposal.md",
+    "modifies_p4_boundary": false,
+    "implements_capability": false,
+    "network_enabled": false,
+    "provider_calls": 0
+  },
+  "source_boundaries": {
+    "p4_runtime_boundary": "docs/tqe-p4-runtime-boundary.md",
+    "p5_amendment": "docs/tqe-p5-phase-driver-contract-amendment.md"
+  },
+  "capabilities": [
+    {
+      "id": "realtime_provider_feed",
+      "p4_boundary_row": "Realtime or delayed provider feed",
+      "recorded_status": "deferred",
+      "proposed_gate": "data-source contract + runtime boundary amendment + capture work-unit human approval"
+    },
+    {
+      "id": "delayed_provider_feed",
+      "p4_boundary_row": "Realtime or delayed provider feed",
+      "recorded_status": "deferred",
+      "proposed_gate": "data-source contract + runtime boundary amendment; independent of realtime approval"
+    },
+    {
+      "id": "alerts_notifications",
+      "p4_boundary_row": "Alerts / notifications",
+      "recorded_status": "deferred",
+      "proposed_gate": "event + delivery contract; each external channel a separate human approval"
+    },
+    {
+      "id": "news_social_cloud_workspace",
+      "p4_boundary_row": "News / social / cloud workspace",
+      "recorded_status": "deferred",
+      "proposed_gate": "source + privacy + persistence approval; news ingestion and cloud sync approved separately"
+    },
+    {
+      "id": "paper_trading_broker_connector",
+      "p4_boundary_row": "Paper trading / broker connector",
+      "recorded_status": "deferred",
+      "proposed_gate": "simulation contract + credential boundary + order-authority gate; two independent human approvals"
+    },
+    {
+      "id": "7b_general_provider_runtime",
+      "p4_boundary_row": null,
+      "recorded_status": "provider_capability_not_active",
+      "source": "docs/tqe-p5-phase-driver-contract-amendment.md",
+      "proposed_gate": "separate 7B contract, capability matrix, credential boundary, egress policy, acceptance package"
+    }
+  ],
+  "p4_deferred_rows_covered": [
+    "Realtime or delayed provider feed",
+    "Alerts / notifications",
+    "News / social / cloud workspace",
+    "Paper trading / broker connector"
+  ],
+  "explicitly_out_of_scope": {
+    "capability": "Automatic order placement",
+    "p4_recorded_status": "prohibited in this phase",
+    "note": "Remains prohibited. No order route, command, or UI control is proposed or authorized by this document."
+  },
+  "acceptance_notes": [
+    "This evidence records a proposal document only; no capability is implemented or activated.",
+    "All four P4 deferred rows are covered item by item; realtime and delayed feeds are split from their shared P4 row for separate approval.",
+    "The 7B general provider runtime is included per the P5 amendment's provider_capability_not_active status.",
+    "Automatic order placement remains prohibited and is explicitly out of scope.",
+    "Every capability activation requires human approval (human gate) of its own contracts before any work-unit, egress, or implementation begins.",
+    "The approved P4 boundary document is unchanged by this proposal."
+  ]
+}

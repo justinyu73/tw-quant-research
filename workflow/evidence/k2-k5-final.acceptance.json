@@ -4,7 +4,7 @@
   "stage_id": "FINAL",
   "goal_id": "k2-k5-final-acceptance",
   "attempt": 2,
-  "status": "awaiting_human_review",
+  "status": "accepted_for_user_k6_review",
   "captured_at": "2026-07-15T17:09:24Z",
   "contract_checks": {
     "declared_commands_pass": true,
@@ -119,5 +119,8 @@
     "decision": "accepted_for_user_k6_review",
     "reviewed_at": "2026-07-16T01:13:22Z",
     "notes": "Human accepted after independent re-run of all four gates (gate 4 required loopback bind, run under loopback-permitted sandbox, external_requests empty). Mechanical/contract layer only, not a performance or realtime-readiness endorsement. K6 remains user-owned."
-  }
+  },
+  "acceptance_notes": [
+    "2026-07-22: Top-level status aligned from \"awaiting_human_review\" to \"accepted_for_user_k6_review\" to match the final_review decision already recorded by JY on 2026-07-16. The final_review record itself is unchanged; K6 remains user-owned."
+  ]
 }

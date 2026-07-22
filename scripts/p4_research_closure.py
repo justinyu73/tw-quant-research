@@ -23,7 +23,13 @@ def run_audit(root: Path = ROOT) -> dict[str, object]:
         "browser_loopback_only": "127.0.0.1" in browser_code and "websocket" not in browser_code and "xmlhttprequest" not in browser_code,
         "browser_no_order_route": "/orders" not in browser_code,
         "sidecar_get_only": "def do_GET" in sidecar_code and all(f"def do_{method}" in sidecar_code for method in ("POST", "PUT", "PATCH", "DELETE", "HEAD")),
-        "tauri_write_scope_is_watchlist": "watchlist::load_watchlist" in tauri_code and "watchlist::save_watchlist" in tauri_code and "order" not in tauri_code.lower(),
+        "tauri_write_scope_is_watchlist_and_alerts": (
+            "watchlist::load_watchlist" in tauri_code
+            and "watchlist::save_watchlist" in tauri_code
+            and "alerts::load_alerts" in tauri_code
+            and "alerts::save_alerts" in tauri_code
+            and "order" not in tauri_code.lower()
+        ),
         "strategy_not_admitted": "not_admitted" in browser_code,
     }
     return {

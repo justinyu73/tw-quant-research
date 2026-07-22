@@ -1,0 +1,76 @@
+{
+  "schema": "tw-quant-engine-p6-approval-in-app-alerts-contract/v1",
+  "stage_id": "P6-approval-in-app-alerts",
+  "status": "contract_defined_pending_implementation",
+  "approval": {
+    "approved_by": "user",
+    "approval_date": "2026-07-22",
+    "activation_order": [3, 5, 2],
+    "network_enabled": false,
+    "provider_calls": 0
+  },
+  "activation_sequence": [
+    {
+      "capability": 3,
+      "id": "alerts_notifications",
+      "approval_status": "approved_contract_defined",
+      "scope": "in-app alerts only; no external delivery channel",
+      "contract": "docs/tqe-p6-in-app-alerts-contract.md",
+      "work_unit_draft": "workflow/tqe-p6-in-app-alerts.work-unit.draft.json"
+    },
+    {
+      "capability": 5,
+      "id": "paper_trading_broker_connector",
+      "approval_status": "approved_next",
+      "scope": "simulation only; contract not yet drafted"
+    },
+    {
+      "capability": 2,
+      "id": "delayed_provider_feed",
+      "approval_status": "approved_next",
+      "scope": "contract not yet drafted"
+    }
+  ],
+  "deferred_not_approved": [
+    {"capability": 1, "id": "realtime_provider_feed"},
+    {"capability": 4, "id": "news_social_cloud_workspace"},
+    {"capability": 6, "id": "7b_general_provider_runtime"}
+  ],
+  "proposal": {
+    "path": "docs/tqe-p6-deferred-capability-activation-proposal.md",
+    "recorded_status": "approved_activation_order_3_5_2",
+    "modifies_p4_boundary": false,
+    "implements_capability": false
+  },
+  "offline_verification": {
+    "p4_closure": {
+      "argv": ["python3", "scripts/p4_research_closure.py"],
+      "exit_code": 0,
+      "status": "pass",
+      "network": false,
+      "provider_calls": 0
+    },
+    "full_tests": {
+      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests"],
+      "exit_code": 0,
+      "result": "138 tests passed, 1 skipped"
+    },
+    "json_load": {
+      "argv": ["python3", "-c", "json.load on new/modified JSON files"],
+      "files": [
+        "workflow/tqe-p6-in-app-alerts.work-unit.draft.json",
+        "workflow/evidence/p6-approval-in-app-alerts-contract.acceptance.json"
+      ],
+      "exit_code": 0
+    }
+  },
+  "acceptance_notes": [
+    "Human gate owner approved the P6 proposal on 2026-07-22 with activation order 3 (in-app alerts) -> 5 (paper trading simulation) -> 2 (delayed provider feed).",
+    "Capability 3 contract is defined and scoped strictly to in-app alerts; external delivery channels (email, webhook, push, SMS) remain unapproved and each requires a separate human gate.",
+    "Capabilities 5 and 2 are approved_next only; their contracts are intentionally not drafted until capability 3 completes its evidence chain.",
+    "Capabilities 1, 4, and 6 are deferred: not approved, not activated; no work may begin on them under this approval.",
+    "Automatic order placement remains prohibited; no order route, order command, or order UI control is created or authorized.",
+    "This evidence records an approval and a contract only; no alerts functionality is implemented. Implementation requires human approval of the hashed work-unit draft.",
+    "The approved P4 boundary is unchanged and p4_research_closure.py passes."
+  ]
+}

@@ -1,0 +1,170 @@
+{
+  "schema": "tw-quant-engine-p6-alerts-fixture/v1",
+  "description": "Deterministic committed fixture for P6 in-app alerts: admitted universe, read-model shaped market data, explicit now, alert definitions, and the exact expected evaluation outcome. No network, no wall clock.",
+  "admitted_security_ids": ["2330", "2308"],
+  "now": "2026-07-22T01:00:00Z",
+  "market_data": {
+    "2330": {
+      "bars": [
+        {"trading_date": "2026-07-14", "close": 95.0},
+        {"trading_date": "2026-07-15", "close": 100.0}
+      ],
+      "indicators": {
+        "ma": {
+          "period": 5,
+          "values": [
+            {"period_key": "2026-07-14", "value": 94.0, "status": "admitted"},
+            {"period_key": "2026-07-15", "value": 98.0, "status": "admitted"}
+          ]
+        },
+        "rsi": {
+          "period": 14,
+          "values": [
+            {"period_key": "2026-07-15", "value": null, "status": "insufficient_window"}
+          ]
+        }
+      }
+    },
+    "2308": null
+  },
+  "session_state": {
+    "p6-dedup-once": {"fired_count": 1, "last_fired_at": "2026-07-22T00:00:00Z"},
+    "p6-dedup-cooldown-blocked": {"fired_count": 1, "last_fired_at": "2026-07-22T00:30:00Z"},
+    "p6-dedup-cooldown-ready": {"fired_count": 1, "last_fired_at": "2026-07-22T00:00:00Z"}
+  },
+  "definitions": [
+    {
+      "schema": "tqe-in-app-alert/v1",
+      "alert_id": "p6-price-fire",
+      "label": "2330 收盤站上 100",
+      "enabled": true,
+      "target": {"security_id": "2330"},
+      "condition": {"type": "price_threshold", "field": "close", "op": ">=", "value": 100},
+      "dedup": {"policy": "once_per_session"},
+      "expiry": {"policy": "session"},
+      "created_at": "2026-07-22T00:00:00Z"
+    },
+    {
+      "schema": "tqe-in-app-alert/v1",
+      "alert_id": "p6-price-miss",
+      "label": "2330 收盤跌破 99",
+      "enabled": true,
+      "target": {"security_id": "2330"},
+      "condition": {"type": "price_threshold", "field": "close", "op": "<=", "value": 99},
+      "dedup": {"policy": "once_per_session"},
+      "expiry": {"policy": "session"},
+      "created_at": "2026-07-22T00:00:00Z"
+    },
+    {
+      "schema": "tqe-in-app-alert/v1",
+      "alert_id": "p6-indicator-fire",
+      "label": "2330 MA5 高於 90",
+      "enabled": true,
+      "target": {"security_id": "2330"},
+      "condition": {"type": "indicator_threshold", "indicator": "ma", "params": {"period": 5}, "op": ">=", "value": 90},
+      "dedup": {"policy": "once_per_session"},
+      "expiry": {"policy": "session"},
+      "created_at": "2026-07-22T00:00:00Z"
+    },
+    {
+      "schema": "tqe-in-app-alert/v1",
+      "alert_id": "p6-indicator-unavailable",
+      "label": "2330 RSI 高於 50（窗口不足）",
+      "enabled": true,
+      "target": {"security_id": "2330"},
+      "condition": {"type": "indicator_threshold", "indicator": "rsi", "params": {}, "op": ">=", "value": 50},
+      "dedup": {"policy": "once_per_session"},
+      "expiry": {"policy": "session"},
+      "created_at": "2026-07-22T00:00:00Z"
+    },
+    {
+      "schema": "tqe-in-app-alert/v1",
+      "alert_id": "p6-data-unavailable",
+      "label": "2308 收盤站上 50（無資料）",
+      "enabled": true,
+      "target": {"security_id": "2308"},
+      "condition": {"type": "price_threshold", "field": "close", "op": ">=", "value": 50},
+      "dedup": {"policy": "once_per_session"},
+      "expiry": {"policy": "session"},
+      "created_at": "2026-07-22T00:00:00Z"
+    },
+    {
+      "schema": "tqe-in-app-alert/v1",
+      "alert_id": "p6-disabled",
+      "label": "停用的提醒不評估",
+      "enabled": false,
+      "target": {"security_id": "2330"},
+      "condition": {"type": "price_threshold", "field": "close", "op": ">=", "value": 1},
+      "dedup": {"policy": "once_per_session"},
+      "expiry": {"policy": "session"},
+      "created_at": "2026-07-22T00:00:00Z"
+    },
+    {
+      "schema": "tqe-in-app-alert/v1",
+      "alert_id": "p6-expired",
+      "label": "已到期的提醒不評估",
+      "enabled": true,
+      "target": {"security_id": "2330"},
+      "condition": {"type": "price_threshold", "field": "close", "op": ">=", "value": 1},
+      "dedup": {"policy": "once_per_session"},
+      "expiry": {"policy": "until", "until": "2026-07-21T00:00:00Z"},
+      "created_at": "2026-07-20T00:00:00Z"
+    },
+    {
+      "schema": "tqe-in-app-alert/v1",
+      "alert_id": "p6-dedup-once",
+      "label": "本工作階段已觸發過",
+      "enabled": true,
+      "target": {"security_id": "2330"},
+      "condition": {"type": "price_threshold", "field": "close", "op": ">=", "value": 1},
+      "dedup": {"policy": "once_per_session"},
+      "expiry": {"policy": "session"},
+      "created_at": "2026-07-22T00:00:00Z"
+    },
+    {
+      "schema": "tqe-in-app-alert/v1",
+      "alert_id": "p6-dedup-cooldown-blocked",
+      "label": "冷卻 3600 秒尚未結束",
+      "enabled": true,
+      "target": {"security_id": "2330"},
+      "condition": {"type": "price_threshold", "field": "close", "op": ">=", "value": 1},
+      "dedup": {"policy": "cooldown_seconds", "cooldown_seconds": 3600},
+      "expiry": {"policy": "session"},
+      "created_at": "2026-07-22T00:00:00Z"
+    },
+    {
+      "schema": "tqe-in-app-alert/v1",
+      "alert_id": "p6-dedup-cooldown-ready",
+      "label": "冷卻 3600 秒已結束",
+      "enabled": true,
+      "target": {"security_id": "2330"},
+      "condition": {"type": "price_threshold", "field": "close", "op": ">=", "value": 1},
+      "dedup": {"policy": "cooldown_seconds", "cooldown_seconds": 3600},
+      "expiry": {"policy": "session"},
+      "created_at": "2026-07-22T00:00:00Z"
+    }
+  ],
+  "expected": {
+    "fired_alert_ids": ["p6-price-fire", "p6-indicator-fire", "p6-dedup-cooldown-ready"],
+    "skipped": {
+      "p6-price-miss": "condition_not_met",
+      "p6-indicator-unavailable": "data_unavailable",
+      "p6-data-unavailable": "data_unavailable",
+      "p6-disabled": "disabled",
+      "p6-expired": "expired",
+      "p6-dedup-once": "dedup_once_per_session",
+      "p6-dedup-cooldown-blocked": "dedup_cooldown"
+    }
+  },
+  "invalid_definitions": [
+    {"case": "bad_schema", "definition": {"schema": "tqe-in-app-alert/v0", "alert_id": "x1", "label": "x", "enabled": true, "target": {"security_id": "2330"}, "condition": {"type": "price_threshold", "field": "close", "op": ">=", "value": 1}, "dedup": {"policy": "once_per_session"}, "expiry": {"policy": "session"}, "created_at": "2026-07-22T00:00:00Z"}},
+    {"case": "unknown_condition_type", "definition": {"schema": "tqe-in-app-alert/v1", "alert_id": "x2", "label": "x", "enabled": true, "target": {"security_id": "2330"}, "condition": {"type": "moving_average_cross", "op": ">=", "value": 1}, "dedup": {"policy": "once_per_session"}, "expiry": {"policy": "session"}, "created_at": "2026-07-22T00:00:00Z"}},
+    {"case": "unknown_indicator", "definition": {"schema": "tqe-in-app-alert/v1", "alert_id": "x3", "label": "x", "enabled": true, "target": {"security_id": "2330"}, "condition": {"type": "indicator_threshold", "indicator": "bollinger", "params": {}, "op": ">=", "value": 1}, "dedup": {"policy": "once_per_session"}, "expiry": {"policy": "session"}, "created_at": "2026-07-22T00:00:00Z"}},
+    {"case": "unknown_price_field", "definition": {"schema": "tqe-in-app-alert/v1", "alert_id": "x4", "label": "x", "enabled": true, "target": {"security_id": "2330"}, "condition": {"type": "price_threshold", "field": "high", "op": ">=", "value": 1}, "dedup": {"policy": "once_per_session"}, "expiry": {"policy": "session"}, "created_at": "2026-07-22T00:00:00Z"}},
+    {"case": "target_outside_universe", "definition": {"schema": "tqe-in-app-alert/v1", "alert_id": "x5", "label": "x", "enabled": true, "target": {"security_id": "9999"}, "condition": {"type": "price_threshold", "field": "close", "op": ">=", "value": 1}, "dedup": {"policy": "once_per_session"}, "expiry": {"policy": "session"}, "created_at": "2026-07-22T00:00:00Z"}},
+    {"case": "malformed_dedup", "definition": {"schema": "tqe-in-app-alert/v1", "alert_id": "x6", "label": "x", "enabled": true, "target": {"security_id": "2330"}, "condition": {"type": "price_threshold", "field": "close", "op": ">=", "value": 1}, "dedup": {"policy": "cooldown_seconds"}, "expiry": {"policy": "session"}, "created_at": "2026-07-22T00:00:00Z"}},
+    {"case": "malformed_expiry", "definition": {"schema": "tqe-in-app-alert/v1", "alert_id": "x7", "label": "x", "enabled": true, "target": {"security_id": "2330"}, "condition": {"type": "price_threshold", "field": "close", "op": ">=", "value": 1}, "dedup": {"policy": "once_per_session"}, "expiry": {"policy": "until"}, "created_at": "2026-07-22T00:00:00Z"}},
+    {"case": "external_channel_field", "definition": {"schema": "tqe-in-app-alert/v1", "alert_id": "x8", "label": "x", "enabled": true, "target": {"security_id": "2330"}, "condition": {"type": "price_threshold", "field": "close", "op": ">=", "value": 1}, "dedup": {"policy": "once_per_session"}, "expiry": {"policy": "session"}, "created_at": "2026-07-22T00:00:00Z", "channel": "webhook"}},
+    {"case": "indicator_params_on_fixed_window", "definition": {"schema": "tqe-in-app-alert/v1", "alert_id": "x9", "label": "x", "enabled": true, "target": {"security_id": "2330"}, "condition": {"type": "indicator_threshold", "indicator": "rsi", "params": {"period": 7}, "op": ">=", "value": 50}, "dedup": {"policy": "once_per_session"}, "expiry": {"policy": "session"}, "created_at": "2026-07-22T00:00:00Z"}}
+  ]
+}

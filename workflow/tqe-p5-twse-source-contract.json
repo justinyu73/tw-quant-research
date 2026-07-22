@@ -137,6 +137,230 @@
     "repository_market_data_requests": 0,
     "repository_fixtures_created": 0
   },
-  "hard_stop": "Do not activate P5 with a paid subscription, substitute the latest-day endpoint, or create an implicit unbounded loop until a free public source contract is proven and approved.",
+  "re_verification": {
+    "verified_at": "2026-07-22",
+    "method": "read_only_web_verification_of_official_pages_and_catalogue_entries_no_provider_call",
+    "result": "conclusions_unchanged_no_free_official_bounded_three_year_bulk_artifact_found",
+    "evidence": [
+      {
+        "candidate_id": "twse_openapi_stock_day_all",
+        "url": "https://openapi.twse.com.tw/",
+        "supporting_report": "https://finlab.finance/blog/python-get-taiwan-stock-data",
+        "finding": "Still documented and reported (2026-06) as a latest-day full-market snapshot with no historical depth; rejection for P5 bulk stands."
+      },
+      {
+        "candidate_id": "twse_historical_stock_day",
+        "url": "https://wwwc.twse.com.tw/zh/trading/historical/stock-day.html",
+        "finding": "Still an interactive per-date per-security-code query surface; no bounded all-market bulk contract; rejection stands."
+      },
+      {
+        "candidate_id": "twse_data_eshop_daily_quotes",
+        "url": "https://eshop.twse.com.tw/en/product/detail/ef7b7785e2cb4793baca3644c8a74d4e",
+        "finding": "Page fetched 2026-07-22: daily OHLCV fields, start date 1992-01-04, files TWT62U/TWT69U/TWTA5U, but unit of subscription is month with cart checkout; paid subscription, rejected under the free-only boundary."
+      },
+      {
+        "candidate_id": "government_catalogue_dataset_11549",
+        "url": "https://data.gov.tw/dataset/11549",
+        "finding": "Page fetched 2026-07-22: free, daily update, OHLCV fields, government open-data license v1; confirms the daily dataset metadata only, not three-year bulk coverage."
+      },
+      {
+        "candidate_id": "twse_official_calendar_holidaySchedule",
+        "url": "https://openapi.twse.com.tw/",
+        "finding": "Still candidate only; digest and same-work-unit version binding remain pending capture at activation."
+      }
+    ]
+  },
+  "decision": {
+    "decided_at": "2026-07-22",
+    "status": "source_contract_blocked",
+    "decision_progress": "option_c_approved_fresh_p5_1_pass_pending",
+    "summary": "No free official bounded three-year bulk source exists as of the 2026-07-22 re-verification. The user selected option C on 2026-07-22; P5.1 stays blocked until a fresh P5.1 contract pass for the chosen endpoint and the pre-activation evidence list are complete.",
+    "user_selection": {
+      "option_id": "C_bounded_per_trading_day_capture_from_official_free_daily_endpoint",
+      "decided_by": "user",
+      "decided_at": "2026-07-22",
+      "approval_scope": [
+        "amend_request_budget_to_bounded_per_trading_day_capture",
+        "amend_work_unit_shape_to_session_enumerated_bounded_loop",
+        "fresh_p5_1_contract_pass_for_the_chosen_endpoint_required_before_activation"
+      ],
+      "chosen_endpoint_candidate": "twse_legacy_mi_index_csv",
+      "note": "Selection approves the request-budget and work-unit-shape amendment direction only. It does not activate capture; no provider call is authorized by this record."
+    },
+    "decision_options": [
+      {
+        "option_id": "A_amend_free_only_boundary_admit_paid_daily_quotes",
+        "description": "Amend the free-only product boundary to admit the paid TWSE Data E-Shop Daily Quotes subscription (schema and 1992-01-04 coverage fit the requested window).",
+        "impact": [
+          "Requires amending docs/tqe-product-boundary.md (paid subscriptions are currently out of scope).",
+          "Introduces recurring subscription cost and Data E-Shop license terms that must be reviewed for local raw and normalized retention.",
+          "P5 could then proceed to P5.3/P5.4 with the requested three-year window unchanged."
+        ],
+        "required_human_approval": "User approval to amend the product boundary and approve the subscription purchase and license review."
+      },
+      {
+        "option_id": "B_reduce_history_depth_target",
+        "description": "Reduce the P5 history-depth goal so the free latest-day STOCK_DAY_ALL snapshot can accumulate history going forward from activation, backfilling later if a free bulk source appears.",
+        "impact": [
+          "The three-calendar-year admission goal is not met at activation; P1-P4 replay coverage shrinks.",
+          "Requires amending workflow/tqe-p5-history-admission.json history_window and the P5 acceptance checklist.",
+          "Free-only boundary is preserved."
+        ],
+        "required_human_approval": "User approval to amend the P5 goal and history_window."
+      },
+      {
+        "option_id": "C_bounded_per_trading_day_capture_from_official_free_daily_endpoint",
+        "description": "Amend the execution contract to allow an explicitly bounded per-trading-day capture loop against the official free daily full-market report endpoint (e.g. the legacy MI_INDEX CSV report), driven by the pre-approved official calendar session list for 2023-07-20..2026-07-19.",
+        "impact": [
+          "Request budget grows from the named 2 GETs to roughly one GET per trading session (about 750) plus the calendar GET; host-egress, rate-limit, and terms-of-use review is required.",
+          "This is a bounded, enumerated, human-approved loop, not the prohibited implicit unbounded loop; it must be specified session-by-session in the work-unit.",
+          "Free-only boundary is preserved; endpoint terms and license for fixture retention still need the full P5.1 evidence set."
+        ],
+        "required_human_approval": "User approval to amend the request budget and work-unit shape, plus a fresh P5.1 contract pass for the chosen endpoint."
+      },
+      {
+        "option_id": "D_keep_blocked_wait_for_free_official_bulk_source",
+        "description": "Keep P5.1 blocked and wait for TWSE or the government open-data catalogue to publish a free bounded historical bulk artifact.",
+        "impact": [
+          "P5.1 and activation-ready P5.3 remain blocked; P5.2 stays pass.",
+          "No cost, no boundary change, no timeline."
+        ],
+        "required_human_approval": "None; this is the current default state."
+      }
+    ],
+    "next_action": {
+      "kind": "pre_activation_evidence",
+      "owner": "user_and_agent",
+      "action": "Option C selected 2026-07-22. Complete the fresh P5.1 contract pass for twse_legacy_mi_index_csv (first human trial capture sha256, official calendar digest binding, fixture retention policy approval, per-session work-unit digest approval) before any activation. Top-level status stays source_contract_blocked until that pass is recorded."
+    }
+  },
+  "option_c_endpoint_assessment": {
+    "assessed_at": "2026-07-22",
+    "status": "assessed_pending_fresh_p5_1_contract_pass",
+    "method": "read_only_web_verification_no_market_data_downloaded",
+    "candidate_id": "twse_legacy_mi_index_csv",
+    "official_page": "https://www.twse.com.tw/zh/page/trading/exchange/MI_INDEX.html",
+    "endpoint": "https://www.twse.com.tw/exchangeReport/MI_INDEX",
+    "http_method": "GET",
+    "query_parameters": {
+      "response": "csv",
+      "date": "YYYYMMDD single trading day",
+      "type": "ALL (full market incl. warrants/CBBC; ALLBUT0999 excludes warrants/CBBC)"
+    },
+    "example_url_shape": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=csv&date=20210507&type=ALL",
+    "response_contract": {
+      "content": "CSV with multiple sections; index rows are prefixed with '=' lines, the full-market section starts at the 證券代號 header row; encoding historically Big5/CP950 (must be detected and recorded at trial capture)",
+      "full_market_columns": ["證券代號", "證券名稱", "成交股數", "成交筆數", "成交金額", "開盤價", "最高價", "最低價", "收盤價", "漲跌(+/-)", "漲跌價差", "最後揭示買價", "最後揭示買量", "最後揭示賣價", "最後揭示賣量", "本益比"],
+      "ohlcv_mapping": {
+        "security_code": "證券代號",
+        "volume_shares": "成交股數",
+        "transaction_count": "成交筆數",
+        "amount": "成交金額",
+        "open": "開盤價",
+        "high": "最高價",
+        "low": "最低價",
+        "close": "收盤價",
+        "price_change": "漲跌價差"
+      }
+    },
+    "historical_depth_evidence": "Public tutorials demonstrate arbitrary past dates on this endpoint (2018-01-31, 2021-05-07, 2022-04-12); the commonly cited earliest available date is 2004-02-11. Exact earliest date and per-day availability inside 2023-07-20..2026-07-19 must be proven by the first human trial capture, not assumed.",
+    "terms_and_rate_limit": {
+      "robots_txt": "https://www.twse.com.tw/robots.txt fetched 2026-07-22: only /epaper/ and /FTSE/ are disallowed for generic agents; MI_INDEX download path is not robots-disallowed.",
+      "explicit_terms": "No explicit bulk-download prohibition was located on the official page during read-only verification; terms-of-use and open-data license review remains a pre-activation requirement.",
+      "rate_limit": "TWSE publishes no numeric rate limit; community reports describe IP throttling/ban on dense crawling. The work-unit therefore serializes requests with a conservative delay and a hard session cap."
+    },
+    "verification_evidence": [
+      {
+        "url": "https://ithelp.ithome.com.tw/articles/10258478",
+        "checked_at": "2026-07-22",
+        "finding": "Documents the exact CSV URL shape: https://www.twse.com.tw/exchangeReport/MI_INDEX?response=csv&date=YYYYMMDD&type=ALL returning the all-market daily closing quotes CSV including sector indices."
+      },
+      {
+        "url": "https://finlab.finance/blog/taiwan-stock-daily-crawler-tutorial",
+        "checked_at": "2026-07-22",
+        "finding": "Demonstrates a historical date (2018-01-31) retrieval with type=ALL and the parsing rule: strip '='-prefixed index lines, locate the 證券代號 header row; includes the 本益比 column."
+      },
+      {
+        "url": "https://quantpass.org/python_crawler1/",
+        "checked_at": "2026-07-22",
+        "finding": "Shows GET with response=csv&date=20220412&type=ALLBUT0999; confirms the type parameter variants and the need for a plain User-Agent header."
+      },
+      {
+        "url": "https://blog.shiangsoft.com/stock-price-clawer/",
+        "checked_at": "2026-07-22",
+        "finding": "Lists the exact 16-column CSV schema: 證券代號, 證券名稱, 成交股數, 成交筆數, 成交金額, 開盤價, 最高價, 最低價, 收盤價, 漲跌(+/-), 漲跌價差, 最後揭示買價, 最後揭示買量, 最後揭示賣價, 最後揭示賣量, 本益比."
+      },
+      {
+        "url": "https://ithelp.ithome.com.tw/m/articles/10300618",
+        "checked_at": "2026-07-22",
+        "finding": "Notes from practitioner experience that overly dense crawling of twse.com.tw is throttled or banned; motivates the serialized, capped, human-run loop."
+      },
+      {
+        "url": "https://www.twse.com.tw/robots.txt",
+        "checked_at": "2026-07-22",
+        "finding": "Only /epaper/ and /FTSE/ are disallowed; the MI_INDEX download path is not excluded by robots policy."
+      }
+    ],
+    "required_before_activation": [
+      "first_human_trial_capture_sha256_bytes_and_timestamp_for_one_recent_session",
+      "official_calendar_holidaySchedule_digest_bound_to_the_same_work_unit",
+      "session_list_generated_from_the_approved_calendar_digest_with_count_at_or_below_cap",
+      "fixture_retention_license_size_and_sha256_policy_approval_for_per_session_csv",
+      "per_session_work_unit_digest_approved_by_human_before_host_egress",
+      "csv_encoding_and_schema_probe_recorded_from_the_trial_capture",
+      "terms_of_use_review_recorded_for_the_mi_index_endpoint"
+    ],
+    "first_trial_capture": {
+      "captured_at": "2026-07-22T11:54:22Z",
+      "approved_by": "user",
+      "approval": "2026-07-22 user instruction: playwright verification with stock 2308",
+      "script": "scripts/p5_trial_capture.cjs",
+      "transport": "playwright-core chromium headless request context",
+      "provider_calls": 3,
+      "provider_calls_note": "Human-approved bounded trial: 1 interactive page load + 2 CSV GETs. The top-level provider_calls_made_by_repository counter tracks P5 activation and remains 0 until activation.",
+      "captures": [
+        {
+          "kind": "stock_day_2308",
+          "url": "https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=csv&date=20260701&stockNo=2308",
+          "http_status": 200,
+          "content_type": "text/csv;charset=ms950",
+          "bytes": 2204,
+          "sha256": "sha256:6ef390d93485abcb5ad2c48de30d10112904f3935b85e6c226a72f8b5f4b7018",
+          "raw_file": "outputs/p5-trial-capture/STOCK_DAY_2308_20260701.csv"
+        },
+        {
+          "kind": "mi_index_all",
+          "date": "20260721",
+          "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=csv&date=20260721&type=ALL",
+          "http_status": 200,
+          "content_type": "text/csv;charset=ms950",
+          "bytes": 3491341,
+          "sha256": "sha256:d5b5eec6bc041fdd810dba2687b1cdaa481645311070b402e0c2c0f2d48bec78",
+          "raw_file": "outputs/p5-trial-capture/MI_INDEX_ALL_20260721.csv.gz",
+          "raw_file_note": "Stored gzip-compressed (685068 bytes, gz sha256:ae16eda9123f3814484fd1e7b9ef02ee6bd3dc2ca80fc99ed976d45ef876b288) to stay under the S9 release-hardening 2 MB artifact audit; the recorded sha256 is of the uncompressed CSV and was verified by decompressing."
+        }
+      ],
+      "interactive_check": {
+        "url": "https://www.twse.com.tw/zh/trading/historical/stock-day.html",
+        "http_status": 200,
+        "title": "個股日成交資訊 - TWSE 臺灣證券交易所",
+        "reachable": true
+      },
+      "encoding_probe": "content-type declares charset=ms950; strict UTF-8 decode fails; CP950 decode succeeds. Encoding confirmed ms950/CP950 for both endpoints.",
+      "schema_probe": "MI_INDEX_ALL_20260721.csv: 30871 lines, 16-column 證券代號 header at line 313 matching response_contract.full_market_columns exactly; 1083 four-digit securities in the full-market section; 2308 台達電 row present with complete OHLCV. STOCK_DAY_2308_20260701.csv: 23 lines, daily OHLCV rows for 2026-07 (115/07/01 onward).",
+      "satisfies": [
+        "first_human_trial_capture_sha256_bytes_and_timestamp_for_one_recent_session",
+        "csv_encoding_and_schema_probe_recorded_from_the_trial_capture"
+      ],
+      "still_pending": [
+        "official_calendar_holidaySchedule_digest_bound_to_the_same_work_unit",
+        "session_list_generated_from_the_approved_calendar_digest_with_count_at_or_below_cap",
+        "fixture_retention_license_size_and_sha256_policy_approval_for_per_session_csv",
+        "per_session_work_unit_digest_approved_by_human_before_host_egress",
+        "terms_of_use_review_recorded_for_the_mi_index_endpoint"
+      ]
+    }
+  },
+  "hard_stop": "Do not activate P5 with a paid subscription, substitute the latest-day endpoint, or create an implicit unbounded loop until a free public source contract is proven and approved. The option C selection authorizes contract amendment work only; capture starts only after the fresh P5.1 pass and the option_c_endpoint_assessment.required_before_activation list are complete.",
   "provider_calls_made_by_repository": 0
 }

@@ -1,0 +1,82 @@
+{
+  "schema": "tw-quant-engine-p5-source-contract-decision/v1",
+  "stage_id": "P5.1",
+  "status": "blocked_source_contract",
+  "approval": {
+    "approved_by": null,
+    "execution_boundary": "workflow/tqe-p5-twse-source-contract.json",
+    "network_enabled": false,
+    "provider_calls": 0
+  },
+  "re_verification": {
+    "verified_at": "2026-07-22",
+    "method": "read_only_web_verification_of_official_pages_and_catalogue_entries_no_provider_call",
+    "result": "conclusions_unchanged_no_free_official_bounded_three_year_bulk_artifact_found",
+    "checks": [
+      {
+        "candidate": "twse_openapi_stock_day_all",
+        "url": "https://openapi.twse.com.tw/",
+        "supporting_report": "https://finlab.finance/blog/python-get-taiwan-stock-data",
+        "checked_at": "2026-07-22",
+        "finding": "Still a latest-day full-market snapshot with no historical depth; rejection for P5 bulk stands."
+      },
+      {
+        "candidate": "twse_historical_stock_day",
+        "url": "https://wwwc.twse.com.tw/zh/trading/historical/stock-day.html",
+        "checked_at": "2026-07-22",
+        "finding": "Still an interactive per-date per-security-code query surface; no bounded all-market bulk contract."
+      },
+      {
+        "candidate": "twse_data_eshop_daily_quotes",
+        "url": "https://eshop.twse.com.tw/en/product/detail/ef7b7785e2cb4793baca3644c8a74d4e",
+        "checked_at": "2026-07-22",
+        "finding": "Daily OHLCV fields, start date 1992-01-04, files TWT62U/TWT69U/TWTA5U, monthly subscription with cart checkout; paid product, rejected under the free-only boundary."
+      },
+      {
+        "candidate": "government_catalogue_dataset_11549",
+        "url": "https://data.gov.tw/dataset/11549",
+        "checked_at": "2026-07-22",
+        "finding": "Free daily OHLCV dataset metadata under government open-data license v1; confirms daily fields only, not three-year bulk coverage."
+      },
+      {
+        "candidate": "twse_official_calendar_holidaySchedule",
+        "url": "https://openapi.twse.com.tw/",
+        "checked_at": "2026-07-22",
+        "finding": "Still candidate only; digest and same-work-unit version binding remain pending capture at activation."
+      }
+    ]
+  },
+  "decision_options": [
+    {
+      "option_id": "A_amend_free_only_boundary_admit_paid_daily_quotes",
+      "summary": "Amend the free-only product boundary to admit the paid Daily Quotes subscription.",
+      "required_human_approval": "User approval to amend docs/tqe-product-boundary.md and approve purchase and license review."
+    },
+    {
+      "option_id": "B_reduce_history_depth_target",
+      "summary": "Reduce the three-year history goal so the free latest-day snapshot accumulates history going forward.",
+      "required_human_approval": "User approval to amend workflow/tqe-p5-history-admission.json history_window and the P5 acceptance checklist."
+    },
+    {
+      "option_id": "C_bounded_per_trading_day_capture_from_official_free_daily_endpoint",
+      "summary": "Amend the execution contract to allow an explicitly bounded per-trading-day capture loop (about 750 sessions) against the official free daily report endpoint, driven by the pre-approved calendar session list.",
+      "required_human_approval": "User approval to amend the request budget and work-unit shape, plus a fresh P5.1 contract pass for the chosen endpoint."
+    },
+    {
+      "option_id": "D_keep_blocked_wait_for_free_official_bulk_source",
+      "summary": "Keep P5.1 blocked and wait for a free official bounded bulk artifact.",
+      "required_human_approval": "None; current default state."
+    }
+  ],
+  "next_action": {
+    "kind": "human_gate",
+    "owner": "user",
+    "action": "Choose one decision_option (A, B, C, or D); P5 execution remains blocked until the user selects an option and the corresponding amendments are approved."
+  },
+  "acceptance_notes": [
+    "The blocked status is preserved; no candidate was admitted and no source ID was added to the provider registry.",
+    "No provider call was made by the repository during re-verification; only read-only public web pages were consulted.",
+    "P5.2 remains pass; P5.1 and activation-ready P5.3 remain blocked pending a human decision.",
+    "The paid Daily Quotes product is recorded as technically suitable but outside the free-only product boundary; it is not activated by this record."
+  ]
+}
