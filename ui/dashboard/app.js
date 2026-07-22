@@ -17,6 +17,7 @@
   var WATCHLIST_LOCAL_STORAGE_KEY = "tw-quant-engine-watchlist.v1";
   var NOTES_LOCAL_STORAGE_KEY = "tw-quant-engine-research-notes.v1";
   var ALERTS_LOCAL_STORAGE_KEY = "tqe-in-app-alerts.v1";
+  var ALERTS_SESSION_STORAGE_KEY = "tqe-in-app-alerts.session";
   var FINANCIAL_REVIEW_LOCAL_STORAGE_KEY = "tw-quant-engine-financial-review.prototype-v1";
   var BACKTEST_SETTINGS_LOCAL_STORAGE_KEY = "tw-quant-engine-backtest-settings.prototype-v1";
   var watchlistModelRequests = {};
@@ -427,8 +428,11 @@
     );
   }
 
+  var sidecarResolvedUrl = null;
+  var sidecarUrlPromise = null;
+
   function sidecarBaseUrl() {
-    var raw = window.__TW_QUANT_SIDECAR_URL__ || "http://127.0.0.1:8767";
+    var raw = window.__TW_QUANT_SIDECAR_URL__ || sidecarResolvedUrl || "http://127.0.0.1:8767";
     try {
       var parsed = new URL(raw);
       if (parsed.protocol !== "http:" || ["127.0.0.1", "localhost", "[::1]", "::1"].indexOf(parsed.hostname) < 0) return "";
@@ -436,6 +440,27 @@
     } catch (error) {
       return "";
     }
+  }
+
+  // Resolve the loopback sidecar URL once at startup: the dev/preview flow
+  // pins it via __TW_QUANT_SIDECAR_URL__, the desktop shell picks a free port
+  // dynamically and reports it through the sidecar_url command, and the 8767
+  // fallback keeps the plain static preview usable.
+  function ensureSidecarUrl() {
+    if (sidecarUrlPromise) return sidecarUrlPromise;
+    if (window.__TW_QUANT_SIDECAR_URL__ || !desktopDataUpdateAvailable()) {
+      sidecarUrlPromise = Promise.resolve(sidecarBaseUrl());
+      return sidecarUrlPromise;
+    }
+    sidecarUrlPromise = tauriInvoke("sidecar_url", {})
+      .then(function (url) {
+        sidecarResolvedUrl = typeof url === "string" ? url : "";
+        return sidecarBaseUrl();
+      })
+      .catch(function () {
+        return sidecarBaseUrl();
+      });
+    return sidecarUrlPromise;
   }
 
   function sidecarRequest(path, options) {
@@ -637,22 +662,45 @@
     }
   }
 
+  // Session boundary for session-expiry alerts: a page session is tracked with
+  // a sessionStorage marker. Reloading the tab (F5) keeps the marker, so
+  // session-expiry definitions survive; a new tab or a desktop app launch
+  // starts without it, so the definitions are dropped from the loaded store
+  // and the pruned store is persisted. If sessionStorage is unreadable the
+  // load is treated as a new session (fail-closed toward dropping).
+  function beginAlertsSession() {
+    try {
+      if (!window.sessionStorage) return true;
+      if (window.sessionStorage.getItem(ALERTS_SESSION_STORAGE_KEY)) return false;
+      window.sessionStorage.setItem(ALERTS_SESSION_STORAGE_KEY, String(Date.now()));
+      return true;
+    } catch (error) {
+      return true;
+    }
+  }
+
+  function loadAlertDefinitions(definitions, newSession) {
+    var kept = newSession ? core.dropSessionAlertDefinitions(definitions) : definitions;
+    state = core.reduce(state, { type: "SET_ALERTS", definitions: kept });
+    if (newSession && kept.length !== definitions.length) persistAlerts();
+    render();
+  }
+
   function ensureAlertsRuntime() {
     if (alertsLoadStarted) return;
     alertsLoadStarted = true;
     // Session-local store owned by the local app: the desktop shell keeps the
     // tqe-in-app-alerts/v1 flat JSON via Tauri commands; the browser preview
     // uses the same format in localStorage (watchlist-style dual path).
+    var newSession = beginAlertsSession();
     tauriInvoke("load_alerts", {})
       .then(function (raw) {
         alertsPersistenceAvailable = true;
-        state = core.reduce(state, { type: "SET_ALERTS", definitions: parseAlertStore(raw) });
-        render();
+        loadAlertDefinitions(parseAlertStore(raw), newSession);
       })
       .catch(function () {
         alertsPersistenceAvailable = "browser";
-        state = core.reduce(state, { type: "SET_ALERTS", definitions: localAlertDefinitions() });
-        render();
+        loadAlertDefinitions(localAlertDefinitions(), newSession);
       });
   }
 
@@ -1252,7 +1300,7 @@
     }
     var colorType = api.ColorType && api.ColorType.Solid ? api.ColorType.Solid : "solid";
     var chart = api.createChart(canvas, {
-      width: Math.max(canvas.clientWidth || 640, 320),
+      width: Math.max(canvas.clientWidth || 640, 240),
       height: 340,
       layout: { background: { type: colorType, color: "#ffffff" }, textColor: "#596273" },
       grid: { vertLines: { color: "#edf0f2" }, horzLines: { color: "#edf0f2" } },
@@ -1331,7 +1379,7 @@
     chartInstance = chart;
     if (window.ResizeObserver) {
       chartResizeObserver = new ResizeObserver(function () {
-        chart.applyOptions({ width: Math.max(canvas.clientWidth || 640, 320) });
+        chart.applyOptions({ width: Math.max(canvas.clientWidth || 640, 240) });
       });
       chartResizeObserver.observe(canvas);
     }
@@ -1772,5 +1820,7 @@
   loadPrototypeDrafts();
   ensureNotesRuntime();
   ensureAlertsRuntime();
-  render();
+  ensureSidecarUrl().then(function () {
+    render();
+  });
 }());

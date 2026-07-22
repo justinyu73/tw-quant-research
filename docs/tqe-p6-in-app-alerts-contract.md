@@ -1,6 +1,11 @@
 # TQE P6 in-app alerts activation contract
 
-Status: `contract_defined_pending_implementation`
+Status: `active` (human acceptance passed 2026-07-22, see workflow/evidence/p6-in-app-alerts.acceptance.json)
+
+Implementation evidence:
+[`workflow/evidence/p6-in-app-alerts.acceptance.json`](../workflow/evidence/p6-in-app-alerts.acceptance.json)
+(recorded 2026-07-22; all seven implementation slices verified offline;
+acceptance by the human gate owner is still pending).
 
 This is the activation contract for capability 3 (alerts / notifications) of
 [`docs/tqe-p6-deferred-capability-activation-proposal.md`](tqe-p6-deferred-capability-activation-proposal.md),

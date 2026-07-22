@@ -186,12 +186,13 @@ def validate_alert(definition: Any, admitted_security_ids: Iterable[str]) -> dic
 
 
 def serialize_alert_store(definitions: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
-    """Flat versioned JSON store (watchlist style). Session-expiry alerts are dropped."""
-    alerts = [
-        copy.deepcopy(dict(definition))
-        for definition in definitions
-        if isinstance(definition, Mapping) and (definition.get("expiry") or {}).get("policy") != "session"
-    ]
+    """Flat versioned JSON store (watchlist style).
+
+    Session-expiry definitions are kept in the store so they survive a reload
+    within the same session; the app-side loader drops them when a new session
+    starts (new browser tab or desktop app launch), per the P6 contract.
+    """
+    alerts = [copy.deepcopy(dict(definition)) for definition in definitions if isinstance(definition, Mapping)]
     return {"schema": ALERT_STORE_SCHEMA, "version": ALERT_STORE_VERSION, "alerts": alerts}
 
 

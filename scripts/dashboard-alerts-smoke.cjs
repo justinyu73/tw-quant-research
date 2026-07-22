@@ -185,9 +185,10 @@ async function main() {
       const store = JSON.parse(raw);
       assert.equal(store.schema, "tqe-in-app-alerts/v1");
       assert.equal(store.version, 1);
-      // The default draft uses session expiry, which is dropped at save time.
-      assert.deepEqual(store.alerts, []);
-      return "session-expiry alert correctly excluded from persisted store";
+      // Session-expiry definitions persist within the session so a reload keeps them.
+      assert.equal(store.alerts.length, 1);
+      assert.equal(store.alerts[0].expiry.policy, "session");
+      return "session-expiry alert persists in the store within the session";
     });
 
     // Persist an until-expiry alert so the reload check has durable content.
@@ -213,14 +214,15 @@ async function main() {
 
     await record("evaluation_stays_loopback", async () => assert.deepEqual(externalRequests, []));
 
-    // Reload: the until-expiry alert survives via the session-local store.
+    // Reload in the same tab session (F5): sessionStorage survives, so both
+    // the session-expiry and the until-expiry alert are kept.
     await page.reload({ waitUntil: "networkidle" });
     await page.locator('[data-action="section"][data-section="market"]').first().click();
     await page.locator('[data-testid="alerts-panel"]').waitFor();
 
     await record("persistence_after_reload", async () => {
       const count = await page.locator('[data-testid="alert-definition"]').count();
-      assert.equal(count, 1, "only the until-expiry alert should persist");
+      assert.equal(count, 2, "reload within the same session keeps both alerts");
     });
 
     await record("no_browser_errors", async () => assert.deepEqual(browserErrors, []));
@@ -249,6 +251,32 @@ async function main() {
     await record("only_expected_400_console_message", async () => {
       const unexpected = browserErrors.filter((message) => !/status of 400/.test(message));
       assert.deepEqual(unexpected, []);
+    });
+
+    // New browser session (new tab in the same profile): sessionStorage starts
+    // empty, so the loader drops session-expiry definitions and persists the
+    // pruned store; the until-expiry alert survives.
+    const freshPage = await context.newPage();
+    freshPage.on("pageerror", (error) => browserErrors.push(`pageerror: ${error.message}`));
+    freshPage.on("console", (message) => {
+      if (message.type() === "error") browserErrors.push(`console: ${message.text()}`);
+    });
+    freshPage.on("request", (request) => {
+      if (!request.url().startsWith(baseUrl) && !request.url().startsWith(sidecarBaseUrl)) externalRequests.push(request.url());
+    });
+
+    await record("new_session_drops_session_alerts", async () => {
+      await freshPage.goto(`${baseUrl}/index.html`, { waitUntil: "networkidle" });
+      await freshPage.locator('[data-action="section"][data-section="market"]').first().click();
+      await freshPage.locator('[data-testid="alerts-panel"]').waitFor();
+      await freshPage.locator('[data-testid="alert-definition"]').waitFor();
+      const count = await freshPage.locator('[data-testid="alert-definition"]').count();
+      assert.equal(count, 1, "new session keeps only the until-expiry alert");
+      const store = JSON.parse(await freshPage.evaluate(() => window.localStorage.getItem("tqe-in-app-alerts.v1")));
+      assert.deepEqual(store.alerts.map((alert) => alert.expiry.policy), ["until"]);
+      const unexpected = browserErrors.filter((message) => !/status of 400/.test(message));
+      assert.deepEqual(unexpected, []);
+      assert.deepEqual(externalRequests, []);
     });
 
     const report = {

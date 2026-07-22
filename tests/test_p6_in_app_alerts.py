@@ -59,15 +59,18 @@ class P6AlertValidationTests(unittest.TestCase):
             with self.assertRaises(AlertValidationError, msg=item["case"]):
                 validate_alert(item["definition"], self.admitted)
 
-    def test_store_roundtrip_and_session_expiry_dropped(self) -> None:
+    def test_store_roundtrip_preserves_session_expiry(self) -> None:
         definitions = [validate_alert(item, self.admitted) for item in self.fixture["definitions"]]
         store = serialize_alert_store(definitions)
         self.assertEqual(store["schema"], ALERT_STORE_SCHEMA)
         self.assertEqual(store["version"], 1)
-        persisted_ids = {alert["alert_id"] for alert in store["alerts"]}
-        self.assertEqual(persisted_ids, {"p6-expired"})  # only non-session expiry persists
+        # Session-expiry definitions persist so a reload within the same
+        # session keeps them; the app-side loader drops them when a new
+        # session starts (new browser tab or desktop app launch).
+        expected_ids = [definition["alert_id"] for definition in definitions]
+        self.assertEqual([alert["alert_id"] for alert in store["alerts"]], expected_ids)
         parsed = parse_alert_store(store, self.admitted)
-        self.assertEqual([alert["alert_id"] for alert in parsed], ["p6-expired"])
+        self.assertEqual([alert["alert_id"] for alert in parsed], expected_ids)
 
     def test_store_parse_is_fail_closed(self) -> None:
         until_definitions = [

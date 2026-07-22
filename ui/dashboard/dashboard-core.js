@@ -562,15 +562,21 @@
     };
   }
 
+  // The store keeps session-expiry definitions so they survive a reload
+  // within the same session; the app loader drops them when a new session
+  // starts via dropSessionAlertDefinitions.
   function alertStorePayload(state) {
-    var definitions = normalizeAlertDefinitions(state && state.alerts ? state.alerts.definitions : []);
     return {
       schema: ALERT_STORE_SCHEMA,
       version: 1,
-      alerts: definitions.filter(function (definition) {
-        return !(definition.expiry && definition.expiry.policy === "session");
-      })
+      alerts: normalizeAlertDefinitions(state && state.alerts ? state.alerts.definitions : [])
     };
+  }
+
+  function dropSessionAlertDefinitions(definitions) {
+    return normalizeAlertDefinitions(definitions).filter(function (definition) {
+      return !(definition.expiry && definition.expiry.policy === "session");
+    });
   }
 
   function watchlistItemsForActiveGroup(state) {
@@ -604,6 +610,7 @@
     klineModel: klineModel,
     watchlistPayload: watchlistPayload,
     alertStorePayload: alertStorePayload,
+    dropSessionAlertDefinitions: dropSessionAlertDefinitions,
     normalizeAlertDefinitions: normalizeAlertDefinitions,
     mergeAlertEvents: mergeAlertEvents,
     watchlistItemsForActiveGroup: watchlistItemsForActiveGroup,
