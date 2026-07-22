@@ -1,0 +1,100 @@
+{
+  "schema": "tw-quant-engine-tqr-wireframe-rwd/v1",
+  "decision_id": "TQR-WIREFRAME-002",
+  "spec": {
+    "path": "docs/tqr-research-platform-spec.md",
+    "section": "Wireframe and responsive contract",
+    "acceptance_rule": "At 1440, 1280, 1024, 820, 720, and 390 px, the watchlist regions do not overlap and documentElement.scrollWidth <= innerWidth."
+  },
+  "status": "pass",
+  "commands": [
+    {
+      "argv": ["npm", "install"],
+      "exit_code": 0,
+      "note": "repo-local install of playwright-core 1.60.0 / lightweight-charts 5.2.0; no global install"
+    },
+    {
+      "argv": ["python3", "scripts/build_dashboard_preview.py"],
+      "exit_code": 0,
+      "note": "rebuild outputs/dashboard-preview (index.html, app.js, dashboard-core.js, styles.css, lightweight-charts.js, tqr-logo.svg)"
+    },
+    {
+      "argv": ["node", "scripts/dashboard-browser-smoke.cjs"],
+      "exit_code": 0,
+      "note": "headless Chromium 148.0.7778.96 via playwright-core; also starts scripts/tqe_sidecar.py on 127.0.0.1 and serves outputs/dashboard-preview on 127.0.0.1"
+    }
+  ],
+  "breakpoints": [
+    {
+      "width": 1440,
+      "height": 900,
+      "scroll_width": 1440,
+      "inner_width": 1440,
+      "horizontal_overflow": false,
+      "watchlist_regions_overlap": false,
+      "result": "pass"
+    },
+    {
+      "width": 1280,
+      "height": 800,
+      "scroll_width": 1280,
+      "inner_width": 1280,
+      "horizontal_overflow": false,
+      "watchlist_regions_overlap": false,
+      "result": "pass"
+    },
+    {
+      "width": 1024,
+      "height": 768,
+      "scroll_width": 1024,
+      "inner_width": 1024,
+      "horizontal_overflow": false,
+      "watchlist_regions_overlap": false,
+      "result": "pass"
+    },
+    {
+      "width": 820,
+      "height": 768,
+      "scroll_width": 820,
+      "inner_width": 820,
+      "horizontal_overflow": false,
+      "watchlist_regions_overlap": false,
+      "result": "pass"
+    },
+    {
+      "width": 720,
+      "height": 768,
+      "scroll_width": 720,
+      "inner_width": 720,
+      "horizontal_overflow": false,
+      "watchlist_regions_overlap": false,
+      "result": "pass"
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "scroll_width": 390,
+      "inner_width": 390,
+      "horizontal_overflow": false,
+      "watchlist_regions_overlap": false,
+      "result": "pass"
+    }
+  ],
+  "browser_smoke": {
+    "status": "pass",
+    "functional_pass": true,
+    "visual_baseline_pass": true,
+    "browser_version": "148.0.7778.96",
+    "browser_errors": [],
+    "external_requests": [],
+    "pixel_mismatches": [],
+    "screenshot_dir": "outputs/dashboard-browser"
+  },
+  "acceptance_notes": [
+    "All six TQR-WIREFRAME-002 breakpoints (1440/1280/1024/820/720/390 px) pass: documentElement.scrollWidth equals innerWidth at every breakpoint, so the application document has no horizontal scrollbar.",
+    "The four watchlist command regions (group management, symbol search plus primary add action, clear/save actions, persistence status) do not overlap at any breakpoint; the smoke asserts pairwise bounding-box non-overlap at each size.",
+    "Browser smoke reports no page errors and no non-loopback/external requests; the visual baseline (8 deterministic screenshot hashes) also matches.",
+    "Table overflow stays inside .table-responsive wrappers; the overflow check is against the document root, matching the spec acceptance criterion.",
+    "Evidence produced on the current working tree, which includes the staged modification to scripts/dashboard-browser-smoke.cjs; no git mutations were performed."
+  ]
+}

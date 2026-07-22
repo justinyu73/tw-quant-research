@@ -1,0 +1,85 @@
+{
+  "schema": "tw-quant-engine-tqr-unavailable-field-contracts/v1",
+  "artifact_kind": "acceptance_evidence",
+  "status": "pass",
+  "spec": {
+    "path": "docs/tqr-research-platform-spec.md",
+    "status": "active",
+    "decision": "TQR-IA-002"
+  },
+  "contract_file": {
+    "path": "workflow/tqr-unavailable-field-contracts.json",
+    "schema": "tw-quant-engine-tqr-unavailable-field-contracts/v1",
+    "contract_set_id": "tqr-unavailable-field-contracts/v1",
+    "status": "defined_pending_source_admission"
+  },
+  "coverage": {
+    "unavailable_category_count": 12,
+    "categories": [
+      "financial_tracker_official_fundamentals",
+      "forward_eps_pe",
+      "adjusted_close",
+      "market_breadth_and_institutional_flows",
+      "external_risk_indicators",
+      "regime_inputs",
+      "zscore_computed_field",
+      "manual_observation_fields",
+      "fair_value_worksheet",
+      "formula_and_factor_draft",
+      "validation_settings_draft",
+      "tranche_risk_planning_vocabulary"
+    ]
+  },
+  "spec_cross_check": [
+    {"spec_lines": "49-51", "item": "financial tracker monthly revenue renders unavailable", "contract_id": "tqr-unavailable/financial-tracker-official-fundamentals", "result": "pass"},
+    {"spec_lines": "50", "item": "financial tracker EPS renders unavailable", "contract_id": "tqr-unavailable/financial-tracker-official-fundamentals", "result": "pass"},
+    {"spec_lines": "50", "item": "financial tracker margin renders unavailable", "contract_id": "tqr-unavailable/financial-tracker-official-fundamentals", "result": "pass"},
+    {"spec_lines": "50", "item": "financial tracker ROE renders unavailable", "contract_id": "tqr-unavailable/financial-tracker-official-fundamentals", "result": "pass"},
+    {"spec_lines": "50", "item": "financial tracker cash flow renders unavailable", "contract_id": "tqr-unavailable/financial-tracker-official-fundamentals", "result": "pass"},
+    {"spec_lines": "50-51", "item": "TTM valuation renders unavailable", "contract_id": "tqr-unavailable/financial-tracker-official-fundamentals", "result": "pass"},
+    {"spec_lines": "51", "item": "percentile valuation renders unavailable", "contract_id": "tqr-unavailable/financial-tracker-official-fundamentals", "result": "pass"},
+    {"spec_lines": "51", "item": "enabling requires free-source, normalization, PIT, and quality contracts", "contract_id": "tqr-unavailable/financial-tracker-official-fundamentals", "result": "pass"},
+    {"spec_lines": "52", "item": "Forward EPS/PE unavailable in this product phase", "contract_id": "tqr-unavailable/forward-eps-pe", "result": "pass"},
+    {"spec_lines": "52-54", "item": "Adjusted Close disabled until adjusted OHLCV and volume policy approved; Close is the only current price basis", "contract_id": "tqr-unavailable/adjusted-close", "result": "pass"},
+    {"spec_lines": "63, 65-68", "item": "advance/decline market breadth needs separately admitted source, renders unavailable", "contract_id": "tqr-unavailable/market-breadth-and-institutional-flows", "result": "pass"},
+    {"spec_lines": "66-68", "item": "institutional flows need separately admitted source, render unavailable", "contract_id": "tqr-unavailable/market-breadth-and-institutional-flows", "result": "pass"},
+    {"spec_lines": "63, 66-68", "item": "VIX needs separately admitted source, renders unavailable", "contract_id": "tqr-unavailable/external-risk-indicators", "result": "pass"},
+    {"spec_lines": "63, 66-68", "item": "DXY needs separately admitted source, renders unavailable", "contract_id": "tqr-unavailable/external-risk-indicators", "result": "pass"},
+    {"spec_lines": "63, 66-68", "item": "US 10-year yield needs separately admitted source, renders unavailable", "contract_id": "tqr-unavailable/external-risk-indicators", "result": "pass"},
+    {"spec_lines": "63, 66-68", "item": "FX needs separately admitted source, renders unavailable", "contract_id": "tqr-unavailable/external-risk-indicators", "result": "pass"},
+    {"spec_lines": "63, 66-68", "item": "futures position needs separately admitted source, renders unavailable", "contract_id": "tqr-unavailable/external-risk-indicators", "result": "pass"},
+    {"spec_lines": "85-88", "item": "Z-score exposes setting vocabulary only; no calculation result without admitted price-policy contract", "contract_id": "tqr-draft/zscore-computed-field", "result": "pass"},
+    {"spec_lines": "47, 77-83", "item": "manual observation fields (industry theme, watch status, human fundamental score, human note) are local prototype drafts", "contract_id": "tqr-draft/manual-observation-fields", "result": "pass"},
+    {"spec_lines": "96, 98-100", "item": "fair-value worksheet manual inputs labelled draft; not market consensus or official forward estimate", "contract_id": "tqr-draft/fair-value-worksheet", "result": "pass"},
+    {"spec_lines": "28, 102-123", "item": "formula rows are UI drafts; P1 does not execute nested logic or derive missing inputs", "contract_id": "tqr-draft/formula-and-factor", "result": "pass"},
+    {"spec_lines": "125-128", "item": "factor definitions and total score are future/human-run, never automatic", "contract_id": "tqr-draft/formula-and-factor", "result": "pass"},
+    {"spec_lines": "132-135", "item": "regime inputs (index/MA, rolling return, volatility, breadth, futures positioning, VIX) remain unavailable unless source admitted", "contract_id": "tqr-unavailable/regime-inputs", "result": "pass"},
+    {"spec_lines": "34-37, 137-141", "item": "tranche planning, allocation methods, and risk limits are explicit human plans, not an execution engine", "contract_id": "tqr-draft/tranche-and-risk-planning", "result": "pass"},
+    {"spec_lines": "30, 147-157", "item": "validation settings are a local draft with PIT-safe signal/fill invariant", "contract_id": "tqr-draft/validation-settings", "result": "pass"},
+    {"spec_lines": "157-161", "item": "saved report metrics only from a reproducible saved result", "contract_id": "tqr-draft/validation-settings", "result": "pass"}
+  ],
+  "cross_check_summary": {
+    "spec_items_checked": 26,
+    "items_with_contract": 26,
+    "items_without_contract": 0,
+    "result": "pass"
+  },
+  "offline_verification": {
+    "contract_json_parse": {
+      "argv": ["python3", "-c", "import json; json.load(open('workflow/tqr-unavailable-field-contracts.json'))"],
+      "exit_code": 0
+    },
+    "network": false,
+    "provider_calls": 0,
+    "git_mutations": 0,
+    "spec_modified": false,
+    "fields_enabled": 0
+  },
+  "acceptance_notes": [
+    "Every unavailable, disabled, and draft-only item in docs/tqr-research-platform-spec.md maps to exactly one contract in workflow/tqr-unavailable-field-contracts.json; 26 of 26 spec items cross-checked pass.",
+    "Twelve contract categories are defined: six unavailable (official fundamentals, forward EPS/PE, adjusted close, market breadth and institutional flows, external-risk indicators, regime inputs) and six draft (Z-score computed field, manual observation fields, fair-value worksheet, formula and factor, validation settings, tranche and risk planning).",
+    "Each contract records its field list, render behaviour (unavailable/disabled/draft), required source type, enabling preconditions, and spec line references; enabling preconditions cite the spec's free-source, normalization, PIT, and quality requirements and, for Adjusted Close, the P5.1 unblock plus P5.4 application in workflow/tqe-p5-adjusted-ohlcv-volume-policy.json.",
+    "The spec was not modified and no field was enabled; the contract file carries an explicit cannot_claim list covering field enablement, draft promotion, source admission, spec modification, P5.1 unblock, and nested-logic execution.",
+    "No git mutations were performed; verification was offline JSON parsing only."
+  ]
+}

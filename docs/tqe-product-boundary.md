@@ -61,7 +61,7 @@ Status: active
 
 The desktop product uses one research-terminal shell across all pages. The
 information architecture is fixed as `行情：市場首頁／行情分析／我的自選／技術指標`、
-`研究：選股中心／財報／回測報告`、`記錄：研究筆記／資料來源`。 Each page keeps the
+`研究計畫：因子與公式／財務追蹤／驗證報告`、`記錄：研究筆記／資料來源`。 Each page keeps the
 same page header, content width, card header, control row, table overflow, and
 status treatment; only the page-specific read model changes.
 
@@ -86,3 +86,22 @@ The shared visual contract is:
 This section is the canonical UI decision for the shared dashboard CSS. The
 implementation may add page-specific classes only when they preserve this
 hierarchy and responsive contract.
+
+## Research planning and tracking prototype v1
+
+Decision: `TQR-IA-002`
+Status: active
+Authority: [`docs/tqr-research-platform-spec.md`](tqr-research-platform-spec.md)
+
+This decision adds the P1 personal-research prototype without widening the
+product into an automatic strategy service. It defines three usable work
+areas: a watchlist comparison surface, a formula/condition draft editor, and
+a validation-settings/report surface. Financial tracking adds human-entered
+industry, observation status, score, and notes as local prototype drafts;
+official financial fields remain unavailable until their free-source and PIT
+contracts are admitted.
+
+The detailed IA, field availability, formula editor, validation settings,
+wireframes, and acceptance criteria have exactly one authority: the linked
+specification. The five named documentation entry points are navigational
+pointers only and must not redefine these decisions.
