@@ -1,0 +1,95 @@
+{
+  "schema": "tw-quant-engine-p6-in-app-alerts/v1",
+  "stage_id": "P6-alerts",
+  "status": "implemented_pending_human_acceptance",
+  "recorded_at": "2026-07-22T12:46:29Z",
+  "work_unit": {
+    "path": "workflow/tqe-p6-in-app-alerts.work-unit.draft.json",
+    "work_unit_id": "tw-quant-engine-p6-in-app-alerts-001",
+    "approved_digest": "sha256:e8eb6ca2bcc6b0f65c35d0d2aabbd503833945c58dd7e2031fb7473c0dac3443",
+    "approval_evidence": "workflow/evidence/p6-in-app-alerts-work-unit-approval.acceptance.json"
+  },
+  "contract": "docs/tqe-p6-in-app-alerts-contract.md",
+  "channels": ["in_app"],
+  "external_channels": {
+    "email": "unapproved",
+    "webhook": "unapproved",
+    "push": "unapproved",
+    "sms": "unapproved",
+    "note": "No external delivery channel exists in the schema or code; the tqe-in-app-alert/v1 definition has no channel field and any extra field is rejected fail-closed at validation."
+  },
+  "network": false,
+  "provider_calls": false,
+  "implementation_slices": {
+    "1_schema_validation": "src/tw_quant_engine/alerts.py validate_alert() — tqe-in-app-alert/v1 fail-closed rejection (bad schema, unknown condition/indicator/field, target outside admitted universe, malformed dedup/expiry, unknown fields incl. any channel field).",
+    "2_evaluator": "src/tw_quant_engine/alerts.py evaluate_alerts() — deterministic, explicit-now, over admitted read-model data (price_threshold close, indicator_threshold ma/ema/rsi/macd/kd/atr from the kline read model); src/tw_quant_engine/desktop_sidecar.py GET /alerts loopback route.",
+    "3_dedup_expiry": "src/tw_quant_engine/alerts.py — once_per_session / cooldown_seconds via caller-owned session_state; session / until expiry (until boundary inclusive-expired at now >= until).",
+    "4_persistence": "serialize_alert_store()/parse_alert_store() flat versioned JSON tqe-in-app-alerts/v1; session-expiry alerts are dropped at save (session semantics); desktop Tauri commands frontend/src-tauri/src/alerts.rs load_alerts/save_alerts (atomic write, watchlist.rs style) registered in frontend/src-tauri/src/lib.rs; ui/dashboard/app.js dual path — Tauri invoke when the desktop shell is present, localStorage key tqe-in-app-alerts.v1 otherwise.",
+    "5_presentation": "ui/dashboard/app.js alertsMarkup() research-only alerts panel in the market section; reducer/actions in ui/dashboard/dashboard-core.js; no order-like affordance, wording, or control.",
+    "6_fixture_tests": "tests/fixtures/p6/alerts.json + tests/test_p6_in_app_alerts.py (14 tests: exact fired set, skip reasons, determinism, dedup replay, expiry boundary, fail-closed store parse, in-app-only delivery stub, sidecar route); tests/dashboard-core.test.cjs extended (alert reducer, store payload, in_app-only event merge).",
+    "7_evidence": "this file."
+  },
+  "offline_verification": {
+    "full_tests": {
+      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests"],
+      "exit_code": 0,
+      "result": "152 tests OK, 1 skipped"
+    },
+    "dashboard_core_node": {
+      "argv": ["node", "tests/dashboard-core.test.cjs"],
+      "exit_code": 0,
+      "result": "status pass (checks include in-app-alerts)"
+    },
+    "p4_closure": {
+      "argv": ["python3", "scripts/p4_research_closure.py"],
+      "exit_code": 0,
+      "status": "pass"
+    },
+    "lh_preflight": {
+      "argv": ["python3", "scripts/lh_preflight.py"],
+      "exit_code": 0,
+      "status": "pass"
+    },
+    "cargo_check": {
+      "argv": ["cargo", "check"],
+      "cwd": "frontend/src-tauri",
+      "exit_code": 0,
+      "result": "Finished dev profile; compiles clean with alerts.rs registered"
+    },
+    "cargo_test": {
+      "argv": ["cargo", "test", "--lib"],
+      "cwd": "frontend/src-tauri",
+      "exit_code": 0,
+      "result": "6 passed, 0 failed (3 alerts store tests + 3 watchlist tests)"
+    },
+    "dashboard_alerts_smoke": {
+      "argv": ["node", "scripts/dashboard-alerts-smoke.cjs"],
+      "exit_code": 0,
+      "result": "status pass; 12/12 checks (panel rendered, research-only label, no order-like affordance in DOM, add alert, session-expiry excluded from store, evaluation events, loopback-only requests, persistence after reload, fail-closed 400, no unexpected console errors); external_requests []"
+    },
+    "dashboard_browser_smoke": {
+      "argv": ["node", "scripts/dashboard-browser-smoke.cjs"],
+      "exit_code": 0,
+      "result": "status pass; six RWD breakpoints green, external_requests []; market_valid/market_partial/market_future pixel baselines updated after human-reviewed intentional change (alerts panel added to the market side rail)"
+    }
+  },
+  "acceptance_notes": [
+    "Done: all seven implementation slices are implemented and verified offline per the work-unit verification commands; p4_research_closure.py passed before and after implementation.",
+    "Done: evaluation runs only in the local engine (src/tw_quant_engine/alerts.py) over admitted fixture/read-model data; the only delivery is the in-app event (channel in_app, research_only true).",
+    "Done: alert definitions persist session-locally as flat versioned JSON (tqe-in-app-alerts/v1) and never leave the local machine; firing history (session_state) is session-local in-memory and is not persisted.",
+    "Resolved (2026-07-22, user-approved extension): the earlier deviation is closed — the desktop Tauri command surface now includes alerts::load_alerts/save_alerts (frontend/src-tauri/src/alerts.rs, atomic write following watchlist.rs, same app-data directory, validated tqe-in-app-alerts/v1 store). The user explicitly approved this write-scope expansion on 2026-07-22; scripts/p4_research_closure.py now enforces it via the renamed check tauri_write_scope_is_watchlist_and_alerts (still excluding any order surface). cargo check and cargo test --lib pass; ui/dashboard/app.js uses the Tauri path when the desktop shell is present and the identical localStorage format otherwise.",
+    "Verified in a real browser (scripts/dashboard-alerts-smoke.cjs, headless Chromium): panel renders, research-only wording present, no order-like affordance in the DOM, alert creation persists, evaluation renders in-app events via loopback only (external_requests []), until-expiry alerts survive reload, invalid definitions are rejected with HTTP 400.",
+    "Not done: human acceptance (this status stays implemented_pending_human_acceptance until the gate owner accepts); no external delivery channel; no provider calls; StrategySpec remains not_admitted; capabilities 1, 2, 4, 5, 6 remain untouched.",
+    "The alerts panel degrades to inert when the loopback sidecar is unreachable (research-only error state, no firing)."
+  ],
+  "cannot_claim": [
+    "external delivery channel implemented or approved",
+    "order route, order command, or order UI control",
+    "provider invoked",
+    "alert definitions or history leaving the local machine",
+    "StrategySpec admitted or executed",
+    "capability 1, 2, 4, 5, or 6 activated",
+    "product acceptance",
+    "automatic promotion"
+  ]
+}

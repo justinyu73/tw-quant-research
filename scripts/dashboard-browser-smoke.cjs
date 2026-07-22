@@ -11,9 +11,9 @@ const PREVIEW_DIR = path.join(ROOT, "outputs", "dashboard-preview");
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
   overview: "58ef8f55291112b48b0d8a7f85e38ef62c944930a4b6fe75ae0910bbd735595a",
-  market_valid: "606abde5735689cc8ee06945b0905c0582f7ab500d928d228dffebb4b2121227",
-  market_partial: "bc5f5d95a2610b5c0f687cace296c4f07db8eba018e1fa7faba5b921bb8b288e",
-  market_future: "0b477a3c486eca4975ff330ea2d2547754bb2a32e9a219caa1e38c56e12cf8be",
+  market_valid: "c042cbe10e0debbaf1b8dcf62b0ac0a14641513520ddaaaaf6c56bc0f2ec4438",
+  market_partial: "33981d86d51ed5099e214483e2d430dc348098c83880106ac3fa7ed7428203a4",
+  market_future: "5ccac732b3cfd6fa62756101e7953b5e8172b8fa871230b8322c52bbeaf003f5",
   products: "af79d07eeacddcf8ad14c2867451f5603a3f9e71778093dac61f1a68ba5dea20",
   detail_dialog: "8e580c573538d311ac4153fff9ab0afcbfb39a94d49c0df3b4d419c3ed698a66",
   financial_tracker: "2cba18feec4484f71fcf94bb4e525d3f30d05b2658e9e2dccd4003d7fccdec77",

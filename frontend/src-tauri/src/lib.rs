@@ -6,6 +6,7 @@ use tauri_plugin_shell::ShellExt;
 
 const SIDECAR_NAME: &str = "tqe-sidecar";
 
+mod alerts;
 mod watchlist;
 
 struct SidecarProcess(Mutex<Option<CommandChild>>);
@@ -15,7 +16,9 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             watchlist::load_watchlist,
-            watchlist::save_watchlist
+            watchlist::save_watchlist,
+            alerts::load_alerts,
+            alerts::save_alerts
         ])
         .setup(|app| {
             let data_dir = app.path().app_data_dir().map_err(|error| {
