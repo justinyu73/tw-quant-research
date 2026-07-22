@@ -1,0 +1,67 @@
+{
+  "schema": "tw-quant-engine-tauri-dynamic-sidecar-port/v1",
+  "stage_id": "desktop-dynamic-sidecar-port",
+  "status": "implemented_pending_human_acceptance",
+  "recorded_at": "2026-07-22T14:17:09Z",
+  "approved_by": "user",
+  "approved_at": "2026-07-22",
+  "approval_note": "User approved option 2 on 2026-07-22: the desktop shell picks a free loopback port at startup, passes it to the sidecar via env, and the front end discovers the actual URL, because the previously fixed sidecar port clashed with another local app.",
+  "network": false,
+  "provider_calls": false,
+  "changes": {
+    "tauri": "frontend/src-tauri/src/lib.rs — reserve_loopback_port() binds 127.0.0.1:0 via std::net::TcpListener and releases it; the port is passed to the sidecar process as TQE_SIDECAR_PORT (TQE_DATA_DIR unchanged), stored in app state as SidecarPort, and exposed through the new sidecar_url command registered in invoke_handler.",
+    "sidecar": "scripts/tqe_sidecar.py already honored TQE_SIDECAR_PORT; no sidecar change was needed.",
+    "frontend": "ui/dashboard/app.js — sidecarBaseUrl() now prefers window.__TW_QUANT_SIDECAR_URL__ (dev/preview unchanged), then the cached Tauri-resolved URL, then the 8767 fallback; new ensureSidecarUrl() invokes the sidecar_url command once at startup and caches the result; the initial render is deferred until resolution so every sidecar caller sees the resolved URL.",
+    "docs": "docs/desktop-release.md product-boundary section records the dynamic port behavior."
+  },
+  "known_tradeoffs": [
+    "Bind-then-drop race: between releasing the reserved port and the sidecar binding it, another process could claim the port. Acceptable for a single-user desktop app; the failure mode is a sidecar that fails to start, and the front end then follows its existing connection-error path (no retry added, per approval).",
+    "If the sidecar process exits early, the discovered URL simply stops answering and the UI shows the existing research-only error state.",
+    "The plain static preview and dev flows keep their pinned-port behavior via TQE_SIDECAR_URL / TQE_SIDECAR_PORT; only the Tauri desktop path is dynamic."
+  ],
+  "offline_verification": {
+    "cargo_check": {
+      "argv": ["cargo", "check"],
+      "cwd": "frontend/src-tauri",
+      "exit_code": 0,
+      "result": "Finished dev profile; compiles clean"
+    },
+    "cargo_test": {
+      "argv": ["cargo", "test", "--lib"],
+      "cwd": "frontend/src-tauri",
+      "exit_code": 0,
+      "result": "6 passed, 0 failed"
+    },
+    "full_tests": {
+      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests"],
+      "exit_code": 0,
+      "result": "152 tests OK, 1 skipped"
+    },
+    "dashboard_core_node": {
+      "argv": ["node", "tests/dashboard-core.test.cjs"],
+      "exit_code": 0,
+      "result": "status pass"
+    },
+    "p4_closure": {
+      "argv": ["python3", "scripts/p4_research_closure.py"],
+      "exit_code": 0,
+      "status": "pass",
+      "note": "tauri_write_scope_is_watchlist_and_alerts true; Rust sources contain no order substring; browser code keeps loopback-only invariants"
+    },
+    "dashboard_browser_smoke": {
+      "argv": ["node", "scripts/dashboard-browser-smoke.cjs"],
+      "exit_code": 0,
+      "result": "status pass; pixel_mismatches []; external_requests []"
+    },
+    "dashboard_alerts_smoke": {
+      "argv": ["node", "scripts/dashboard-alerts-smoke.cjs"],
+      "exit_code": 0,
+      "result": "status pass; 12/12 checks; external_requests []"
+    }
+  },
+  "acceptance_notes": [
+    "Done: dynamic loopback port selection in the Tauri shell, env handoff to the sidecar, sidecar_url discovery command, front-end resolution and caching, docs note.",
+    "Not done: real-machine desktop verification (launching the packaged Tauri app and confirming the resolved port end-to-end) — that is a release-gate human item, so this status stays implemented_pending_human_acceptance.",
+    "Unchanged boundaries: no external channel, no provider call, loopback-only browser surface, no order surface of any kind; the six drift-fix files owned by the other work stream were not touched."
+  ]
+}
