@@ -195,6 +195,12 @@
       "enabling_preconditions": [
         "worksheet shows EPS source, PE source, safety margin, formula version, and data status (spec lines 98-99)"
       ],
+      "activation_note": {
+        "note": "The P6 valuation & analysis contract defines the worksheet schema with EPS/PE source labelling, safety margin, formula_version, and data status exactly as required by the enabling precondition; this partially satisfies the precondition at contract-definition level only. Implementation and landing have not been done; render_behavior stays draft and no status is flipped by this note.",
+        "contract": "docs/tqe-p6-valuation-analysis-contract.md",
+        "work_unit_draft": "workflow/tqe-p6-valuation-analysis.work-unit.draft.json",
+        "date": "2026-07-22"
+      },
       "spec_sections": [
         {"section": "Field dictionary / Fundamentals and valuation", "lines": "96, 98-100"}
       ]

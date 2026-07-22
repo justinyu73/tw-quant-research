@@ -33,10 +33,10 @@ class K4KlineUiContractTests(unittest.TestCase):
             build_preview(output)
             app = (output / "app.js").read_text(encoding="utf-8").lower()
             template = (output / "index.html").read_text(encoding="utf-8").lower()
-        for token in ("kline-chart", "kline-instrument", "kline-period", "kline-indicator", "kline-quality", "kline-coverage", "kline-empty", "technical-snapshot", "technical-value-", "valuation-panel", "valuation-eps", "valuation-pe-low", "valuation-pe-high", "valuation-safety-margin"):
+        for token in ("kline-chart", "kline-instrument", "kline-period", "kline-indicator", "kline-quality", "kline-coverage", "kline-empty", "technical-snapshot", "technical-value-", "valuation-panel", "valuation-form", "valuation-ws-model", "valuation-ws-safety-margin", "valuation-indicators", "valuation-evaluate"):
             self.assertIn(token, app)
-        self.assertIn("尚未套用個人計算規則", app)
-        self.assertIn("不提供網路預設合理價", app)
+        self.assertIn("使用者假設", app)
+        self.assertIn("不構成投資建議", app)
         self.assertIn("fetch(", app)
         self.assertIn("http://127.0.0.1", app)
         self.assertNotIn("xmlhttprequest", app)

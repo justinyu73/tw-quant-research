@@ -1,0 +1,22 @@
+{
+  "schema": "tw-quant-engine-p6-work-unit-approval/v1",
+  "stage_id": "P6-valuation-analysis",
+  "status": "pass",
+  "approval": {
+    "approved_by": "user",
+    "approved_at": "2026-07-22",
+    "approval_note": "User approved the valuation-analysis work-unit digest verbatim: '批准: workflow/tqe-p6-valuation-analysis.work-unit.draft.json（9 個實作切片）等你核准 digest 才實作'.",
+    "work_unit_path": "workflow/tqe-p6-valuation-analysis.work-unit.draft.json",
+    "approved_digest": "sha256:27c1bbb99101052e8bc31ad8f4e5d0a2497e7dc8832692d516bbf1a94c5a80e6",
+    "digest_method": "json.dumps(ensure_ascii=False, sort_keys=True, compact separators) -> sha256, same canonicalization as scripts/p5_work_unit_digest.py"
+  },
+  "precondition_evidence": {
+    "contract": "docs/tqe-p6-valuation-analysis-contract.md",
+    "contract_evidence": "workflow/evidence/p6-valuation-analysis-contract.acceptance.json",
+    "reshape_decision": "User 2026-07-22: capability 5 reshaped to valuation and analysis; paper trading returned to deferred_not_approved."
+  },
+  "acceptance_notes": [
+    "Approval authorizes implementation of the nine slices only; no order or simulated-order surface, no automatic fundamentals ingestion, no investment advice.",
+    "Human acceptance is required after implementation per the work unit activation_requirements."
+  ]
+}

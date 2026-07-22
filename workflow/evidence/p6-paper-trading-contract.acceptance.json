@@ -1,0 +1,94 @@
+{
+  "schema": "tw-quant-engine-p6-paper-trading-contract/v1",
+  "stage_id": "P6-paper-trading-contract",
+  "status": "superseded_by_user_decision_2026_07_22",
+  "superseded_note": {
+    "date": "2026-07-22",
+    "decision": "同意能力 5，但我不需要模擬下單，我要算的是分析和股票價值。",
+    "effect": "Capability 5 reshaped as valuation & analysis; paper trading / simulated order matching returned to deferred_not_approved; broker read-only connector remains a separate unapproved gate.",
+    "active_contract": "docs/tqe-p6-valuation-analysis-contract.md",
+    "active_evidence": "workflow/evidence/p6-valuation-analysis-contract.acceptance.json",
+    "retention": "This evidence and the referenced contract/work-unit draft are retained for audit history only and authorize nothing."
+  },
+  "approval": {
+    "approved_by": "user",
+    "approval_date": "2026-07-22",
+    "activation_order": [3, 5, 2],
+    "capability": 5,
+    "scope": "simulation_only_first_slice",
+    "network_enabled": false,
+    "provider_calls": 0,
+    "credentials": false
+  },
+  "contract": "docs/tqe-p6-paper-trading-simulation-contract.md",
+  "work_unit_draft": "workflow/tqe-p6-paper-trading.work-unit.draft.json",
+  "proposal_section": "docs/tqe-p6-deferred-capability-activation-proposal.md#5-paper-trading--broker-connector",
+  "prerequisite_alignment": [
+    {
+      "prerequisite": "Simulation contract: fill model, fee/slippage assumptions, data inputs, explicit hypothetical statement",
+      "aligned": true,
+      "contract_section": "Simulation contract (fill model) + Cost model",
+      "note": "Fill rule next_trading_day_open on raw OHLCV; parameterized TW fee/tax/slippage with documented defaults; hypothetical-fills statement explicit."
+    },
+    {
+      "prerequisite": "Credential boundary: storage, scope, revocation; read-only scopes only",
+      "aligned": true,
+      "contract_section": "Credential boundary",
+      "note": "Simulation-only slice needs and stores no credentials; any broker connector is a separate subsequent human approval with its own credential boundary."
+    },
+    {
+      "prerequisite": "Order-authority gate: written statement of what the connector may not do, enforced in the command surface",
+      "aligned": true,
+      "contract_section": "Order-authority gate",
+      "note": "Explicit must-not list (place/amend/cancel real orders, no order route/command/UI control, no order-shaped artifact); enforcement via p4_research_closure.py kept passing."
+    },
+    {
+      "prerequisite": "Test and evidence: deterministic simulation tests against fixtures, audit evidence proving no order route exists, acceptance JSON",
+      "aligned": true,
+      "contract_section": "Test and evidence requirements",
+      "note": "Fixture-driven deterministic tests plus no-order-code-path assertions required; this acceptance JSON records scope; work-unit verification includes the P4 audit."
+    },
+    {
+      "prerequisite": "Two independent human approvals: simulation-only first, broker read-only connector second; no combined approval",
+      "aligned": true,
+      "contract_section": "Scope preamble + Credential boundary",
+      "note": "This contract covers the simulation-only slice only; the broker read-only connector is explicitly out of scope and unapproved."
+    }
+  ],
+  "pit_and_price_basis": {
+    "pit_convention": "available_at <= as_of (P5.2)",
+    "fill_price_basis": "raw_ohlcv",
+    "policy_reference": "workflow/tqe-p5-adjusted-ohlcv-volume-policy.json"
+  },
+  "offline_verification": {
+    "p4_closure": {
+      "argv": ["python3", "scripts/p4_research_closure.py"],
+      "exit_code": 0,
+      "status": "pass",
+      "network": false,
+      "provider_calls": 0
+    },
+    "full_tests": {
+      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests"],
+      "exit_code": 0,
+      "result": "152 tests passed, 1 skipped"
+    },
+    "json_load": {
+      "argv": ["python3", "-c", "json.load on new/modified JSON files"],
+      "files": [
+        "workflow/tqe-p6-paper-trading.work-unit.draft.json",
+        "workflow/evidence/p6-paper-trading-contract.acceptance.json"
+      ],
+      "exit_code": 0
+    }
+  },
+  "acceptance_notes": [
+    "Capability 5 contract is drafted for the simulation-only first slice only, per the 2026-07-22 approval order 3 -> 5 -> 2.",
+    "The broker read-only connector remains a separate, independent human approval and is not covered.",
+    "Automatic order placement remains prohibited; the contract forbids any order route, order command, order UI control, or order-shaped artifact.",
+    "StrategySpec remains not_admitted; the slice deliberately uses single-security explicit rules instead of StrategySpec execution semantics, with the rationale recorded in the contract.",
+    "This evidence records a contract and a work-unit draft only; no simulation functionality is implemented. Implementation requires human approval of the work-unit digest.",
+    "Capabilities 1, 4, and 6 remain deferred_not_approved; capability 2 remains approved_next pending capability 5 completion.",
+    "The approved P4 boundary is unchanged and p4_research_closure.py passes."
+  ]
+}

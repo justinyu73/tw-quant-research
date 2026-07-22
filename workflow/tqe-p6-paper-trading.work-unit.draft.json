@@ -1,0 +1,69 @@
+{
+  "schema": "loop-hybrid-work-unit/v2",
+  "status": "superseded_by_user_decision_2026_07_22",
+  "superseded_note": "Human gate owner reshaped capability 5 on 2026-07-22: valuation & analysis replaces paper trading simulation. This draft is retained for audit history only and is not runnable. Active contract: docs/tqe-p6-valuation-analysis-contract.md; active draft: workflow/tqe-p6-valuation-analysis.work-unit.draft.json.",
+  "blocked_reason": "work_unit_not_yet_human_approved",
+  "work_unit_id": "tw-quant-engine-p6-paper-trading-sim-001",
+  "target_repo": "/absolute/path/to/tw-quant-engine",
+  "goal": "Implement the simulation-only paper trading slice per the approved P6 contract: deterministic hypothetical fills (next-trading-day-open rule) over admitted EOD data for a single security with explicit simple rules, parameterized TW fee/tax/slippage cost model, session-local persistence, and research-only hypothetical performance presentation. No broker connector, no credentials, no order artifact of any kind.",
+  "contract": "docs/tqe-p6-paper-trading-simulation-contract.md",
+  "activation_proposal": "docs/tqe-p6-deferred-capability-activation-proposal.md",
+  "network": false,
+  "provider_calls": false,
+  "credentials": false,
+  "host_egress": "not_applicable_zero_network",
+  "mode": "simulation_only",
+  "implementation_slices": [
+    "simulation spec schema validation (tqe-paper-trading-sim/v1) with fail-closed rejection",
+    "local-engine deterministic fill model: next_trading_day_open on raw OHLCV with PIT (available_at <= as_of) visibility",
+    "parameterized TW cost model (brokerage fee, fee discount, sell-side transaction tax, slippage bps)",
+    "hypothetical trade and performance record computation with explicit cost-model echo",
+    "session-local persistence of specs and results (flat versioned JSON, watchlist/alerts style)",
+    "research-only in-app presentation (hypothetical performance notes, no order-like affordance, no solicitation language)",
+    "deterministic fixture tests asserting fills, cost arithmetic, PIT behaviour, and absence of any order/credential code path",
+    "acceptance evidence JSON recording simulation_only scope"
+  ],
+  "activation_requirements": [
+    "human approval of this exact work-unit digest",
+    "p4_research_closure.py passing before and after implementation",
+    "offline replay of deterministic fixture tests",
+    "acceptance JSON with mode recorded as simulation_only and broker connector recorded as unapproved",
+    "human acceptance after implementation"
+  ],
+  "verification": [
+    {
+      "id": "offline-tests",
+      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
+      "timeout_seconds": 180,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "engine-preflight",
+      "argv": ["python3", "scripts/lh_preflight.py"],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "p4-closure",
+      "argv": ["python3", "scripts/p4_research_closure.py"],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    }
+  ],
+  "cannot_claim": [
+    "broker connector implemented or approved",
+    "order route, order command, or order UI control",
+    "credentials stored or used",
+    "StrategySpec admitted or executed",
+    "intraday, delayed, or realtime data used",
+    "provider invoked",
+    "simulated results presented as solicitation or performance promise",
+    "specs or results leaving the local machine",
+    "capability 1, 2, 4, or 6 activated",
+    "product acceptance",
+    "automatic promotion"
+  ]
+}
