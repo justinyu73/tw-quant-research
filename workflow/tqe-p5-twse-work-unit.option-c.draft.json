@@ -22,8 +22,26 @@
     "session_list_source": {
       "endpoint": "https://openapi.twse.com.tw/v1/holidaySchedule/holidaySchedule",
       "coverage_required": "2023-07-20..2026-07-19",
-      "digest_status": "pending_capture_at_activation",
-      "binding": "calendar response sha256 must be recorded in this work-unit digest before any session GET"
+      "digest_status": "captured_2026-07-22_partial_coverage",
+      "captured_calendar": {
+        "method": "GET",
+        "fetched_at": "2026-07-22T21:56:13.158Z",
+        "http_status": 200,
+        "content_type": "application/json",
+        "response_bytes": 3774,
+        "response_sha256": "sha256:7644c1a8af784c09f54670fd7413f536b13eb76c54d658058e8873d1aee32117",
+        "raw_file": "outputs/p5-trial-capture/holidaySchedule.json",
+        "covered_gregorian_years": ["2026"],
+        "coverage_limitation": "The official holidaySchedule endpoint returns only the current ROC year (115 = 2026); 2023-07-20..2025-12-31 is not covered by this capture."
+      },
+      "session_list_file": "workflow/tqe-p5-option-c-session-list.json",
+      "session_list_status": "partial_calendar_coverage_pending_full_window_enumeration",
+      "enumerated_sessions": 129,
+      "enumerated_segment": "2026-01-01..2026-07-19",
+      "uncovered_segment": "2023-07-20..2025-12-31",
+      "estimated_total_sessions": 727,
+      "coverage_gap_handling": "See workflow/tqe-p5-option-c-session-list.json coverage_gap_handling_options; per-year official calendar captures are extra GETs and require separate user approval before execution.",
+      "binding": "The calendar response sha256 recorded here is bound to this work-unit; the full-window session enumeration and its own digest must replace the partial list before any session GET"
     },
     "session_count_cap": 750,
     "session_enumeration": "every trading session in the approved calendar-derived list is enumerated explicitly in the finalized work-unit before host egress; no date arithmetic at run time",
@@ -54,11 +72,28 @@
       "url": "exact GET URL issued",
       "retrieval_timestamp": "ISO-8601 with +08:00 offset",
       "http_status": "integer",
-      "response_bytes": "integer",
-      "response_sha256": "sha256:<hex>",
+      "response_bytes": "integer, uncompressed CSV",
+      "response_sha256": "sha256:<hex> of the uncompressed CSV bytes",
+      "gzip_bytes": "integer, stored .csv.gz size",
+      "gzip_sha256": "sha256:<hex> of the stored .csv.gz file",
       "row_count_full_market_section": "integer",
       "result": "captured|failed_stop"
-    }
+    },
+    "fixture_retention_policy": "workflow/tqe-p5-option-c-fixture-retention-policy.json (status pending_human_approval)"
+  },
+  "approval_packet": {
+    "purpose": "single human approval point before host egress",
+    "prepared_at": "2026-07-22",
+    "ready_for_user_review": true,
+    "user_approves_in_one_decision": [
+      "calendar digest binding recorded in bounded_capture_loop.session_list_source.captured_calendar",
+      "fixture retention policy workflow/tqe-p5-option-c-fixture-retention-policy.json",
+      "full-window enumerated session list replacing workflow/tqe-p5-option-c-session-list.json partial list (requires resolving the 2023-2025 calendar coverage gap first)",
+      "the final sha256 digest of this work-unit after that replacement"
+    ],
+    "not_yet_approvable": [
+      "per_session_work_unit_digest: blocked until the full-window session enumeration exists; current digest is template-only"
+    ]
   },
   "activation_requirements": [
     "first_human_trial_capture_sha256_bytes_and_timestamp_for_one_recent_session",
