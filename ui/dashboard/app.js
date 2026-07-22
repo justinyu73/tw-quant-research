@@ -16,6 +16,7 @@
   var watchlistSaveInFlight = false;
   var WATCHLIST_LOCAL_STORAGE_KEY = "tw-quant-engine-watchlist.v1";
   var NOTES_LOCAL_STORAGE_KEY = "tw-quant-engine-research-notes.v1";
+  var ALERTS_LOCAL_STORAGE_KEY = "tqe-in-app-alerts.v1";
   var FINANCIAL_REVIEW_LOCAL_STORAGE_KEY = "tw-quant-engine-financial-review.prototype-v1";
   var BACKTEST_SETTINGS_LOCAL_STORAGE_KEY = "tw-quant-engine-backtest-settings.prototype-v1";
   var watchlistModelRequests = {};
@@ -38,6 +39,24 @@
   var backtestSettingsDraft = defaultBacktestSettingsDraft();
   var backtestSettingsSaved = false;
   var dataUpdateInFlight = false;
+  var alertsLoadStarted = false;
+  var alertsPersistenceAvailable = null;
+  var alertEvaluateInFlight = false;
+  var alertDraft = defaultAlertDraft();
+
+  function defaultAlertDraft() {
+    return {
+      label: "",
+      conditionType: "price_threshold",
+      indicator: "ma",
+      op: ">=",
+      value: "",
+      dedupPolicy: "once_per_session",
+      cooldownSeconds: "3600",
+      expiryPolicy: "session",
+      until: ""
+    };
+  }
 
   function chartTemplateLabel(name) {
     return name === "research" ? "研究模板" : "預設模板";
@@ -309,11 +328,62 @@
       '<div class="story-board"><section class="story-board-main">' + card("我的研究記錄", "像 XQ 的自訂追蹤欄位，也保留 FinLab 的研究脈絡", notesMarkup(), "") + card("事件時間線", "公告／財報／除權息／產業變化", '<div class="timeline"><div><span class="timeline-dot"></span><div><strong>等待免費官方事件來源</strong><small>尚未抓取；不以新聞摘要代替原始證據。</small></div></div><div><span class="timeline-dot muted-dot"></span><div><strong>人為新增下一個檢查點</strong><small>保存日期、來源、觀察與結論。</small></div></div></div>', "") + '</section><aside class="story-board-rail">' + card("筆記欄位", "個人研究工具", '<div class="story-field-list"><div><span>標的</span><strong>目前行情標的</strong></div><div><span>支持</span><strong>財報與公開公告</strong></div><div><span>反證</span><strong>數據衰退或來源衝突</strong></div><div><span>狀態</span><strong>本機草稿 · 人工審查</strong></div></div>', "") + card("資料規則", "免費資料本地保存", '<p class="research-boundary">行情、財報與筆記分開保存；筆記不會改寫官方資料，也不會被當成回測輸入。每一筆記錄都保留建立時間與目前標的。</p>', "") + '</aside></div>';
   }
 
+  function alertSelectOptions(pairs, selected) {
+    return pairs.map(function (pair) {
+      return '<option value="' + escapeHtml(pair[0]) + '"' + (pair[0] === selected ? ' selected' : '') + '>' + text(pair[1]) + '</option>';
+    }).join("");
+  }
+
+  function alertDedupLabel(dedup) {
+    if (dedup && dedup.policy === "cooldown_seconds") return "冷卻 " + text(dedup.cooldown_seconds) + " 秒";
+    return "每工作階段一次";
+  }
+
+  function alertExpiryLabel(expiry) {
+    if (expiry && expiry.policy === "until") return "有效至 " + text(expiry.until);
+    return "本工作階段";
+  }
+
+  function alertsMarkup() {
+    var alerts = state.alerts || { definitions: [], events: [], status: "idle", message: "" };
+    var definitions = Array.isArray(alerts.definitions) ? alerts.definitions : [];
+    var events = Array.isArray(alerts.events) ? alerts.events : [];
+    var instrument = selectedKlineInstrument();
+    var symbol = instrument && instrument.symbol;
+    var definitionRows = definitions.length ? definitions.map(function (definition) {
+      return '<article class="alert-definition" data-testid="alert-definition"><div><strong>' + text(definition.label) + '</strong><small>' + text(definition.target && definition.target.security_id) + ' · ' + alertConditionSummary(definition) + ' · ' + alertDedupLabel(definition.dedup) + ' · ' + alertExpiryLabel(definition.expiry) + '</small></div><button class="icon-button" type="button" data-action="alert-delete" data-alert-id="' + escapeHtml(definition.alert_id) + '" aria-label="刪除研究提醒">×</button></article>';
+    }).join("") : '<div class="alert-empty" data-testid="alert-empty">尚未建立研究提醒。</div>';
+    var eventRows = events.length ? events.map(function (item) {
+      return '<article class="alert-event" data-testid="alert-event"><span class="alert-event-badge">研究註記</span><div><strong>' + text(item.label) + '</strong><small>' + text(item.security_id) + ' 觀察值 ' + core.formatNumber(item.observed_value) + ' ' + text(item.op) + ' 門檻 ' + core.formatNumber(item.threshold) + ' · ' + text(item.fired_at) + '</small></div></article>';
+    }).join("") : '<div class="alert-empty" data-testid="alert-event-empty">本工作階段尚無觸發事件。</div>';
+    var statusLine = alerts.status === "error"
+      ? '<p class="alert-status error" data-testid="alert-status">' + text(alerts.message || "研究提醒評估失敗") + '</p>'
+      : "";
+    var form = '<div class="alert-form" data-testid="alert-form">' +
+      '<label><span>名稱</span><input type="text" maxlength="120" placeholder="例如：收盤突破近期高點" value="' + escapeHtml(alertDraft.label) + '" data-action="alert-input" data-field="label" data-testid="alert-label"></label>' +
+      '<label><span>條件</span><select data-action="alert-input" data-field="conditionType" data-testid="alert-condition-type">' + alertSelectOptions([["price_threshold", "收盤價門檻"], ["indicator_threshold", "指標門檻"]], alertDraft.conditionType) + '</select></label>' +
+      '<label><span>指標</span><select data-action="alert-input" data-field="indicator" data-testid="alert-indicator">' + selectOptionMarkup(["ma", "ema", "rsi", "macd", "kd", "atr"], alertDraft.indicator) + '</select></label>' +
+      '<label><span>比較</span><select data-action="alert-input" data-field="op" data-testid="alert-op">' + alertSelectOptions([[">=", ">="], ["<=", "<="]], alertDraft.op) + '</select></label>' +
+      '<label><span>門檻值</span><input type="number" step="any" placeholder="數值" value="' + escapeHtml(alertDraft.value) + '" data-action="alert-input" data-field="value" data-testid="alert-value"></label>' +
+      '<label><span>重複觸發</span><select data-action="alert-input" data-field="dedupPolicy" data-testid="alert-dedup">' + alertSelectOptions([["once_per_session", "每工作階段一次"], ["cooldown_seconds", "冷卻秒數"]], alertDraft.dedupPolicy) + '</select></label>' +
+      '<label><span>冷卻秒數</span><input type="number" min="1" step="1" value="' + escapeHtml(alertDraft.cooldownSeconds) + '" data-action="alert-input" data-field="cooldownSeconds" data-testid="alert-cooldown"></label>' +
+      '<label><span>有效期限</span><select data-action="alert-input" data-field="expiryPolicy" data-testid="alert-expiry">' + alertSelectOptions([["session", "本工作階段"], ["until", "直到指定時間"]], alertDraft.expiryPolicy) + '</select></label>' +
+      '<label><span>到期時間</span><input type="datetime-local" value="' + escapeHtml(alertDraft.until) + '" data-action="alert-input" data-field="until" data-testid="alert-until"></label>' +
+      '<button class="btn btn-outline btn-sm" type="button" data-action="alert-add" data-testid="alert-add"' + (symbol && String(alertDraft.label || "").trim() && alertDraft.value !== "" ? "" : " disabled") + '>新增提醒（' + text(symbol || "未選標的") + '）</button></div>';
+    return card("研究提醒", "本機引擎評估 · 僅研究用途 · 非交易指示", '<div class="alerts-panel" data-testid="alerts-panel">' +
+      form + statusLine +
+      '<div class="alert-definition-list" data-testid="alert-definition-list">' + definitionRows + '</div>' +
+      '<div class="alert-toolbar"><button class="btn btn-primary btn-sm" type="button" data-action="alert-evaluate" data-testid="alert-evaluate"' + (definitions.length && !alertEvaluateInFlight ? "" : " disabled") + '>' + (alertEvaluateInFlight ? "評估中…" : "立即評估") + '</button>' +
+      '<button class="btn btn-outline btn-sm" type="button" data-action="alert-clear-events" data-testid="alert-clear-events"' + (events.length ? "" : " disabled") + '>清除事件</button></div>' +
+      '<div class="alert-event-list" data-testid="alert-event-list">' + eventRows + '</div>' +
+      '<p class="alert-note">提醒定義只保存在本機（tqe-in-app-alerts/v1），由本機引擎對已納入資料評估；結果僅在此工作階段顯示，沒有任何外部遞送，也不提供任何下單或執行功能。</p></div>', "");
+  }
+
   function marketTerminalMarkup() {
     return pageHeader("行情分析", "TradingView / MultiCharts 型個人市場終端") +
       quoteHeaderMarkup() +
       '<nav class="terminal-tabs" aria-label="標的分析分頁"><button class="terminal-tab active" type="button" data-action="section" data-section="market">行情</button><button class="terminal-tab" type="button" data-action="section" data-section="features">技術指標</button><button class="terminal-tab" type="button" data-action="section" data-section="fundamentals">財報</button><button class="terminal-tab" type="button" data-action="section" data-section="stories">研究筆記</button></nav>' +
-      '<div class="market-terminal-layout"><main class="market-terminal-chart">' + klineMarkup() + '</main><aside class="market-terminal-side">' + compactWatchlistMarkup() + card("快速記錄", "把目前畫面留下來", '<div class="quick-record"><p>看完價格、成交量與技術線後，直接留下你的觀察。</p><button class="btn btn-primary" type="button" data-action="section" data-section="stories">新增研究筆記</button></div>', "") + '</aside></div>';
+      '<div class="market-terminal-layout"><main class="market-terminal-chart">' + klineMarkup() + '</main><aside class="market-terminal-side">' + compactWatchlistMarkup() + alertsMarkup() + card("快速記錄", "把目前畫面留下來", '<div class="quick-record"><p>看完價格、成交量與技術線後，直接留下你的觀察。</p><button class="btn btn-primary" type="button" data-action="section" data-section="stories">新增研究筆記</button></div>', "") + '</aside></div>';
   }
 
   function analysisRailMarkup() {
@@ -537,6 +607,142 @@
   function persistNotes() {
     if (notesPersistenceAvailable !== "browser") return false;
     return saveLocalNotes(state.notes || []);
+  }
+
+  function parseAlertStore(raw) {
+    var payload = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!payload || payload.schema !== core.ALERT_STORE_SCHEMA || payload.version !== 1 || !Array.isArray(payload.alerts)) {
+      throw new Error("alert store schema mismatch");
+    }
+    return payload.alerts;
+  }
+
+  function localAlertDefinitions() {
+    try {
+      if (!window.localStorage) return [];
+      var raw = window.localStorage.getItem(ALERTS_LOCAL_STORAGE_KEY);
+      return raw ? parseAlertStore(raw) : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function saveLocalAlerts(payload) {
+    try {
+      if (!window.localStorage) return false;
+      window.localStorage.setItem(ALERTS_LOCAL_STORAGE_KEY, JSON.stringify(payload));
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function ensureAlertsRuntime() {
+    if (alertsLoadStarted) return;
+    alertsLoadStarted = true;
+    // Session-local store owned by the local app: the desktop shell keeps the
+    // tqe-in-app-alerts/v1 flat JSON via Tauri commands; the browser preview
+    // uses the same format in localStorage (watchlist-style dual path).
+    tauriInvoke("load_alerts", {})
+      .then(function (raw) {
+        alertsPersistenceAvailable = true;
+        state = core.reduce(state, { type: "SET_ALERTS", definitions: parseAlertStore(raw) });
+        render();
+      })
+      .catch(function () {
+        alertsPersistenceAvailable = "browser";
+        state = core.reduce(state, { type: "SET_ALERTS", definitions: localAlertDefinitions() });
+        render();
+      });
+  }
+
+  function persistAlerts() {
+    var payload = core.alertStorePayload(state);
+    if (alertsPersistenceAvailable === true) {
+      tauriInvoke("save_alerts", { content: JSON.stringify(payload) }).catch(function () {
+        alertsPersistenceAvailable = "browser";
+        saveLocalAlerts(payload);
+      });
+      return true;
+    }
+    return saveLocalAlerts(payload);
+  }
+
+  function alertConditionSummary(definition) {
+    var condition = definition && definition.condition ? definition.condition : {};
+    if (condition.type === "price_threshold") return "收盤價 " + text(condition.op) + " " + core.formatNumber(condition.value);
+    if (condition.type === "indicator_threshold") {
+      var params = condition.params && condition.params.period ? "(" + condition.params.period + ")" : "";
+      return text(String(condition.indicator || "").toUpperCase() + params) + " " + text(condition.op) + " " + core.formatNumber(condition.value);
+    }
+    return "未知條件";
+  }
+
+  function buildAlertFromDraft() {
+    var instrument = selectedKlineInstrument();
+    var symbol = instrument && instrument.symbol;
+    var value = Number(alertDraft.value);
+    if (!symbol || !String(alertDraft.label || "").trim() || !Number.isFinite(value)) return null;
+    var condition = alertDraft.conditionType === "indicator_threshold"
+      ? { type: "indicator_threshold", indicator: alertDraft.indicator, params: {}, op: alertDraft.op, value: value }
+      : { type: "price_threshold", field: "close", op: alertDraft.op, value: value };
+    var dedup = alertDraft.dedupPolicy === "cooldown_seconds"
+      ? { policy: "cooldown_seconds", cooldown_seconds: Math.max(1, Math.round(Number(alertDraft.cooldownSeconds) || 3600)) }
+      : { policy: "once_per_session" };
+    var expiry = { policy: "session" };
+    if (alertDraft.expiryPolicy === "until" && alertDraft.until) {
+      var until = new Date(alertDraft.until);
+      if (isNaN(until.getTime())) return null;
+      expiry = { policy: "until", until: until.toISOString() };
+    }
+    return {
+      schema: "tqe-in-app-alert/v1",
+      alert_id: "alert-" + Date.now(),
+      label: String(alertDraft.label).trim().slice(0, 120),
+      enabled: true,
+      target: { security_id: symbol },
+      condition: condition,
+      dedup: dedup,
+      expiry: expiry,
+      created_at: new Date().toISOString()
+    };
+  }
+
+  function addAlertFromDraft() {
+    var definition = buildAlertFromDraft();
+    if (!definition) return;
+    state = core.reduce(state, { type: "ADD_ALERT", alert: definition });
+    alertDraft = defaultAlertDraft();
+    persistAlerts();
+  }
+
+  function evaluateAlerts() {
+    var definitions = state.alerts && Array.isArray(state.alerts.definitions) ? state.alerts.definitions : [];
+    if (alertEvaluateInFlight) return;
+    if (!definitions.length) {
+      state = core.reduce(state, { type: "ALERTS_ERROR", message: "尚無研究提醒可評估" });
+      render();
+      return;
+    }
+    alertEvaluateInFlight = true;
+    var query = "definitions=" + encodeURIComponent(JSON.stringify(definitions)) +
+      "&state=" + encodeURIComponent(JSON.stringify(state.alertSessionState || {}));
+    sidecarFetch("/alerts?" + query)
+      .then(function (payload) {
+        if (!payload || !payload.data) throw new Error("sidecar returned no alerts data");
+        state = core.reduce(state, {
+          type: "ALERTS_EVALUATED",
+          fired: payload.data.fired,
+          sessionState: payload.data.session_state
+        });
+      })
+      .catch(function (error) {
+        state = core.reduce(state, { type: "ALERTS_ERROR", message: sidecarErrorMessage(error) });
+      })
+      .then(function () {
+        alertEvaluateInFlight = false;
+        render();
+      });
   }
 
   function noteStatus() {
@@ -1271,6 +1477,13 @@
       }
     }
     if (action === "note-submit") addNoteFromDraft();
+    if (action === "alert-add") addAlertFromDraft();
+    if (action === "alert-delete") {
+      state = core.reduce(state, { type: "DELETE_ALERT", alertId: target.getAttribute("data-alert-id") });
+      persistAlerts();
+    }
+    if (action === "alert-evaluate") evaluateAlerts();
+    if (action === "alert-clear-events") state = core.reduce(state, { type: "CLEAR_ALERT_EVENTS" });
     if (action === "screen-condition") {
       var conditionId = target.getAttribute("data-condition-id");
       var conditionIndex = screenConditions.indexOf(conditionId);
@@ -1443,6 +1656,14 @@
       backtestSettingsDraft[target.getAttribute("data-field")] = target.value;
       backtestSettingsSaved = false;
     }
+    if (target.getAttribute("data-action") === "alert-input") {
+      alertDraft[target.getAttribute("data-field")] = target.value;
+      var alertAddButtonOnChange = root.querySelector('[data-testid="alert-add"]');
+      var alertInstrumentOnChange = selectedKlineInstrument();
+      if (alertAddButtonOnChange) {
+        alertAddButtonOnChange.disabled = !(alertInstrumentOnChange && alertInstrumentOnChange.symbol && String(alertDraft.label || "").trim() && alertDraft.value !== "");
+      }
+    }
   });
 
   root.addEventListener("input", function (event) {
@@ -1502,6 +1723,15 @@
       backtestSettingsSaved = false;
       return;
     }
+    if (target.getAttribute("data-action") === "alert-input") {
+      alertDraft[target.getAttribute("data-field")] = target.value;
+      var alertAddButton = root.querySelector('[data-testid="alert-add"]');
+      var alertInstrument = selectedKlineInstrument();
+      if (alertAddButton) {
+        alertAddButton.disabled = !(alertInstrument && alertInstrument.symbol && String(alertDraft.label || "").trim() && alertDraft.value !== "");
+      }
+      return;
+    }
     if (target.getAttribute("data-action") !== "valuation-input") return;
     state = core.reduce(state, {
       type: "SET_VALUATION_INPUT",
@@ -1541,5 +1771,6 @@
 
   loadPrototypeDrafts();
   ensureNotesRuntime();
+  ensureAlertsRuntime();
   render();
 }());
