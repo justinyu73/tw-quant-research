@@ -1,0 +1,43 @@
+{
+  "schema": "tw-quant-engine-p6-work-unit-approval/v1",
+  "stage_id": "P6-alerts",
+  "status": "pass",
+  "approval": {
+    "approved_by": "user",
+    "approved_at": "2026-07-22",
+    "approval_note": "User approved the P6 in-app alerts work-unit digest after the P5.1 trial-capture verification (stock 2308) passed.",
+    "work_unit_path": "workflow/tqe-p6-in-app-alerts.work-unit.draft.json",
+    "work_unit_id": "tw-quant-engine-p6-in-app-alerts-001",
+    "approved_digest": "sha256:e8eb6ca2bcc6b0f65c35d0d2aabbd503833945c58dd7e2031fb7473c0dac3443",
+    "digest_method": "json.dumps(ensure_ascii=False, sort_keys=True, compact separators) -> sha256, same canonicalization as scripts/p5_work_unit_digest.py",
+    "post_approval_changes": "Only the status flip (draft_not_runnable -> approved_pending_implementation) and the embedded approval block; all implementation slices, verification commands, and cannot_claim entries are unchanged from the approved digest."
+  },
+  "precondition_evidence": {
+    "p5_1_trial_capture": "workflow/evidence/p5.1-trial-capture-2308.acceptance.json (status pass)",
+    "contract": "docs/tqe-p6-in-app-alerts-contract.md",
+    "activation_proposal": "docs/tqe-p6-deferred-capability-activation-proposal.md (approved_activation_order_3_5_2)"
+  },
+  "offline_verification": {
+    "full_tests": {
+      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests"],
+      "exit_code": 0,
+      "result": "138 tests OK, 1 skipped"
+    },
+    "p4_closure": {
+      "argv": ["python3", "scripts/p4_research_closure.py"],
+      "exit_code": 0,
+      "status": "pass"
+    },
+    "lh_preflight": {
+      "argv": ["python3", "scripts/lh_preflight.py"],
+      "exit_code": 0,
+      "status": "pass"
+    }
+  },
+  "acceptance_notes": [
+    "Approval authorizes implementation of the seven slices in the work unit; it does not authorize external delivery channels, provider calls, or any order surface.",
+    "Capabilities 5 (simulation) and 2 (delayed feed) remain approved_next and require their own contracts and work-unit approvals after capability 3 completes.",
+    "Capabilities 1, 4, 6 remain deferred_not_approved.",
+    "Human acceptance is still required after implementation per the work unit's activation_requirements."
+  ]
+}

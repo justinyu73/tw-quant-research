@@ -1,0 +1,74 @@
+{
+  "schema": "tw-quant-engine-p5-trial-capture-evidence/v1",
+  "stage_id": "P5.1",
+  "status": "pass",
+  "approval": {
+    "approved_by": "user",
+    "approval_note": "2026-07-22 user instruction: playwright verification with stock 2308",
+    "execution_boundary": "workflow/tqe-p5-twse-source-contract.json option_c_endpoint_assessment.first_trial_capture",
+    "network_enabled": true,
+    "provider_calls": 3,
+    "provider_calls_note": "Bounded human-approved trial: 1 interactive page load + 2 CSV GETs, no other egress."
+  },
+  "script": {
+    "argv": ["node", "scripts/p5_trial_capture.cjs"],
+    "exit_code": 0,
+    "transport": "playwright-core 1.60.0 chromium headless"
+  },
+  "captures": [
+    {
+      "kind": "stock_day_2308",
+      "url": "https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=csv&date=20260701&stockNo=2308",
+      "fetched_at": "2026-07-22T11:54:22Z",
+      "http_status": 200,
+      "content_type": "text/csv;charset=ms950",
+      "bytes": 2204,
+      "sha256": "sha256:6ef390d93485abcb5ad2c48de30d10112904f3935b85e6c226a72f8b5f4b7018",
+      "raw_file": "outputs/p5-trial-capture/STOCK_DAY_2308_20260701.csv",
+      "raw_file_retention": "caller_owned_external_evidence_under_outputs_gitignored"
+    },
+    {
+      "kind": "mi_index_all",
+      "date": "20260721",
+      "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=csv&date=20260721&type=ALL",
+      "fetched_at": "2026-07-22T11:54:22Z",
+      "http_status": 200,
+      "content_type": "text/csv;charset=ms950",
+      "bytes": 3491341,
+      "sha256": "sha256:d5b5eec6bc041fdd810dba2687b1cdaa481645311070b402e0c2c0f2d48bec78",
+      "raw_file": "outputs/p5-trial-capture/MI_INDEX_ALL_20260721.csv.gz",
+      "raw_file_retention": "caller_owned_external_evidence_under_outputs_gitignored_gzip_compressed",
+      "raw_file_note": "Stored gzip-compressed (685068 bytes, gz sha256:ae16eda9123f3814484fd1e7b9ef02ee6bd3dc2ca80fc99ed976d45ef876b288) to stay under the S9 release-hardening 2 MB artifact audit; recorded sha256 is of the uncompressed CSV, verified by decompressing."
+    }
+  ],
+  "interactive_check": {
+    "url": "https://www.twse.com.tw/zh/trading/historical/stock-day.html",
+    "http_status": 200,
+    "title": "個股日成交資訊 - TWSE 臺灣證券交易所",
+    "reachable": true
+  },
+  "probes": {
+    "encoding": "charset=ms950 declared; strict UTF-8 decode fails; CP950 decode succeeds for both captures.",
+    "schema_stock_day": "Header row 日期/成交股數/成交金額/開盤價/最高價/最低價/收盤價/漲跌價差/成交筆數/註記; daily rows 115/07/01 onward for 2308 台達電.",
+    "schema_mi_index": "16-column 證券代號 header at line 313 matches option_c_endpoint_assessment.response_contract.full_market_columns exactly; 1083 four-digit securities; 2308 row present with complete OHLCV."
+  },
+  "required_before_activation_progress": {
+    "satisfied_by_this_trial": [
+      "first_human_trial_capture_sha256_bytes_and_timestamp_for_one_recent_session",
+      "csv_encoding_and_schema_probe_recorded_from_the_trial_capture"
+    ],
+    "still_pending": [
+      "official_calendar_holidaySchedule_digest_bound_to_the_same_work_unit",
+      "session_list_generated_from_the_approved_calendar_digest_with_count_at_or_below_cap",
+      "fixture_retention_license_size_and_sha256_policy_approval_for_per_session_csv",
+      "per_session_work_unit_digest_approved_by_human_before_host_egress",
+      "terms_of_use_review_recorded_for_the_mi_index_endpoint"
+    ]
+  },
+  "acceptance_notes": [
+    "Trial capture was human-initiated and bounded; it does not activate P5 and does not flip the source contract out of source_contract_blocked.",
+    "MI_INDEX single-session payload is ~3.5 MB CSV (full market, incl. warrants/CBBC); per-session fixture size policy must account for this before the 750-session loop.",
+    "Encoding is confirmed ms950/CP950; the normalization pipeline must decode CP950, not UTF-8.",
+    "Raw CSVs are caller-owned external evidence under outputs/ (gitignored); no normalized fixture was admitted into the repository."
+  ]
+}

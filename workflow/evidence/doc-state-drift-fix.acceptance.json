@@ -1,0 +1,50 @@
+{
+  "schema": "tw-quant-engine-doc-state-drift-fix/v1",
+  "stage_id": "doc-state-drift-fix",
+  "status": "pass",
+  "fixed_at": "2026-07-22",
+  "changes": [
+    {
+      "file": "workflow/engine-manifest.json",
+      "field": "current_phase",
+      "before": "s1_qlib_integration",
+      "after": "p5_history_admission",
+      "reason": "S1 through S9 acceptance evidence (workflow/evidence/s1-qlib-spike.acceptance.json through s9-release-hardening.acceptance.json) all record top-level status \"pass\", so the engine is no longer in the S1 spike phase. The actual work in flight is the P5 history-admission target, which remains blocked at source contract; next_phase_target (\"p5_history_admission\") and next_phase_target_status (\"blocked_source_contract\") are unchanged, and current_phase now uses the same phase naming convention as the manifest's other phase fields."
+    },
+    {
+      "file": "workflow/README.md",
+      "field": "K2-K5 approval package paragraph",
+      "before": "It is pending user approval, uses a bounded per-stage loop, stops after three consecutive acceptance failures.",
+      "after": "It is approved for execution and its K2-K5 stage evidence all passed; the consolidated final acceptance was accepted by JY on 2026-07-16 for user-owned K6 review.",
+      "reason": "workflow/k2-k5-approval-package.json records status \"approved_for_execution\", K2/K3/K4/K5 evidence artifacts all pass, and workflow/evidence/k2-k5-final.acceptance.json records JY's accepted_for_user_k6_review decision on 2026-07-16. The package description now states the executed outcome; K6 remains user-owned."
+    },
+    {
+      "file": "workflow/evidence/k2-k5-final.acceptance.json",
+      "field": "status",
+      "before": "awaiting_human_review",
+      "after": "accepted_for_user_k6_review",
+      "reason": "The final_review block (reviewed_by JY, decision accepted_for_user_k6_review, reviewed_at 2026-07-16T01:13:22Z) already records the human decision; the top-level status lagged behind it. The final_review record itself is unchanged, and an acceptance_notes entry dated 2026-07-22 documents this status alignment."
+    }
+  ],
+  "offline_verification": {
+    "full_tests": {
+      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests"],
+      "exit_code": 0,
+      "result": "138 tests passed, 1 skipped"
+    },
+    "json_parse_check": {
+      "files": [
+        "workflow/engine-manifest.json",
+        "workflow/evidence/k2-k5-final.acceptance.json",
+        "workflow/evidence/doc-state-drift-fix.acceptance.json"
+      ],
+      "exit_code": 0
+    }
+  },
+  "acceptance_notes": [
+    "No git mutations were performed; only the three documentation/status files were edited.",
+    "engine-manifest.json next_phase_target and next_phase_target_status were intentionally left unchanged; P5.1 remains fail-closed at source_contract_blocked.",
+    "The k2-k5-final.acceptance.json final_review block was not altered; only the top-level status and an appended acceptance_notes array changed.",
+    "K6 remains user-owned; this fix does not promote or approve any K6 work."
+  ]
+}

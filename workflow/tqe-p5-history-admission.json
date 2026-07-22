@@ -65,6 +65,19 @@
         "named_gets": ["bulk_history", "official_calendar"],
         "corporate_action_fetch": "separate_preapproved_fixture_not_fetched_by_this_work_unit"
       },
+      "option_c_request_budget_amendment": {
+        "status": "approved_direction_pending_fresh_p5_1_pass",
+        "approved_by": "user_selection option C, 2026-07-22, workflow/tqe-p5-twse-source-contract.json decision.user_selection",
+        "amended_shape": {
+          "calendar_gets": 1,
+          "session_gets_max": 750,
+          "total_gets_max": 751,
+          "endpoint": "https://www.twse.com.tw/exchangeReport/MI_INDEX",
+          "enumeration": "one GET per trading session from the approved calendar list, session-by-session in the work-unit"
+        },
+        "work_unit_draft": "workflow/tqe-p5-twse-work-unit.option-c.draft.json",
+        "note": "The original 2-GET request_budget remains the pre-amendment baseline. The option C amendment takes effect only after the fresh P5.1 contract pass and per-session work-unit digest approval; until then this package stays blocked."
+      },
       "automatic_provider_expansion": false
     }
   },

@@ -56,9 +56,13 @@ The K2-K5 K-line analysis approval package is documented in
 [`workflow/k2-k5-approval-package.json`](k2-k5-approval-package.json) with a
 human-readable review at
 [`docs/k2-k5-approval-package.md`](../docs/k2-k5-approval-package.md). It is
-pending user approval, uses a bounded per-stage loop, stops after three
-consecutive acceptance failures. After one human approval before K2, a passing
-evidence gate automatically advances K2 through K5; K5 is followed by one
+approved for execution and its K2–K5 stage evidence all passed; the
+consolidated final acceptance
+([`workflow/evidence/k2-k5-final.acceptance.json`](evidence/k2-k5-final.acceptance.json))
+was accepted by JY on 2026-07-16 for user-owned K6 review. The package used a
+bounded per-stage loop and stopped after three consecutive acceptance
+failures. After one human approval before K2, a passing
+evidence gate automatically advanced K2 through K5; K5 was followed by one
 consolidated human acceptance, and K6 remains user-owned.
 
 ## Promotion rule

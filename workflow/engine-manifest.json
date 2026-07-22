@@ -12,7 +12,7 @@
     "order_placement": false,
     "automatic_strategy_execution": false
   },
-  "current_phase": "s1_qlib_integration",
+  "current_phase": "p5_history_admission",
   "driver": "loop-hybrid",
   "driver_role": "external_orchestration_platform",
   "entrypoint": ["python3", "scripts/lh_preflight.py"],

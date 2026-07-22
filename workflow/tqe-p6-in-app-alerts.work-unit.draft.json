@@ -1,0 +1,70 @@
+{
+  "schema": "loop-hybrid-work-unit/v2",
+  "status": "approved_pending_implementation",
+  "approval": {
+    "approved_by": "user",
+    "approved_at": "2026-07-22",
+    "approval_note": "User approved the P6 in-app alerts work-unit digest after the P5.1 trial-capture verification passed.",
+    "approved_digest": "sha256:e8eb6ca2bcc6b0f65c35d0d2aabbd503833945c58dd7e2031fb7473c0dac3443",
+    "approved_digest_note": "Digest of the exact draft content (status draft_not_runnable) at approval time, computed with the p5_work_unit_digest canonicalization (JSON, sort_keys, compact separators). This file's status flip to approved_pending_implementation and this approval block are the only post-approval changes."
+  },
+  "work_unit_id": "tw-quant-engine-p6-in-app-alerts-001",
+  "target_repo": "/absolute/path/to/tw-quant-engine",
+  "goal": "Implement in-app alerts per the approved P6 contract: local-engine evaluation of price/indicator threshold alerts against admitted data, session-local persistence, and research-only in-app presentation. No external delivery channel.",
+  "contract": "docs/tqe-p6-in-app-alerts-contract.md",
+  "activation_proposal": "docs/tqe-p6-deferred-capability-activation-proposal.md",
+  "network": false,
+  "provider_calls": false,
+  "credentials": false,
+  "host_egress": "not_applicable_zero_network",
+  "channels": ["in_app"],
+  "implementation_slices": [
+    "alert definition schema validation (tqe-in-app-alert/v1) with fail-closed rejection",
+    "local-engine deterministic evaluator over admitted fixture/read-model data (price_threshold, indicator_threshold)",
+    "dedup and expiry semantics (once_per_session, cooldown_seconds, session, until)",
+    "session-local persistence of alert definitions (flat versioned JSON, watchlist style)",
+    "in-app presentation surface (research-only alerts panel, no order-like affordance)",
+    "deterministic fixture tests with delivery stubbed to in-app events only",
+    "acceptance evidence JSON recording channel scope"
+  ],
+  "activation_requirements": [
+    "human approval of this exact work-unit digest",
+    "p4_research_closure.py passing before and after implementation",
+    "offline replay of deterministic fixture tests",
+    "acceptance JSON with channels recorded as in_app only",
+    "human acceptance after implementation"
+  ],
+  "verification": [
+    {
+      "id": "offline-tests",
+      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
+      "timeout_seconds": 180,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "engine-preflight",
+      "argv": ["python3", "scripts/lh_preflight.py"],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "p4-closure",
+      "argv": ["python3", "scripts/p4_research_closure.py"],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    }
+  ],
+  "cannot_claim": [
+    "external delivery channel implemented or approved",
+    "order route, order command, or order UI control",
+    "provider invoked",
+    "alert definitions or history leaving the local machine",
+    "StrategySpec admitted or executed",
+    "capability 1, 2, 4, 5, or 6 activated",
+    "product acceptance",
+    "automatic promotion"
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "schema": "tw-quant-engine-p5-option-c-selection/v1",
+  "stage_id": "P5.1",
+  "status": "option_c_approved_fresh_p5_1_pass_pending",
+  "recorded_at": "2026-07-22",
+  "user_selection": {
+    "option_id": "C_bounded_per_trading_day_capture_from_official_free_daily_endpoint",
+    "decided_by": "user",
+    "decided_at": "2026-07-22",
+    "recorded_in": "workflow/tqe-p5-twse-source-contract.json decision.user_selection",
+    "approval_scope": [
+      "amend_request_budget_to_bounded_per_trading_day_capture",
+      "amend_work_unit_shape_to_session_enumerated_bounded_loop",
+      "fresh_p5_1_contract_pass_for_the_chosen_endpoint_required_before_activation"
+    ],
+    "note": "Approves the amendment direction only; no provider call is authorized. Top-level contract status stays source_contract_blocked until the fresh P5.1 pass is recorded."
+  },
+  "endpoint_assessment": {
+    "candidate_id": "twse_legacy_mi_index_csv",
+    "recorded_in": "workflow/tqe-p5-twse-source-contract.json option_c_endpoint_assessment",
+    "method": "GET",
+    "endpoint": "https://www.twse.com.tw/exchangeReport/MI_INDEX",
+    "query_parameters": "response=csv, date=YYYYMMDD, type=ALL",
+    "schema_columns": ["證券代號", "證券名稱", "成交股數", "成交筆數", "成交金額", "開盤價", "最高價", "最低價", "收盤價", "漲跌(+/-)", "漲跌價差", "最後揭示買價", "最後揭示買量", "最後揭示賣價", "最後揭示賣量", "本益比"],
+    "robots": "https://www.twse.com.tw/robots.txt fetched 2026-07-22: only /epaper/ and /FTSE/ disallowed; MI_INDEX path not excluded",
+    "rate_limit": "no published numeric limit; practitioner reports of throttling/ban on dense crawling; work-unit serializes with delay and hard cap",
+    "verification_method": "read_only_web_verification_no_market_data_downloaded",
+    "verification_urls": [
+      "https://ithelp.ithome.com.tw/articles/10258478",
+      "https://finlab.finance/blog/taiwan-stock-daily-crawler-tutorial",
+      "https://quantpass.org/python_crawler1/",
+      "https://blog.shiangsoft.com/stock-price-clawer/",
+      "https://ithelp.ithome.com.tw/m/articles/10300618",
+      "https://www.twse.com.tw/robots.txt"
+    ]
+  },
+  "amended_work_unit_draft": {
+    "path": "workflow/tqe-p5-twse-work-unit.option-c.draft.json",
+    "status": "draft_not_runnable",
+    "shape": "bounded per-trading-day capture: 1 calendar GET + at most 750 session GETs (751 total), sessions enumerated from official holidaySchedule calendar (digest pending), one GET per session, fail-closed rules, per-session sha256 record format"
+  },
+  "history_admission_alignment": {
+    "path": "workflow/tqe-p5-history-admission.json",
+    "change": "human_selection.execution.option_c_request_budget_amendment added; original 2-GET request_budget kept as pre-amendment baseline; amendment effective only after fresh P5.1 pass"
+  },
+  "missing_pre_activation_evidence": [
+    "first_human_trial_capture_sha256_bytes_and_timestamp_for_one_recent_session",
+    "official_calendar_holidaySchedule_digest_bound_to_the_same_work_unit",
+    "session_list_generated_from_the_approved_calendar_digest_with_count_at_or_below_cap",
+    "fixture_retention_license_size_and_sha256_policy_approval_for_per_session_csv",
+    "per_session_work_unit_digest_approved_by_human_before_host_egress",
+    "csv_encoding_and_schema_probe_recorded_from_the_trial_capture",
+    "terms_of_use_review_recorded_for_the_mi_index_endpoint"
+  ],
+  "offline_verification": {
+    "verified_at": "2026-07-22",
+    "json_load": [
+      "workflow/tqe-p5-twse-source-contract.json ok",
+      "workflow/tqe-p5-history-admission.json ok",
+      "workflow/tqe-p5-twse-work-unit.option-c.draft.json ok"
+    ],
+    "unittest_discover": "python3 -B -m unittest discover -s tests: Ran 138 tests, OK (skipped=1)",
+    "p5_execution_target": "status=blocked_source_contract, errors=[], all checks true, provider_calls=0",
+    "p5_work_unit_digest": "status=blocked_source_contract, errors=[], template_digest=sha256:5bcd14023a0861f2d3b13d62e5b9a76716c78ed673bf251eb0d512f7dbf1d44c, provider_calls=0",
+    "lh_preflight": "status=pass, errors=[], phase=p5_history_admission"
+  },
+  "acceptance_notes": [
+    "No provider call was made by the repository; provider_calls_made_by_repository remains 0 and all verification was read-only public web access.",
+    "Fail-closed invariants preserved: source contract status=source_contract_blocked, selected_source=null, original work-unit draft untouched and still draft_not_runnable.",
+    "P5.2 remains pass; P5.1 and activation-ready P5.3 remain blocked pending the fresh P5.1 contract pass for twse_legacy_mi_index_csv.",
+    "No git mutation was performed."
+  ]
+}
