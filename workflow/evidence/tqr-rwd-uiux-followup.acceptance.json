@@ -1,0 +1,129 @@
+{
+  "schema": "tw-quant-engine-tqr-rwd-uiux-followup/v1",
+  "status": "implemented_pending_human_acceptance",
+  "scope": {
+    "summary": "Follow-up to the RWD diagnosis (scripts/dashboard-rwd-audit.cjs, outputs/dashboard-rwd-audit.json): fixes root causes A-G, leaves H (intentional 720px breadcrumb truncation) untouched, and converges the dashboard UI/UX onto the existing TQR-UIUX-001 design tokens (type ladder, badge scale, 38px controls, module spacing, de-AI terminal colors).",
+    "files_changed": [
+      "ui/dashboard/styles.css",
+      "ui/dashboard/app.js",
+      "scripts/dashboard-browser-smoke.cjs"
+    ],
+    "files_created": [
+      ".agents/skills/uiux-review/SKILL.md",
+      "workflow/evidence/tqr-rwd-uiux-followup.acceptance.json"
+    ],
+    "files_intentionally_not_touched": [
+      "docs/ (E-group doc edits in the worktree)",
+      "src/tw_quant_engine/alerts.py, tests/, workflow/ drafts (alerts session fixes in the worktree)",
+      "frontend/src-tauri/src/lib.rs (dynamic sidecar port work in the worktree)",
+      "scripts/dashboard-alerts-smoke.cjs, tests/dashboard-core.test.cjs (worktree changes owned by another session)"
+    ]
+  },
+  "rwd_root_cause_fixes": {
+    "A_market_390_page_overflow": {
+      "diagnosis": ".market-terminal-layout collapsed to a bare `1fr` track at <=900px, so the chart column's min-content (plus valuation inputs' intrinsic min-width) pushed the page to 432px scrollWidth at 390px; the Lightweight Charts canvas also had a 320px width floor that exceeded the 266px container.",
+      "fix": "styles.css @media<=900 `.market-terminal-layout { grid-template-columns: minmax(0, 1fr) }` (line 349), `.market-terminal-chart { min-width: 0 }` (line 291), `.valuation-field input { min-width: 0 }` (line 213); app.js chart width floor 320 -> 240 both at createChart (line 1303) and in the ResizeObserver (line 1382).",
+      "result": "market@390 pageOverflow false, docScrollWidth 390, 0 failures (was 141)."
+    },
+    "B_alert_form_label_overflow": {
+      "diagnosis": ".alert-form label is a grid whose implicit auto column kept the select/input intrinsic min-width (~187px), overflowing every breakpoint's two-column form (and the alert-dedup select at 820px).",
+      "fix": "styles.css line 909 label gets `min-width: 0; grid-template-columns: minmax(0, 1fr)`; line 910 input/select get `min-width: 0` (width:100% already present); new @media<=900 single-column alert form (line 922) for the narrow side rail.",
+      "result": "market@1440/1280/1024/820/720 label and select failures all 0 (was 1-3 per breakpoint)."
+    },
+    "C_formula_rule_track_mismatch": {
+      "diagnosis": "Base grid has 9 tracks for 9 children, but the @container<=1060px rule declared only 6 tracks, so labels 4-6 auto-placed into the 30px number/remove tracks (selects crushed to 28px); at <=680px the `label:nth-of-type(5-7) { grid-column: span 1 }` rule out-specified `label { grid-column: 2 }`, sending those labels into wrong tracks.",
+      "fix": "styles.css @container<=1060px now places `label:nth-of-type(5/6/7)` explicitly at row 2, columns 3/4/5 (lines 833-836); @container<=680px overrides with matching-specificity selectors `grid-column: 2; grid-row: auto` (line 845).",
+      "result": "research@1280/1024/820/720/390 failures all 0 (was 2-3 per breakpoint); formula rows read as one line on desktop, stacked fields on mobile."
+    },
+    "D_backtest_390_metric_cards": {
+      "diagnosis": ".compact-metrics stayed at 3 columns at 390px (77px per card vs ~173px content), causing 96px overflows and page overflow; mono labels like max_drawdown could not wrap.",
+      "fix": "styles.css new breakpoints: <=900px 2 columns, <=560px 1 column (lines 246-251); `.metric-card > div { min-width: 0 }` and `.metric-card .stat-label, .metric-card .metric-value { overflow-wrap: anywhere }` (lines 119-120).",
+      "result": "backtest@390 pageOverflow false, 0 failures (was 15); backtest@820 0 (was 2)."
+    },
+    "E_technical_reading_mono_numbers": {
+      "diagnosis": ".technical-reading-grid forced 4 columns (2 at <=820px); 19px mono values like 2,373.416174 (137px) overflowed cards down to 55px wide.",
+      "fix": "styles.css line 561 grid becomes `repeat(auto-fit, minmax(min(170px, 100%), 1fr))` (drops the <=820px 2-col rule); line 565 strong gets `overflow-wrap: anywhere`.",
+      "result": "market@1024/1280 and features@390 technical-* failures all 0 (was up to 10)."
+    },
+    "F_terminal_quote_bar": {
+      "diagnosis": "@media<=1120 quote bar gave the price column only minmax(130px, 0.7fr) vs its ~156px nowrap content; .terminal-ohlc minmax(42px,1fr) cells spilled 4px; at <=620 the price column starved next to the action buttons.",
+      "fix": "styles.css line 344 price column now `minmax(170px, 0.8fr)`; line 282 ohlc `repeat(4, minmax(0, 1fr))` with min-width:0 cells and overflow-wrap on dd; @media<=700 quote bar becomes a single column (identity / price / actions / ohlc 2x2, lines 353-358).",
+      "result": "market@1280/820/720/390 quote-bar and ohlc failures all 0."
+    },
+    "G_watchlist_group_new_input": {
+      "diagnosis": ".watchlist-group-new is a grid label whose implicit auto column kept the input's intrinsic ~201px min-width (products@1440 +38px).",
+      "fix": "styles.css line 171 label gets `grid-template-columns: minmax(0, 1fr)`; canonical input rule (lines 714-719) gains `width: 100%; min-width: 0`.",
+      "result": "products@1440 failure 0 (was 1)."
+    },
+    "H_breadcrumb_720": "Intentional truncation (`.system-topbar-left .breadcrumb { max-width: 96px; overflow: hidden }` at <=720px); left unchanged. The final audit reports exactly these 9 clipped breadcrumb entries and nothing else."
+  },
+  "visual_polish": {
+    "type_ladder": {
+      "before": "page-title 30px flat; card-title 17px via token but subsection-heading/terminal-panel-heading/data-update-heading also 18px; dialog 19px; screen-builder 18px; formula/financial/backtest headers 18px; note-card h3 13px; cockpit hero clamp max 35px - ladder muddled",
+      "after": "--type-page 30->26, --type-card 17 (unchanged), --type-section 18->14; subsection-heading h2 = 14px small title; card-level headers (card-title, terminal-panel-heading, data-update-heading, dialog, screen-builder, formula/financial/backtest builders) = 17px; note-card h3 13->14px; cockpit hero clamp max 35->28px"
+    },
+    "badges": {
+      "before": "per-badge ad-hoc sizes (padding 2-7px, font 9-10px, weight 700/800 mixed); alert-event-badge blue border",
+      "after": "one badge scale (padding 4px 8px, radius 3px, 10px/700, letter-spacing 0.02em) applied to .status/.story-kind/.alert-event-badge/.free-first-tag/.read-only-pill/.screen-chip/.screen-condition-count; alert-event-badge now neutral (muted on --surface-secondary); semantic colors unchanged (green/amber/red/blue)"
+    },
+    "form_controls": {
+      "before": "input/select heights 27-38px scattered (global search 27, terminal watchlist 29, kline/research/note 31, valuation 32, alert form unset), fonts 10-14px, terminal-watchlist labels 9px, topbar search label 8px",
+      "after": "all text inputs/selects min-height var(--control-h)=38px, padding 0 10px, font var(--type-helper)=12px (watchlist toolbar keeps 14px body per canonical rule); labels unified to 10px"
+    },
+    "module_spacing": {
+      "before": "layout gaps mixed 14/16/18px (market-terminal 14, terminal-home 14, cockpit/story/stock-analysis 18)",
+      "after": "all layout and rail gaps 16px; card paddings untouched (already 16px)"
+    },
+    "colors_de_ai": {
+      "before": "system-command-bar 90deg white-to-#f7f9fc gradient; borders #cfd6df ad-hoc on quote bar/command bar/data-update panel; --shadow-modal 0 20px 60px/0.28",
+      "after": "command bar flat var(--surface); all three borders var(--border); --shadow-modal 0 12px 32px/0.22; TW convention kept (.positive red #d94b4b up, .negative green #0b8f70 down); no purple/neon/multi-stop gradients remain (earlier de-AI pass already flattened hero/snapshot)"
+    }
+  },
+  "offline_verification": [
+    {
+      "argv": ["node", "scripts/dashboard-rwd-audit.cjs"],
+      "exit_code": 0,
+      "note": "Final run: 9 views x 6 breakpoints; total failures 9, all of them the intentional clipped .breadcrumb @720px (H); 0 non-breadcrumb failures, 0 page overflows, 0 table violations. Report written to outputs/dashboard-rwd-audit.json."
+    },
+    {
+      "argv": ["node", "scripts/dashboard-browser-smoke.cjs"],
+      "exit_code": 0,
+      "note": "First run reported functional_pass_baseline_required (all 8 screenshots changed by the visual overhaul). All 8 PNGs in outputs/dashboard-browser/ were reviewed manually - every diff is an intended change (type ladder, badges, 38px controls, spacing, flat surfaces, RWD fixes). EXPECTED_SCREENSHOTS hashes then updated; rerun status pass (functional_pass true, visual_baseline_pass true, browser_errors [], external_requests [])."
+    },
+    {
+      "argv": ["node", "scripts/dashboard-alerts-smoke.cjs"],
+      "exit_code": 0,
+      "note": "status pass, 13/13 checks, external_requests []."
+    },
+    {
+      "argv": ["node", "tests/dashboard-core.test.cjs"],
+      "exit_code": 0,
+      "note": "status pass, 9 checks including in-app-alerts."
+    },
+    {
+      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests"],
+      "exit_code": 0,
+      "note": "Ran 152 tests, OK (skipped=1)."
+    },
+    {
+      "argv": ["python3", "scripts/p4_research_closure.py"],
+      "exit_code": 0,
+      "note": "status pass; research-only closure checks all true."
+    }
+  ],
+  "screenshot_self_review": {
+    "method": "All nine views captured at 1440x900 and 390x844 with a Playwright harness mirroring scripts/dashboard-rwd-audit.cjs (same spawned preview server), then every image inspected manually.",
+    "findings": [
+      "Initial review caught the .terminal-ohlc volume wrapping mid-number at 390px; fixed by switching ohlc to a 2x2 grid at <=700px and re-verified by screenshot.",
+      "Quote price change renders red for +30 (TW red-up convention) - verified at native resolution.",
+      "No AI-style gradients, purple accents, or heavy shadows remain in any view."
+    ]
+  },
+  "acceptance_notes": [
+    "ui/dashboard/app.js was already modified in the worktree (alerts session fixes owned by another session); this work adds exactly two one-line changes to it (chart width floor 320 -> 240 at createChart and in the ResizeObserver) and nothing else.",
+    "scripts/dashboard-browser-smoke.cjs change is limited to the EXPECTED_SCREENSHOTS hash block, updated only after manual review of all 8 new screenshots.",
+    "The breadcrumb clipping at 720px (H) is deliberate and remains the only audit failure class; outputs/dashboard-rwd-audit.json holds the final state.",
+    "No git mutations were performed; other in-flight worktree changes (E-group docs, alerts session, dynamic sidecar port) were not read-modified or reverted.",
+    "Status stays implemented_pending_human_acceptance: visual taste sign-off and the human gate remain with the reviewer."
+  ]
+}
