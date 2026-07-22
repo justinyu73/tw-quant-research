@@ -428,7 +428,7 @@
   }
 
   function sidecarBaseUrl() {
-    var raw = window.__TW_QUANT_SIDECAR_URL__ || "http://127.0.0.1:8766";
+    var raw = window.__TW_QUANT_SIDECAR_URL__ || "http://127.0.0.1:8767";
     try {
       var parsed = new URL(raw);
       if (parsed.protocol !== "http:" || ["127.0.0.1", "localhost", "[::1]", "::1"].indexOf(parsed.hostname) < 0) return "";

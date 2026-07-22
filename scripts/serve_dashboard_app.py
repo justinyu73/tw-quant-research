@@ -26,7 +26,7 @@ from tw_quant_engine.desktop_sidecar import create_server, load_catalog, validat
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=5173)
-    parser.add_argument("--sidecar-port", type=int, default=8766)
+    parser.add_argument("--sidecar-port", type=int, default=8767)
     args = parser.parse_args()
 
     host = validate_loopback_host("127.0.0.1")

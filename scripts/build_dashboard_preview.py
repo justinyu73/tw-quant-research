@@ -24,7 +24,7 @@ def _load(path: Path) -> dict[str, Any]:
 
 
 def _sidecar_url() -> str:
-    raw = os.getenv("TQE_SIDECAR_URL", "http://127.0.0.1:8766").strip()
+    raw = os.getenv("TQE_SIDECAR_URL", "http://127.0.0.1:8767").strip()
     parsed = urlsplit(raw)
     if parsed.scheme != "http" or parsed.hostname not in LOOPBACK_HOSTS or not parsed.port:
         raise ValueError("TQE_SIDECAR_URL must be an explicit loopback http URL")
