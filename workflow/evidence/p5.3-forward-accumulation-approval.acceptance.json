@@ -1,0 +1,19 @@
+{
+  "schema": "tw-quant-engine-p5-work-unit-approval/v1",
+  "stage_id": "P5.3",
+  "status": "pass",
+  "approval": {
+    "approved_by": "user",
+    "approved_at": "2026-07-22",
+    "work_unit_path": "workflow/tqe-p5-forward-accumulation.work-unit.draft.json",
+    "approved_digest": "sha256:2eb454e1d5d7442851bae3af4a6930a0fb661dbfeb24a6da46bb8a4b1bcc0ad5",
+    "activation_start_date": "2026-07-23",
+    "scope": "Human-initiated STOCK_DAY_ALL capture, 1 GET per trading day, raw retained caller-owned under outputs/ with sha256, attribution 資料來源：臺灣證券交易所. No backfill.",
+    "digest_correction": "Recomputed 2026-07-22 after the initially quoted digest was found not to match the file; content unchanged."
+  },
+  "acceptance_notes": [
+    "This approval activates forward accumulation only; the abandoned option C per-session loop remains superseded.",
+    "Each daily capture is human-initiated; normalized read-model updates run offline from retained raw files.",
+    "Calendar rollover: each new year requires a separately approved calendar capture."
+  ]
+}

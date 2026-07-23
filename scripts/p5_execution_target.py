@@ -81,25 +81,39 @@ def run(root: Path = ROOT) -> dict[str, Any]:
         "amendment_is_not_active": "provider_capability_not_active" in amendment_text,
         "exact_work_unit_is_required": "exact_human_run_work_unit_digest" in workflow.get("required_decisions", []),
         "adjustment_provenance_is_required": "adjustment_provenance_missing_or_ambiguous" in workflow.get("hard_stops", []),
-        "twse_source_contract_is_fail_closed": source_contract.get("status") == "source_contract_blocked"
-        and source_contract.get("selected_source") is None
-        and source_contract.get("provider_calls_made_by_repository") == 0,
+        "twse_source_contract_is_fail_closed": source_contract.get("status")
+        in {"source_contract_blocked", "source_contract_selected_pending_activation"}
+        and source_contract.get("provider_calls_made_by_repository") == 0
+        and (
+            source_contract.get("selected_source") is None
+            or (
+                isinstance(source_contract.get("selected_source"), dict)
+                and source_contract["selected_source"].get("activation")
+                in {"pending_work_unit_digest_approval", "approved_pending_first_capture"}
+            )
+        ),
         "corporate_action_admission_is_pass": corporate_action.get("stage_id") == "P5.2"
         and corporate_action.get("status") == "pass"
         and corporate_action.get("provider_calls") == 0,
-        "work_unit_digest_is_fail_closed_template": work_unit_digest.get("stage_id") == "P5.3"
-        and work_unit_digest.get("status") == "blocked_source_contract"
-        and work_unit_digest.get("activation_ready") is False,
+        "work_unit_digest_is_valid": work_unit_digest.get("stage_id") == "P5.3"
+        and work_unit_digest.get("status")
+        in {"blocked_source_contract", "approved_pending_execution"},
     }
     errors.extend(name for name, passed in checks.items() if not passed)
-    pending_gates = [
-        "p5_1_official_twse_three_year_bulk_and_calendar_contract",
-        "p5_3_exact_human_run_work_unit_digest",
-    ]
+    workflow_status = workflow.get("status")
+    if workflow_status == "approved_pending_first_capture":
+        pending_gates: list[str] = []
+    elif workflow_status == "pending_work_unit_digest_approval":
+        pending_gates = ["p5_3_exact_human_run_work_unit_digest"]
+    else:
+        pending_gates = [
+            "p5_1_official_twse_three_year_bulk_and_calendar_contract",
+            "p5_3_exact_human_run_work_unit_digest",
+        ]
     status = "fail" if errors else (
         "blocked_source_contract"
-        if workflow.get("status") == "source_contract_blocked"
-        else "pending_human_gate"
+        if workflow_status == "source_contract_blocked"
+        else ("approved_pending_first_capture" if workflow_status == "approved_pending_first_capture" else "pending_human_gate")
     )
     return {
         "schema": "tw-quant-engine-p5-execution-target/v1",

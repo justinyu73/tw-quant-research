@@ -1,0 +1,132 @@
+{
+  "schema": "tw-quant-engine-p5-option-b-selection/v1",
+  "stage_id": "P5.1",
+  "status": "pass_source_selected_pending_work_unit_digest",
+  "recorded_at": "2026-07-22",
+  "decision": {
+    "option_id": "B_reduce_history_depth_target",
+    "decided_by": "user",
+    "decided_at": "2026-07-22",
+    "supersedes": "C_bounded_per_trading_day_capture_from_official_free_daily_endpoint",
+    "supersede_reason": "The 2026-07-22 terms-of-use review found the TWSE website 使用條款 prohibits automated/scripted downloads without TWSE consent; the user abandoned option C and selected option B.",
+    "tos_human_gate": "resolved_by_abandoning_option_c",
+    "recorded_in": "workflow/tqe-p5-twse-source-contract.json decision.user_selection_option_b"
+  },
+  "selected_source": {
+    "candidate_id": "twse_openapi_stock_day_all",
+    "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
+    "strategy": "free_official_daily_snapshot_forward_accumulation",
+    "activation": "pending_work_unit_digest_approval"
+  },
+  "trial_capture": {
+    "script": "scripts/p5_stock_day_all_capture.cjs",
+    "approved_by": "user",
+    "approval_note": "2026-07-22 user selection of option B; exactly 1 bounded GET, same pattern as the 2308 trial capture",
+    "network_enabled": true,
+    "provider_calls": 1,
+    "provider_calls_note": "Human-approved bounded trial GET only; provider_calls_made_by_repository remains 0 (activation counter).",
+    "method": "GET",
+    "url": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
+    "fetched_at": "2026-07-23T00:55:38.563Z",
+    "http_status": 200,
+    "content_type": "application/json",
+    "bytes": 317735,
+    "sha256": "sha256:a7fb7f32a89682516f3dd69e716a2c73c343943a4c31e8f945d66acc3f192cb0",
+    "encoding": "utf-8",
+    "raw_file": "outputs/p5-trial-capture/STOCK_DAY_ALL_20260723.json",
+    "schema_probe": {
+      "row_count": 1371,
+      "keys": ["Date", "Code", "Name", "TradeVolume", "TradeValue", "OpeningPrice", "HighestPrice", "LowestPrice", "ClosingPrice", "Change", "Transaction"],
+      "four_digit_listed_securities": 1091,
+      "stock_2308_present_with_full_ohlcv": true
+    },
+    "latest_day_semantics": "All 1371 rows share exactly one Date value (1150722 = 2026-07-22, the most recent completed session at fetch time). Confirmed: single-latest-trading-day snapshot; history accumulates from daily captures only."
+  },
+  "license_analysis": {
+    "conclusion": "STOCK_DAY_ALL is the endpoint behind data.gov.tw dataset 11549, published under 政府資料開放授權條款-第1版: free, non-exclusive, irrevocable use including derivatives, with mandatory attribution. The TWSE 使用條款 automated-download clause expressly exempts data licensed through 政府資料開放平臺, so the option C conflict does not apply to this open-licensed channel. One human-initiated GET per trading day matches the dataset's daily-update design.",
+    "obligations": ["attribution 資料來源：臺灣證券交易所", "respect third-party moral rights", "no claim of TWSE endorsement"],
+    "residual_caveat": "The license covers each captured daily snapshot, not a retrospective bulk pull; forward accumulation stays inside the licensed scope.",
+    "evidence_urls": [
+      "https://data.gov.tw/dataset/11549",
+      "https://data.gov.tw/license",
+      "https://www.twse.com.tw/zh/terms/use.html"
+    ],
+    "recorded_in": "workflow/tqe-p5-twse-source-contract.json option_b_forward_accumulation.license_analysis"
+  },
+  "revisions": [
+    {
+      "file": "workflow/tqe-p5-twse-source-contract.json",
+      "changes": "status source_contract_blocked -> source_contract_selected_pending_activation; decision.user_selection_option_b added (supersedes option C, ToS gate resolved_by_abandoning_option_c); selected_strategy/selected_source set; option_b_forward_accumulation block with license analysis and trial capture; option C assessment marked superseded."
+    },
+    {
+      "file": "workflow/tqe-p5-history-admission.json",
+      "changes": "history_window three_calendar_years 2023-07-20..2026-07-19 -> forward_accumulation_from_activation (backfill none, backfill_policy wait_for_free_bulk); status -> pending_work_unit_digest_approval; preparation_status -> active_work_unit_preparation; current_preparation_step -> p5_3_exact_human_run_work_unit_digest; request budget, scope, required_decisions, execution_order reworded to daily-snapshot shape; option C budget amendment marked superseded."
+    },
+    {
+      "file": "docs/tqe-p5-execution-plan.md",
+      "changes": "2026-07-22 revision note added; target and acceptance checklist revised from three-year retrospective to forward accumulation with accumulation target."
+    },
+    {
+      "file": "workflow/tqe-p5-forward-accumulation.work-unit.draft.json",
+      "changes": "New work-unit draft: 1 human-initiated GET per trading day, calendar binding with rollover rule, raw retention (outputs/, sha256, attribution), normalized accumulation flow, fail-closed rules; status draft_not_runnable."
+    },
+    {
+      "file": "workflow/tqe-p5-twse-work-unit.option-c.draft.json",
+      "changes": "status -> superseded_by_option_b_2026_07_22 (retained, not deleted)."
+    },
+    {
+      "file": "workflow/tqe-p5-option-c-session-list.json",
+      "changes": "status -> superseded_by_option_b_2026_07_22 (retained, not deleted)."
+    },
+    {
+      "file": "workflow/tqe-p5-option-c-fixture-retention-policy.json",
+      "changes": "status -> superseded_by_option_b_2026_07_22 (retained, not deleted)."
+    },
+    {
+      "file": "scripts/p5_execution_target.py",
+      "changes": "twse_source_contract_is_fail_closed now accepts source_contract_selected_pending_activation with invariants (provider_calls_made_by_repository == 0; selected_source null or activation pending_work_unit_digest_approval); pending_gates reduced to p5_3_exact_human_run_work_unit_digest when the workflow status is pending_work_unit_digest_approval."
+    },
+    {
+      "file": "scripts/p5_work_unit_digest.py",
+      "changes": "DRAFT_PATH switched from the superseded tqe-p5-twse-work-unit.draft.json to the forward-accumulation draft; check renamed source_contract_is_blocked -> source_contract_is_fail_closed with the same dual-status invariant; output status blocked_source_contract -> blocked_pending_work_unit_digest_approval."
+    },
+    {
+      "file": "tests/test_p5_execution_target.py",
+      "changes": "Assertions updated: preflight status pending_human_gate, preparation step p5_3_exact_human_run_work_unit_digest, single pending gate; candidate test replaced by option-B selection assertions (source selected, not activated, decision recorded)."
+    },
+    {
+      "file": "tests/test_p5_work_unit_digest.py",
+      "changes": "Status assertion updated to blocked_pending_work_unit_digest_approval; fail-closed check key asserted."
+    }
+  ],
+  "status_change_justification": "Keeping source_contract_blocked would misrepresent the decision record: the user has selected a source under option B, so the blocker is no longer the absence of a free source but the unapproved work-unit digest. The fail-closed semantics are preserved in both scripts: activation still requires provider_calls_made_by_repository == 0 and selected_source.activation == pending_work_unit_digest_approval, and execution_ready stays false.",
+  "fresh_pass_remaining": [
+    "exact_forward_accumulation_work_unit_digest_approved_by_human_before_host_egress (template digest sha256:6a493dd3b4a1a8d1d026a3372dca0c17c1afbea9a13d4420459faddb7c890102, recomputed by scripts/p5_work_unit_digest.py)"
+  ],
+  "offline_verification": {
+    "p5_execution_target": {
+      "argv": ["python3", "scripts/p5_execution_target.py"],
+      "exit_code": 0,
+      "status": "pending_human_gate",
+      "errors": []
+    },
+    "p5_work_unit_digest": {
+      "argv": ["python3", "scripts/p5_work_unit_digest.py"],
+      "exit_code": 0,
+      "status": "blocked_pending_work_unit_digest_approval",
+      "errors": []
+    },
+    "full_tests": {
+      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests"],
+      "exit_code": 0,
+      "result": "173 tests passed, 1 skipped"
+    }
+  },
+  "acceptance_notes": [
+    "No activation occurred: the only network call was the 1-GET bounded trial capture of STOCK_DAY_ALL; provider_calls_made_by_repository remains 0.",
+    "Option C artifacts (work-unit draft, session list, retention policy, trial captures) are retained as superseded records and must not be activated without a new explicit user decision.",
+    "The three-year retrospective goal is deferred, not abandoned: backfill may resume if a free official bounded bulk source appears, via a separate P5.1 pass.",
+    "Each new calendar year requires a fresh official calendar capture with separate user approval (calendar rollover rule in the work-unit draft)."
+  ],
+  "next_human_approval_point": "Approve the exact forward-accumulation work-unit digest (set the activation date, then approve the recomputed sha256) before any host egress."
+}

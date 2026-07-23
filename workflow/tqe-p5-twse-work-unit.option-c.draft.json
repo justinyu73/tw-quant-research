@@ -1,7 +1,8 @@
 {
   "schema": "loop-hybrid-work-unit/v2",
-  "status": "draft_not_runnable",
-  "blocked_reason": "fresh_p5_1_contract_pass_pending_option_c_pre_activation_evidence_incomplete",
+  "status": "superseded_by_option_b_2026_07_22",
+  "supersede_note": "Retained as a record, not deleted. The user abandoned option C on 2026-07-22 after the terms-of-use conflict (TWSE 使用條款 prohibits scripted downloads without consent) and selected option B; see workflow/tqe-p5-forward-accumulation.work-unit.draft.json.",
+  "blocked_reason": "superseded_option_c_withdrawn_terms_of_use_conflict",
   "work_unit_id": "tw-quant-engine-p5-twse-history-option-c-001",
   "amends": "workflow/tqe-p5-twse-work-unit.draft.json",
   "amendment_authority": "user_selection option C in workflow/tqe-p5-twse-source-contract.json decision.user_selection, decided 2026-07-22",

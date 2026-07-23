@@ -11,30 +11,36 @@ import p5_execution_target  # noqa: E402
 
 
 class P5ExecutionTargetTests(unittest.TestCase):
-    def test_target_is_located_but_waits_for_human_gate(self) -> None:
+    def test_target_is_approved_pending_first_capture(self) -> None:
         result = p5_execution_target.run(ROOT)
-        self.assertEqual(result["status"], "blocked_source_contract")
+        self.assertEqual(result["status"], "approved_pending_first_capture")
         self.assertFalse(result["execution_ready"])
         self.assertEqual(result["provider_calls"], 0)
-        self.assertEqual(result["preparation_step"], "p5_2_validate_preapproved_corporate_action_fixture")
+        self.assertEqual(result["preparation_step"], "p5_3_exact_human_run_work_unit_digest")
         self.assertTrue(all(result["checks"].values()))
-        self.assertTrue(result["checks"]["work_unit_digest_is_fail_closed_template"])
+        self.assertTrue(result["checks"]["work_unit_digest_is_valid"])
         self.assertNotIn("preapproved_corporate_action_fixture_and_factor_provenance", result["pending_gates"])
-        self.assertEqual(
-            result["pending_gates"],
-            [
-                "p5_1_official_twse_three_year_bulk_and_calendar_contract",
-                "p5_3_exact_human_run_work_unit_digest",
-            ],
-        )
+        self.assertEqual(result["pending_gates"], [])
 
-    def test_source_contract_does_not_admit_a_candidate(self) -> None:
+    def test_source_contract_option_b_source_approved_not_yet_captured(self) -> None:
         contract = json.loads(
             (ROOT / "workflow/tqe-p5-twse-source-contract.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(contract["status"], "source_contract_blocked")
-        self.assertIsNone(contract["selected_source"])
+        self.assertEqual(contract["status"], "source_contract_selected_pending_activation")
         self.assertEqual(contract["provider_calls_made_by_repository"], 0)
+        self.assertEqual(
+            contract["selected_source"]["candidate_id"], "twse_openapi_stock_day_all"
+        )
+        self.assertEqual(
+            contract["selected_source"]["activation"], "approved_pending_first_capture"
+        )
+        self.assertEqual(
+            contract["selected_source"]["activation_start_date"], "2026-07-23"
+        )
+        self.assertEqual(
+            contract["decision"]["user_selection_option_b"]["option_id"],
+            "B_reduce_history_depth_target",
+        )
         self.assertEqual(
             contract["resolution_audit"]["result"],
             "no_official_bounded_bulk_artifact_found",
