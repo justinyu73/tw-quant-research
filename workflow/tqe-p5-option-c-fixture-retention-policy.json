@@ -1,0 +1,48 @@
+{
+  "schema": "tw-quant-engine-p5-option-c-fixture-retention/v1",
+  "status": "pending_human_approval",
+  "drafted_at": "2026-07-22",
+  "approval_authority": "user",
+  "applies_to": "workflow/tqe-p5-twse-work-unit.option-c.draft.json bounded per-trading-day capture",
+  "raw_response_retention": {
+    "ownership": "caller_owned_external_evidence",
+    "storage_location": "outputs/p5-option-c-capture/ (gitignored; never committed to the repository)",
+    "file_naming": "MI_INDEX_ALL_{YYYYMMDD}.csv.gz",
+    "compression": {
+      "format": "gzip level 9",
+      "reason": "Trial capture shows one full-market MI_INDEX CSV is ~3.49 MB uncompressed; the S9 release-hardening audit caps artifacts at 2 MB, so raw CSVs are stored gzip-compressed (~0.69 MB observed).",
+      "trial_reference": "workflow/evidence/p5.1-trial-capture-2308.acceptance.json captures[mi_index_all]"
+    },
+    "size_limits": {
+      "per_session_csv_uncompressed_max_bytes": 5000000,
+      "per_session_csv_gzip_max_bytes": 2000000,
+      "total_raw_retention_estimate_bytes": 525000000,
+      "total_raw_retention_estimate_note": "750 sessions x ~0.7 MB gzip; exact total is recorded per session at capture time.",
+      "fail_closed": "stop the run if any single session exceeds per_session_csv_uncompressed_max_bytes"
+    }
+  },
+  "digest_record_format": {
+    "recorded_digest": "sha256 of the uncompressed CSV bytes, prefixed sha256:<hex>",
+    "gzip_digest": "sha256 of the stored .csv.gz file is also recorded for storage integrity",
+    "per_session_record": "session_date, url, retrieval_timestamp (+08:00), http_status, response_bytes (uncompressed), response_sha256, gzip_bytes, gzip_sha256, row_count_full_market_section, result",
+    "aggregate_manifest": "one JSON manifest per run listing every per-session record plus the calendar digest and work-unit digest, stored under outputs/ with the raw files"
+  },
+  "license_and_attribution": {
+    "attribution": "資料來源：臺灣證券交易所",
+    "catalog_reference": "https://data.gov.tw/dataset/11549",
+    "license_reference": "https://data.gov.tw/license (政府資料開放授權條款-第1版)",
+    "attribution_display_required": true,
+    "note": "Attribution is shown in the dashboard data-source panel and in every normalized fixture manifest."
+  },
+  "normalized_fixture_admission": {
+    "repo_admission_condition": "Normalized fixtures enter the repository only after (1) this retention policy is approved, (2) the terms_of_use review for the MI_INDEX endpoint is recorded in the source contract, and (3) the exact per-session work-unit digest is approved by the user.",
+    "normalized_format": "compact JSON/CSV per session with source, retrieval time, period, and sha256 metadata, decoded from CP950 per the trial-capture encoding probe",
+    "private_or_large_snapshot": false,
+    "no_credentials_or_cookies": true
+  },
+  "retention_review": {
+    "review_trigger": "before the first capture run and at every P5.6 acceptance replay",
+    "deletion_policy": "caller may delete outputs/p5-option-c-capture/ at any time; the repository must function without it (raw responses are external evidence, not repository state)"
+  },
+  "required_approval": "User approval of this policy is required_before_activation item fixture_retention_license_size_and_sha256_policy_approval_for_per_session_csv."
+}

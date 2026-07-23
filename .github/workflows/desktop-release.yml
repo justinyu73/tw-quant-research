@@ -174,6 +174,16 @@ jobs:
           - macOS Apple Silicon: `TQR-macOS-Apple-Silicon.dmg`
           - Source: `TQR-source.tar.gz`
 
+          macOS note: this release is unsigned. If macOS reports the app as
+          damaged, remove the quarantine flag once after install:
+
+          ```sh
+          xattr -dr com.apple.quarantine "/Applications/TW Quant Research.app"
+          ```
+
+          Updates: after installing v0.2.0 or later, use 設定 → 檢查更新 for
+          signed in-app updates; fresh installs always come from this page.
+
           In-app updates: the desktop app checks this release's `latest.json`
           when the user explicitly asks in Settings. Update payloads
           (`*.app.tar.gz`, `*-setup.exe`) are minisign-signed; the app verifies

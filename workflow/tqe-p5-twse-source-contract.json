@@ -359,6 +359,85 @@
         "per_session_work_unit_digest_approved_by_human_before_host_egress",
         "terms_of_use_review_recorded_for_the_mi_index_endpoint"
       ]
+    },
+    "calendar_capture": {
+      "captured_at": "2026-07-22T21:56:13.158Z",
+      "approved_by": "user",
+      "approval": "2026-07-22 user approval to arrange the remaining option C pre-activation evidence; exactly 1 calendar GET, same bounded pattern as the 2308 trial capture",
+      "script": "scripts/p5_calendar_capture.cjs",
+      "transport": "playwright-core chromium headless request context",
+      "provider_calls": 1,
+      "provider_calls_note": "Human-approved bounded calendar GET only. The top-level provider_calls_made_by_repository counter tracks P5 activation and remains 0 until activation.",
+      "method": "GET",
+      "url": "https://openapi.twse.com.tw/v1/holidaySchedule/holidaySchedule",
+      "http_status": 200,
+      "content_type": "application/json",
+      "response_bytes": 3774,
+      "response_sha256": "sha256:7644c1a8af784c09f54670fd7413f536b13eb76c54d658058e8873d1aee32117",
+      "raw_file": "outputs/p5-trial-capture/holidaySchedule.json",
+      "covered_gregorian_years": ["2026"],
+      "roc_year_format": "Date uses ROC year (1150101 = 2026-01-01)",
+      "coverage_limitation": "The endpoint returns only the current ROC year; the requested window segment 2023-07-20..2025-12-31 is not covered by this capture.",
+      "same_work_unit_binding": "workflow/tqe-p5-twse-work-unit.option-c.draft.json bounded_capture_loop.session_list_source.captured_calendar"
+    },
+    "session_list": {
+      "file": "workflow/tqe-p5-option-c-session-list.json",
+      "generator": "scripts/p5_option_c_session_list.py",
+      "status": "partial_calendar_coverage_pending_full_window_enumeration",
+      "enumerated_sessions": 129,
+      "enumerated_segment": "2026-01-01..2026-07-19",
+      "uncovered_segment": "2023-07-20..2025-12-31",
+      "estimated_total_sessions": 727,
+      "session_count_cap": 750,
+      "cap_note": "Estimate is at or below the cap but is not proof; activation requires the fully enumerated list for the whole window.",
+      "coverage_gap_handling": "Per-year official calendar captures or official yearly schedule publications; extra GETs not executed, recorded as options in the session-list file."
+    },
+    "terms_of_use_review": {
+      "reviewed_at": "2026-07-22",
+      "status": "recorded_conflict_identified_human_decision_required",
+      "findings": [
+        {
+          "url": "https://www.twse.com.tw/zh/terms/use.html",
+          "checked_at": "2026-07-22",
+          "finding": "TWSE 使用條款『下載軟體或資料』: 非依證交所同意之方式或經證交所同意者，禁止透過自動化裝置、指令碼、自動程式、蜘蛛程式、爬蟲程式或擷取程式下載本網站之軟體或資料。An automated per-session MI_INDEX capture loop reads as a prohibited scripted download absent TWSE consent."
+        },
+        {
+          "url": "https://www.twse.com.tw/zh/terms/use.html",
+          "checked_at": "2026-07-22",
+          "finding": "TWSE 使用條款『智慧財產權』: website content is TWSE IP; reproduction/distribution requires prior written consent, except data TWSE has licensed through 政府資料開放平臺, and quotation with clear source attribution is permitted."
+        },
+        {
+          "url": "https://data.gov.tw/license",
+          "checked_at": "2026-07-22",
+          "finding": "政府資料開放授權條款-第1版: free, non-exclusive, irrevocable use including derivatives, with a mandatory attribution (顯名聲明) obligation."
+        },
+        {
+          "url": "https://data.gov.tw/dataset/11549",
+          "checked_at": "2026-07-22",
+          "finding": "TWSE's official reply on the dataset page states the open-licensed dataset only provides daily transaction data from 2017-05 onward and directs historical requests to the official website; the open-data license therefore does not clearly cover bulk historical MI_INDEX captures."
+        },
+        {
+          "url": "https://www.twse.com.tw/robots.txt",
+          "checked_at": "2026-07-22",
+          "finding": "robots.txt disallows only /epaper/ and /FTSE/; robots policy does not override the 使用條款 automated-download clause."
+        }
+      ],
+      "conclusion": "The literal TWSE website terms prohibit scripted/crawler downloads without TWSE consent. Option C activation must stay blocked until the user resolves this: obtain TWSE consent or written clarification, treat the site's own CSV download function as the consented method (requires user's explicit risk acceptance recorded in the work-unit), or abandon option C. This finding does not flip any earlier evidence; it adds a human gate."
+    },
+    "evidence_progress": {
+      "as_of": "2026-07-22",
+      "completed": [
+        "first_human_trial_capture_sha256_bytes_and_timestamp_for_one_recent_session",
+        "csv_encoding_and_schema_probe_recorded_from_the_trial_capture",
+        "official_calendar_holidaySchedule_digest_bound_to_the_same_work_unit (partial coverage: ROC year 115 / 2026 only)",
+        "terms_of_use_review_recorded_for_the_mi_index_endpoint (conflict identified; human decision required)"
+      ],
+      "still_pending": [
+        "session_list_generated_from_the_approved_calendar_digest_with_count_at_or_below_cap (partial: 129 of ~727 estimated sessions enumerated; 2023-2025 calendar coverage gap unresolved)",
+        "fixture_retention_license_size_and_sha256_policy_approval_for_per_session_csv (drafted at workflow/tqe-p5-option-c-fixture-retention-policy.json, pending_human_approval)",
+        "per_session_work_unit_digest_approved_by_human_before_host_egress (blocked on full session enumeration and the terms-of-use decision)",
+        "terms_of_use_conflict_resolution_by_human (new gate from the 2026-07-22 review)"
+      ]
     }
   },
   "hard_stop": "Do not activate P5 with a paid subscription, substitute the latest-day endpoint, or create an implicit unbounded loop until a free public source contract is proven and approved. The option C selection authorizes contract amendment work only; capture starts only after the fresh P5.1 pass and the option_c_endpoint_assessment.required_before_activation list are complete.",

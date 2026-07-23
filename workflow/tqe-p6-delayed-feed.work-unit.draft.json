@@ -1,0 +1,70 @@
+{
+  "schema": "loop-hybrid-work-unit/v2",
+  "status": "draft_not_runnable",
+  "blocked_reason": "work_unit_not_yet_human_approved",
+  "work_unit_id": "tw-quant-engine-p6-delayed-feed-001",
+  "target_repo": "/absolute/path/to/tw-quant-engine",
+  "goal": "Activate the delayed provider feed per the approved P6 contract: human-initiated bounded capture of delayed quotes into the research read model with explicit delay-label propagation and P5.2-aligned PIT semantics. Not realtime, not streaming, not a persistent connection; no order-decision surface.",
+  "contract": "docs/tqe-p6-delayed-feed-contract.md",
+  "activation_proposal": "docs/tqe-p6-deferred-capability-activation-proposal.md",
+  "network": true,
+  "network_note": "Bounded human-approved capture only, after source contract digest and work-unit digest approval with host-egress admission. Zero network in verification commands.",
+  "provider_calls": false,
+  "provider_calls_note": "Remains false until activation; each approved request is accounted in the acceptance JSON.",
+  "credentials": false,
+  "host_egress": "required_before_activation",
+  "implementation_slices": [
+    "source contract finalization for the chosen endpoint (delay definition, cadence, schema, coverage, licence, digest policy) in the P5.1 style",
+    "first human trial capture with caller-owned raw evidence (sha256, bytes, timestamps, encoding probe) proving delay semantics during market hours",
+    "runtime boundary amendment: delay label propagation into read model and UI, staleness threshold, cutoff and available_at PIT semantics",
+    "deterministic normalization of captured responses into the read model with delay labels",
+    "research-only UI presentation of delayed data with explicit delay/staleness labelling, never presented as current",
+    "deterministic fixture tests with no network and no wall-clock dependence; offline P1-P4 replay",
+    "acceptance evidence JSON with provider_calls accounted per approved request"
+  ],
+  "activation_requirements": [
+    "human approval of the source contract digest for the chosen endpoint",
+    "human approval of this exact work-unit digest",
+    "host_egress_admission",
+    "terms_of_use_and_robots_review_recorded_for_the_chosen_endpoint",
+    "trial capture proving delay semantics recorded before any scheduled capture",
+    "p4_research_closure.py passing before and after implementation",
+    "offline replay of deterministic fixture tests",
+    "human acceptance after implementation"
+  ],
+  "verification": [
+    {
+      "id": "offline-tests",
+      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests", "-v"],
+      "timeout_seconds": 180,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "engine-preflight",
+      "argv": ["python3", "scripts/lh_preflight.py"],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "p4-closure",
+      "argv": ["python3", "scripts/p4_research_closure.py"],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    }
+  ],
+  "cannot_claim": [
+    "realtime or streaming data of any kind",
+    "persistent connection or unattended poller",
+    "capture executed before source contract and work-unit digest approval with host-egress admission",
+    "delayed data presented as current",
+    "order route, order command, order UI control, or order-decision surface",
+    "redistribution of feed data beyond the local machine",
+    "licence terms inherited from the P5 EOD bulk slice",
+    "capability 1, 4, or 6 activated",
+    "product acceptance",
+    "automatic promotion"
+  ]
+}

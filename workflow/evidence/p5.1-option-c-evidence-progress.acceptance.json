@@ -1,0 +1,115 @@
+{
+  "schema": "tw-quant-engine-p5-option-c-evidence-progress/v1",
+  "stage_id": "P5.1",
+  "status": "progress_recorded_blocked_source_contract",
+  "recorded_at": "2026-07-22",
+  "approval": {
+    "approved_by": "user",
+    "approval_note": "2026-07-22 user approval to arrange the remaining option C pre-activation evidence (calendar capture, session list, retention policy draft, work-unit preparation, terms review). The per-session 750-session capture is NOT approved and was not executed.",
+    "execution_boundary": "workflow/tqe-p5-twse-source-contract.json option_c_endpoint_assessment",
+    "network_enabled": true,
+    "provider_calls": 1,
+    "provider_calls_note": "Exactly 1 bounded official-calendar GET (holidaySchedule), same pattern as the approved 2308 trial capture. No market-data session GETs were issued. Top-level provider_calls_made_by_repository remains 0."
+  },
+  "completed_items": [
+    {
+      "item": "official_calendar_holidaySchedule_digest_bound_to_the_same_work_unit",
+      "status": "completed_with_limitation",
+      "evidence": {
+        "script": "scripts/p5_calendar_capture.cjs",
+        "method": "GET",
+        "url": "https://openapi.twse.com.tw/v1/holidaySchedule/holidaySchedule",
+        "fetched_at": "2026-07-22T21:56:13.158Z",
+        "http_status": 200,
+        "response_bytes": 3774,
+        "response_sha256": "sha256:7644c1a8af784c09f54670fd7413f536b13eb76c54d658058e8873d1aee32117",
+        "raw_file": "outputs/p5-trial-capture/holidaySchedule.json",
+        "bound_in": "workflow/tqe-p5-twse-work-unit.option-c.draft.json bounded_capture_loop.session_list_source.captured_calendar"
+      },
+      "limitation": "The endpoint covers only ROC year 115 (2026); 2023-07-20..2025-12-31 is uncovered."
+    },
+    {
+      "item": "session_list_generated_from_the_approved_calendar_digest_with_count_at_or_below_cap",
+      "status": "partial_pending_coverage_resolution",
+      "evidence": {
+        "file": "workflow/tqe-p5-option-c-session-list.json",
+        "generator": "scripts/p5_option_c_session_list.py",
+        "enumerated_sessions": 129,
+        "enumerated_segment": "2026-01-01..2026-07-19",
+        "uncovered_segment": "2023-07-20..2025-12-31",
+        "estimated_total_sessions": 727,
+        "session_count_cap": 750
+      },
+      "limitation": "Full-window enumeration requires resolving the 2023-2025 calendar coverage gap (options recorded in the session-list file; extra GETs require separate user approval)."
+    },
+    {
+      "item": "fixture_retention_license_size_and_sha256_policy_approval_for_per_session_csv",
+      "status": "drafted_pending_human_approval",
+      "evidence": {
+        "file": "workflow/tqe-p5-option-c-fixture-retention-policy.json",
+        "highlights": [
+          "raw per-session CSV stored gzip-compressed under outputs/ (gitignored), caller-owned",
+          "per-session caps: 5 MB uncompressed / 2 MB gzip (S9 audit); ~0.7 MB gzip observed in trial",
+          "sha256 of uncompressed CSV plus gzip sha256 recorded per session",
+          "attribution 資料來源：臺灣證券交易所; normalized fixtures enter repo only after policy approval, ToS resolution, and work-unit digest approval"
+        ]
+      }
+    },
+    {
+      "item": "per_session_work_unit_digest_approved_by_human_before_host_egress",
+      "status": "prepared_not_approvable_yet",
+      "evidence": {
+        "file": "workflow/tqe-p5-twse-work-unit.option-c.draft.json",
+        "status": "draft_not_runnable",
+        "approval_packet_ready": true,
+        "blockers": [
+          "full-window session enumeration missing (calendar coverage gap)",
+          "terms-of-use conflict unresolved"
+        ]
+      }
+    },
+    {
+      "item": "terms_of_use_review_recorded_for_the_mi_index_endpoint",
+      "status": "completed_conflict_identified",
+      "evidence": {
+        "recorded_in": "workflow/tqe-p5-twse-source-contract.json option_c_endpoint_assessment.terms_of_use_review",
+        "sources": [
+          "https://www.twse.com.tw/zh/terms/use.html",
+          "https://data.gov.tw/license",
+          "https://data.gov.tw/dataset/11549",
+          "https://www.twse.com.tw/robots.txt"
+        ],
+        "conclusion": "TWSE 使用條款 prohibits automated/scripted downloads without TWSE consent; open-data license clearly covers only the data.gov.tw datasets (daily, 2017-05 onward), not bulk historical MI_INDEX captures. Human decision required before activation."
+      }
+    }
+  ],
+  "fail_closed_verification": {
+    "p5_execution_target": {
+      "argv": ["python3", "scripts/p5_execution_target.py"],
+      "exit_code": 0,
+      "status": "blocked_source_contract"
+    },
+    "p5_work_unit_digest": {
+      "argv": ["python3", "scripts/p5_work_unit_digest.py"],
+      "exit_code": 0,
+      "status": "blocked_source_contract"
+    },
+    "offline_tests": {
+      "argv": ["python3", "-B", "-m", "unittest", "discover", "-s", "tests"],
+      "exit_code": 0,
+      "result": "no regressions"
+    }
+  },
+  "acceptance_notes": [
+    "Top-level source-contract status stays source_contract_blocked; no candidate was admitted and the 750-session capture was not executed.",
+    "The calendar capture adds exactly 1 provider call recorded inside option_c_endpoint_assessment.calendar_capture; the activation counter provider_calls_made_by_repository stays 0.",
+    "New human gate: the 2026-07-22 terms-of-use review found the TWSE website terms prohibit scripted downloads without consent; option C cannot activate until the user resolves this.",
+    "The 2023-2025 calendar coverage gap must be resolved (per-year official calendars or yearly schedule publications) before the session list can be fully enumerated within the 750 cap."
+  ],
+  "next_human_approval_points": [
+    "Resolve the terms-of-use conflict: obtain TWSE consent, accept the site CSV download as the consented method with recorded risk acceptance, or abandon option C.",
+    "Approve the 2023-2025 calendar coverage resolution (extra per-year calendar GETs or official yearly schedule publications).",
+    "Approve the fixture retention policy (workflow/tqe-p5-option-c-fixture-retention-policy.json).",
+    "Approve the final per-session work-unit digest after the above, before any host egress."
+  ]
+}
