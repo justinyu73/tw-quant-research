@@ -10,13 +10,15 @@ import p5_work_unit_digest  # noqa: E402
 
 
 class P5WorkUnitDigestTests(unittest.TestCase):
-    def test_template_digest_is_stable_but_not_activation_ready(self) -> None:
+    def test_approved_digest_replays_and_is_execution_ready(self) -> None:
         result = p5_work_unit_digest.run(ROOT)
-        self.assertEqual(result["status"], "blocked_source_contract")
+        self.assertEqual(result["status"], "approved_pending_execution")
         self.assertEqual(result["stage_id"], "P5.3")
-        self.assertFalse(result["activation_ready"])
+        self.assertTrue(result["activation_ready"])
         self.assertEqual(result["provider_calls"], 0)
         self.assertTrue(all(result["checks"].values()))
+        self.assertTrue(result["checks"]["source_contract_is_fail_closed"])
+        self.assertTrue(result["checks"]["approved_digest_replays"])
 
     def test_digest_replay_is_deterministic(self) -> None:
         first = p5_work_unit_digest.run(ROOT)

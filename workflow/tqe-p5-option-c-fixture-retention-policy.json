@@ -1,6 +1,7 @@
 {
   "schema": "tw-quant-engine-p5-option-c-fixture-retention/v1",
-  "status": "pending_human_approval",
+  "status": "superseded_by_option_b_2026_07_22",
+  "supersede_note": "Retained as a record, not deleted. Option C was withdrawn on 2026-07-22; the forward-accumulation retention rules are in workflow/tqe-p5-forward-accumulation.work-unit.draft.json.",
   "drafted_at": "2026-07-22",
   "approval_authority": "user",
   "applies_to": "workflow/tqe-p5-twse-work-unit.option-c.draft.json bounded per-trading-day capture",

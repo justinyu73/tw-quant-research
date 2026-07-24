@@ -1,0 +1,202 @@
+{
+  "schema": "loop-hybrid-work-unit/v2",
+  "status": "approved_runnable",
+  "work_unit_id": "tw-quant-engine-p5-twse-forward-accumulation-001",
+  "amends": "workflow/tqe-p5-twse-work-unit.draft.json",
+  "amendment_authority": "user_selection option B in workflow/tqe-p5-twse-source-contract.json decision.user_selection_option_b, decided 2026-07-22",
+  "target_repo": "/absolute/path/to/tw-quant-engine",
+  "goal": "Admit a point-in-time TWSE EOD history by forward accumulation: one human-initiated capture of the official free STOCK_DAY_ALL full-market daily snapshot per trading day, starting at the activation date, with the official calendar bound in the same work-unit and separate corporate-action evidence. No retrospective backfill.",
+  "approval_package": "workflow/tqe-p5-history-admission.json",
+  "source_contract": "workflow/tqe-p5-twse-source-contract.json",
+  "corporate_action_admission": "workflow/tqe-p5-corporate-action-admission.json",
+  "network": false,
+  "provider_calls": false,
+  "credentials": false,
+  "host_egress": "required_before_activation",
+  "activation_date": "to_be_set_by_user_at_digest_approval",
+  "daily_capture": {
+    "kind": "human_initiated_daily_snapshot_capture",
+    "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
+    "http_method": "GET",
+    "url_exact": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
+    "frequency": "once per trading day, human-initiated; never scheduled or automatic",
+    "one_get_per_run": true,
+    "request_budget": {
+      "calendar_gets_at_activation": 1,
+      "daily_snapshot_gets_per_run": 1,
+      "retry_policy": "no automatic retry; a failed run is recorded and stops for human review"
+    },
+    "encoding": "utf-8 (trial capture 2026-07-23: strict UTF-8 decode succeeds)",
+    "schema_contract": {
+      "row_keys_exact": [
+        "Date",
+        "Code",
+        "Name",
+        "TradeVolume",
+        "TradeValue",
+        "OpeningPrice",
+        "HighestPrice",
+        "LowestPrice",
+        "ClosingPrice",
+        "Change",
+        "Transaction"
+      ],
+      "date_format": "ROC calendar YYYMMDD (1150722 = 2026-07-22)",
+      "ohlcv_mapping": {
+        "date": "Date",
+        "security_code": "Code",
+        "security_name": "Name",
+        "volume_shares": "TradeVolume",
+        "amount": "TradeValue",
+        "open": "OpeningPrice",
+        "high": "HighestPrice",
+        "low": "LowestPrice",
+        "close": "ClosingPrice",
+        "price_change": "Change",
+        "transaction_count": "Transaction"
+      },
+      "trial_capture_reference": "workflow/tqe-p5-twse-source-contract.json option_b_forward_accumulation.trial_capture (sha256:a7fb7f32a89682516f3dd69e716a2c73c343943a4c31e8f945d66acc3f192cb0)"
+    },
+    "latest_day_semantics": "The response covers exactly one trading day (all rows share one Date). The run records that date; the accumulated history is the union of all daily captures from the activation date onward.",
+    "fail_closed_rules": [
+      "stop before the GET if the calendar digest is not recorded in this work-unit",
+      "stop if more than one GET would be issued in a run",
+      "stop on any non-200 response or empty body",
+      "stop if strict UTF-8 decode fails",
+      "stop if the JSON row keys differ from schema_contract.row_keys_exact",
+      "stop if the rows contain more than one distinct Date value",
+      "stop if the Date value is not a plausible trading session on or after the activation date",
+      "stop if a capture for the same Date already exists in the accumulation store (no double-counting)",
+      "never request any date before the activation date; no date parameter exists and none may be synthesized"
+    ],
+    "per_run_record_format": {
+      "capture_date_roc": "Date value shared by all rows",
+      "capture_date_iso": "converted Gregorian date",
+      "url": "exact GET URL issued",
+      "retrieval_timestamp": "ISO-8601 with +08:00 offset",
+      "http_status": "integer",
+      "response_bytes": "integer",
+      "response_sha256": "sha256:<hex>",
+      "row_count": "integer",
+      "result": "captured|failed_stop"
+    }
+  },
+  "calendar_binding": {
+    "endpoint": "https://openapi.twse.com.tw/v1/holidaySchedule/holidaySchedule",
+    "captured_at_activation": {
+      "method": "GET",
+      "fetched_at": "2026-07-22T21:56:13.158Z",
+      "http_status": 200,
+      "response_bytes": 3774,
+      "response_sha256": "sha256:7644c1a8af784c09f54670fd7413f536b13eb76c54d658058e8873d1aee32117",
+      "raw_file": "outputs/p5-trial-capture/holidaySchedule.json",
+      "covered_gregorian_years": [
+        "2026"
+      ]
+    },
+    "binding": "The calendar response sha256 recorded here is bound to this work-unit; it validates expected trading sessions going forward.",
+    "rollover_rule": "The official calendar endpoint serves the current ROC year only. When a new calendar year begins, a fresh calendar capture (1 GET) with a new digest requires separate user approval before captures continue into that year.",
+    "calendar_inference_prohibited": "Sessions are validated against the official calendar only; never inferred from observed snapshot dates."
+  },
+  "raw_retention_policy": {
+    "ownership": "caller_owned_external_evidence",
+    "storage_location": "outputs/p5-forward-accumulation/ (gitignored; never committed)",
+    "file_naming": "STOCK_DAY_ALL_{YYYYMMDD_gregorian_capture_date}.json",
+    "compression": "not required: the daily snapshot is ~318 KB JSON, well under the S9 audit 2 MB cap; gzip may be enabled later if size grows",
+    "digest": "sha256 of the exact stored bytes, prefixed sha256:<hex>, recorded per run in the run manifest",
+    "attribution": "資料來源：臺灣證券交易所",
+    "license": "政府資料開放授權條款-第1版 via data.gov.tw dataset 11549; attribution displayed in the dashboard data-source panel and recorded in every fixture manifest"
+  },
+  "normalized_accumulation": {
+    "flow": "raw JSON -> CP950-free UTF-8 parse -> schema validation against schema_contract -> normalized OHLCV rows appended to the local accumulation read model keyed by (date, security_code) -> per-run manifest update",
+    "read_model": "local accumulation store under the user application data directory; repository admission of normalized fixtures only after exact source and terms review per the source contract",
+    "corporate_action_adjustment": "applied per workflow/tqe-p5-adjusted-ohlcv-volume-policy.json only with the separately preapproved fixture; raw OHLCV stays unchanged",
+    "pit_rule": "each row is point-in-time stamped with its capture retrieval timestamp; no look-ahead across capture dates"
+  },
+  "activation_requirements": [
+    "exact_forward_accumulation_work_unit_digest_approved_by_human_before_host_egress",
+    "activation_date_set_by_user_at_digest_approval",
+    "preapproved_corporate_action_fixture_and_factor_provenance",
+    "host_egress_admission"
+  ],
+  "verification": [
+    {
+      "id": "p5-2-corporate-action-validation",
+      "argv": [
+        "python3",
+        "scripts/p5_corporate_action_validation.py"
+      ],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "p5-target-preflight",
+      "argv": [
+        "python3",
+        "scripts/p5_execution_target.py"
+      ],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "offline-tests",
+      "argv": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "timeout_seconds": 180,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "engine-preflight",
+      "argv": [
+        "python3",
+        "scripts/lh_preflight.py"
+      ],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    },
+    {
+      "id": "p4-closure",
+      "argv": [
+        "python3",
+        "scripts/p4_research_closure.py"
+      ],
+      "timeout_seconds": 60,
+      "read_only": true,
+      "network": false
+    }
+  ],
+  "cannot_claim": [
+    "provider invoked",
+    "retrospective history before the activation date",
+    "data completeness",
+    "adjusted-price correctness before corporate-action evidence",
+    "TPEx admitted",
+    "general provider runtime enabled",
+    "product acceptance",
+    "automatic promotion"
+  ],
+  "approval": {
+    "approved_by": "user",
+    "approved_at": "2026-07-22",
+    "approved_digest": "sha256:2eb454e1d5d7442851bae3af4a6930a0fb661dbfeb24a6da46bb8a4b1bcc0ad5",
+    "activation_start_date": "2026-07-23",
+    "approval_note": "User approved the forward-accumulation work-unit digest and set the activation start date. Digest computed with the p5_work_unit_digest canonicalization; only the status flip and this approval block are post-approval changes.",
+    "digest_correction": "The digest first quoted for approval (sha256:6a493dd3...) did not match the actual file content; the content was re-verified and the correct digest recomputed on 2026-07-22. Substance unchanged.",
+    "pre_approval_fields": {
+      "status": "draft_not_runnable",
+      "blocked_reason": "work_unit_not_yet_human_approved"
+    }
+  }
+}

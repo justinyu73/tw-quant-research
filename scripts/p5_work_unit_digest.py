@@ -10,7 +10,7 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DRAFT_PATH = ROOT / "workflow/tqe-p5-twse-work-unit.draft.json"
+DRAFT_PATH = ROOT / "workflow/tqe-p5-forward-accumulation.work-unit.draft.json"
 SOURCE_PATH = ROOT / "workflow/tqe-p5-twse-source-contract.json"
 CORPORATE_ACTION_PATH = ROOT / "workflow/tqe-p5-corporate-action-admission.json"
 POLICY_PATH = ROOT / "workflow/tqe-p5-adjusted-ohlcv-volume-policy.json"
@@ -34,10 +34,31 @@ def run(root: Path = ROOT) -> dict[str, Any]:
     corporate_action = _load(root / CORPORATE_ACTION_PATH.relative_to(ROOT))
     policy = _load(root / POLICY_PATH.relative_to(ROOT))
     digest = _digest(draft)
+    selected_source = source.get("selected_source")
+    approval = draft.get("approval") if isinstance(draft.get("approval"), dict) else None
+    approved = draft.get("status") == "approved_runnable" and approval is not None
+    if approval:
+        pre_fields = approval.get("pre_approval_fields") if isinstance(approval.get("pre_approval_fields"), dict) else {}
+        replay = {key: value for key, value in draft.items() if key != "approval"}
+        for key in ("status", "blocked_reason"):
+            if key in pre_fields:
+                replay[key] = pre_fields[key]
+        approved_digest_replays = _digest(replay) == approval.get("approved_digest")
+    else:
+        approved_digest_replays = True
     checks = {
-        "draft_is_non_runnable": draft.get("status") == "draft_not_runnable",
-        "source_contract_is_blocked": source.get("status") == "source_contract_blocked"
-        and source.get("selected_source") is None,
+        "work_unit_status_valid": draft.get("status") in {"draft_not_runnable", "approved_runnable"},
+        "source_contract_is_fail_closed": source.get("status")
+        in {"source_contract_blocked", "source_contract_selected_pending_activation"}
+        and source.get("provider_calls_made_by_repository") == 0
+        and (
+            selected_source is None
+            or (
+                isinstance(selected_source, dict)
+                and selected_source.get("activation")
+                in {"pending_work_unit_digest_approval", "approved_pending_first_capture"}
+            )
+        ),
         "corporate_action_is_admitted": corporate_action.get("stage_id") == "P5.2"
         and corporate_action.get("status") == "pass",
         "adjusted_ohlcv_policy_is_defined": policy.get("policy_id") == "tqe-adjusted-ohlcv-volume/v1"
@@ -46,17 +67,22 @@ def run(root: Path = ROOT) -> dict[str, Any]:
         and draft.get("provider_calls") is False,
         "digest_is_stable": digest.startswith("sha256:") and len(digest) == 71,
         "activation_is_not_claimed": draft.get("host_egress") == "required_before_activation",
+        "approved_digest_replays": approved_digest_replays,
     }
     errors = [name for name, passed in checks.items() if not passed]
+    status = "fail" if errors else (
+        "approved_pending_execution" if approved else "blocked_pending_work_unit_digest_approval"
+    )
     return {
         "schema": "tw-quant-engine-p5-work-unit-digest/v1",
         "stage_id": "P5.3",
-        "status": "fail" if errors else "blocked_source_contract",
+        "status": status,
         "work_unit_id": draft.get("work_unit_id"),
         "draft_path": str((root / DRAFT_PATH.relative_to(ROOT)).relative_to(root)),
         "template_digest": digest,
-        "digest_status": "template_only_waiting_p5_1",
-        "activation_ready": False,
+        "approved_digest": approval.get("approved_digest") if approval else None,
+        "digest_status": "approved_exact_digest" if approved else "template_only_pending_human_approval",
+        "activation_ready": approved and not errors,
         "network": False,
         "provider_calls": 0,
         "checks": checks,

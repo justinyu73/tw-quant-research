@@ -1,15 +1,37 @@
 {
   "schema": "tw-quant-engine-p5-twse-source-contract/v1",
-  "status": "source_contract_blocked",
+  "status": "source_contract_selected_pending_activation",
+  "status_note": "Changed from source_contract_blocked on 2026-07-22 after the user selected option B (forward accumulation). The fail-closed invariant is unchanged: no activation until the exact work-unit digest is approved; provider_calls_made_by_repository remains 0.",
   "market": "TWSE",
   "purpose": "free_reference_data_capture_for_human_research",
   "requested_window": {
     "start": "2023-07-20",
     "end": "2026-07-19",
-    "as_of": "2026-07-19T23:59:59+08:00"
+    "as_of": "2026-07-19T23:59:59+08:00",
+    "revision_note": "Original three-year retrospective window. Superseded 2026-07-22 by option B: forward accumulation from the activation date; see forward_accumulation_window."
   },
-  "selected_strategy": "free_official_public_capture",
-  "selected_source": null,
+  "forward_accumulation_window": {
+    "kind": "forward_accumulation_from_activation",
+    "start": "activation_date_to_be_set_in_the_approved_work_unit",
+    "end": "ongoing_daily",
+    "accumulation_target": "three_calendar_years_accumulated_by_daily_snapshots",
+    "backfill": "none",
+    "backfill_policy": "wait_for_free_official_bulk_source; if a free bounded bulk artifact appears later, a separate P5.1 pass may backfill 2023-07-20..activation_date"
+  },
+  "selected_strategy": "free_official_daily_snapshot_forward_accumulation",
+  "selected_source": {
+    "candidate_id": "twse_openapi_stock_day_all",
+    "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
+    "role": "latest_full_market_daily_snapshot_captured_once_per_trading_day_from_activation",
+    "selection": "option_b_reduce_history_depth_target",
+    "selected_by": "user",
+    "selected_at": "2026-07-22",
+    "activation": "approved_pending_first_capture",
+    "license": "政府資料開放授權條款-第1版 via data.gov.tw dataset 11549, attribution required",
+    "note": "Selected for forward accumulation only. This source does not provide the original three-year retrospective window; the backfill policy is recorded in forward_accumulation_window.",
+    "activation_start_date": "2026-07-23",
+    "work_unit_approval": "workflow/evidence/p5.3-forward-accumulation-approval.acceptance.json"
+  },
   "access_policy": {
     "free_public_sources_only": true,
     "paid_subscriptions": false,
@@ -26,9 +48,23 @@
       "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
       "official_reference": "https://openapi.twse.com.tw/",
       "role": "latest_full_market_daily_transaction_snapshot",
-      "required_fields": ["date", "security_code", "security_name", "volume_shares", "amount", "open", "high", "low", "close", "price_change", "transaction_count"],
+      "required_fields": [
+        "date",
+        "security_code",
+        "security_name",
+        "volume_shares",
+        "amount",
+        "open",
+        "high",
+        "low",
+        "close",
+        "price_change",
+        "transaction_count"
+      ],
       "decision": "rejected_for_p5_bulk",
-      "reason": "The public contract evidence identifies a daily dataset but does not prove one bounded response can cover the requested three-year range. Existing repository evidence treats this endpoint as a latest-day snapshot."
+      "reason": "The public contract evidence identifies a daily dataset but does not prove one bounded response can cover the requested three-year range. Existing repository evidence treats this endpoint as a latest-day snapshot.",
+      "forward_accumulation_decision": "selected_for_option_b",
+      "forward_accumulation_reason": "2026-07-22 trial capture (see option_b_forward_accumulation.trial_capture) confirms the schema and the single-latest-trading-day semantics; under option B the endpoint is captured once per trading day from activation and history accumulates going forward."
     },
     {
       "candidate_id": "twse_openapi_stock_day_avg_all",
@@ -36,7 +72,13 @@
       "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_AVG_ALL",
       "official_reference": "https://openapi.twse.com.tw/",
       "role": "daily_close_and_monthly_average_snapshot",
-      "required_fields": ["date", "security_code", "security_name", "close", "monthly_average"],
+      "required_fields": [
+        "date",
+        "security_code",
+        "security_name",
+        "close",
+        "monthly_average"
+      ],
       "decision": "rejected_for_p5_bulk",
       "reason": "The official catalogue describes close and monthly average fields, not daily OHLCV."
     },
@@ -73,8 +115,21 @@
       "endpoint": "https://eshop.twse.com.tw/en/product/detail/ef7b7785e2cb4793baca3644c8a74d4e",
       "official_reference": "https://eshop.twse.com.tw/en/product/detail/ef7b7785e2cb4793baca3644c8a74d4e",
       "role": "official_daily_full_market_ohlcv_file",
-      "product_files": ["TWT62U", "TWT69U", "TWTA5U"],
-      "required_fields": ["security_code", "open", "high", "low", "close", "volume_shares", "transactions", "trading_value"],
+      "product_files": [
+        "TWT62U",
+        "TWT69U",
+        "TWTA5U"
+      ],
+      "required_fields": [
+        "security_code",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume_shares",
+        "transactions",
+        "trading_value"
+      ],
       "coverage_evidence": {
         "official_start_date": "1992-01-04",
         "period": "daily",
@@ -89,9 +144,20 @@
     "method": "GET",
     "endpoint": "https://openapi.twse.com.tw/v1/holidaySchedule/holidaySchedule",
     "official_reference": "https://openapi.twse.com.tw/",
-    "observed_shape": ["Name", "Date", "Weekday", "Description"],
+    "observed_shape": [
+      "Name",
+      "Date",
+      "Weekday",
+      "Description"
+    ],
     "decision": "candidate_pending_digest",
-    "required_before_activation": ["retrieval_timestamp", "response_bytes", "sha256", "version_or_coverage_label", "same_work_unit_binding"]
+    "required_before_activation": [
+      "retrieval_timestamp",
+      "response_bytes",
+      "sha256",
+      "version_or_coverage_label",
+      "same_work_unit_binding"
+    ]
   },
   "license_and_retention": {
     "catalog_reference": "https://data.gov.tw/dataset/11549",
@@ -172,9 +238,9 @@
   },
   "decision": {
     "decided_at": "2026-07-22",
-    "status": "source_contract_blocked",
-    "decision_progress": "option_c_approved_fresh_p5_1_pass_pending",
-    "summary": "No free official bounded three-year bulk source exists as of the 2026-07-22 re-verification. The user selected option C on 2026-07-22; P5.1 stays blocked until a fresh P5.1 contract pass for the chosen endpoint and the pre-activation evidence list are complete.",
+    "status": "source_contract_selected_pending_activation",
+    "decision_progress": "option_b_selected_supersedes_option_c_forward_accumulation_pass_pending_work_unit_digest",
+    "summary": "No free official bounded three-year bulk source exists as of the 2026-07-22 re-verification. The user first selected option C on 2026-07-22, then the same day selected option B after the terms-of-use review found the TWSE website terms prohibit scripted downloads without consent. Option B reduces the history-depth goal to forward accumulation from the official free STOCK_DAY_ALL daily snapshot; P5.1 stays pending until the exact work-unit digest is approved.",
     "user_selection": {
       "option_id": "C_bounded_per_trading_day_capture_from_official_free_daily_endpoint",
       "decided_by": "user",
@@ -185,7 +251,25 @@
         "fresh_p5_1_contract_pass_for_the_chosen_endpoint_required_before_activation"
       ],
       "chosen_endpoint_candidate": "twse_legacy_mi_index_csv",
-      "note": "Selection approves the request-budget and work-unit-shape amendment direction only. It does not activate capture; no provider call is authorized by this record."
+      "note": "Selection approves the request-budget and work-unit-shape amendment direction only. It does not activate capture; no provider call is authorized by this record.",
+      "superseded_by": "user_selection_option_b",
+      "superseded_at": "2026-07-22"
+    },
+    "user_selection_option_b": {
+      "option_id": "B_reduce_history_depth_target",
+      "decided_by": "user",
+      "decided_at": "2026-07-22",
+      "supersedes": "C_bounded_per_trading_day_capture_from_official_free_daily_endpoint",
+      "supersede_reason": "The 2026-07-22 terms-of-use review found the TWSE website 使用條款 prohibits automated/scripted downloads without TWSE consent; rather than pursue consent or accept the risk, the user abandoned option C and selected option B.",
+      "approval_scope": [
+        "amend_p5_goal_from_three_year_retrospective_to_forward_accumulation",
+        "amend_history_window_to_activation_date_forward_with_no_backfill",
+        "select_twse_openapi_stock_day_all_as_the_forward_accumulation_source"
+      ],
+      "required_human_approval_received": "User approval to amend the P5 goal and history_window was given by this selection on 2026-07-22.",
+      "tos_human_gate": "resolved_by_abandoning_option_c",
+      "chosen_source": "twse_openapi_stock_day_all",
+      "note": "This selection approves the goal and window amendment and the source choice. It does not activate capture; activation still requires the exact forward-accumulation work-unit digest approved by the user."
     },
     "decision_options": [
       {
@@ -229,14 +313,98 @@
       }
     ],
     "next_action": {
-      "kind": "pre_activation_evidence",
-      "owner": "user_and_agent",
-      "action": "Option C selected 2026-07-22. Complete the fresh P5.1 contract pass for twse_legacy_mi_index_csv (first human trial capture sha256, official calendar digest binding, fixture retention policy approval, per-session work-unit digest approval) before any activation. Top-level status stays source_contract_blocked until that pass is recorded."
+      "kind": "human_gate",
+      "owner": "user",
+      "action": "Option B selected 2026-07-22, superseding option C. Review and approve the exact forward-accumulation work-unit digest (workflow/tqe-p5-forward-accumulation.work-unit.draft.json) before any activation. Option C artifacts are retained as superseded records; the terms-of-use human gate is resolved by abandoning option C."
     }
+  },
+  "option_b_forward_accumulation": {
+    "selected_at": "2026-07-22",
+    "status": "source_selected_pending_work_unit_digest_approval",
+    "license_analysis": {
+      "reviewed_at": "2026-07-22",
+      "conclusion": "STOCK_DAY_ALL is the endpoint behind data.gov.tw dataset 11549, which TWSE publishes under 政府資料開放授權條款-第1版. That license grants free, non-exclusive, irrevocable use including derivatives, with a mandatory attribution (顯名聲明) obligation. Unlike the MI_INDEX website report, this endpoint is the open-licensed channel itself, so the TWSE 使用條款 automated-download clause concern that blocked option C does not apply in the same way: the dataset is expressly licensed for public use via the open-data platform, and the official OpenAPI portal is its published access path. One human-initiated GET per trading day is consistent with the dataset's daily-update design.",
+      "obligations": [
+        "attribution 資料來源：臺灣證券交易所 displayed in the data-source panel and recorded in every fixture manifest",
+        "respect third-party moral rights when using the data",
+        "no claim of TWSE endorsement"
+      ],
+      "residual_caveat": "TWSE's reply on the dataset page notes the open-licensed dataset provides daily data from 2017-05 onward and the OpenAPI serves the latest snapshot; the license covers each captured daily snapshot, not a retrospective bulk pull. Forward accumulation stays inside the licensed scope.",
+      "evidence": [
+        {
+          "url": "https://data.gov.tw/dataset/11549",
+          "checked_at": "2026-07-22",
+          "finding": "Dataset 個股日成交資訊 (STOCK_DAY_ALL): free, daily update, OHLCV fields, 政府資料開放授權條款-第1版, API documented at https://openapi.twse.com.tw/v1/swagger.json."
+        },
+        {
+          "url": "https://data.gov.tw/license",
+          "checked_at": "2026-07-22",
+          "finding": "License grants unlimited-purpose, non-exclusive, irrevocable, royalty-free use including reproduction, distribution, and derivatives; attribution per the 顯名聲明 attachment is mandatory."
+        },
+        {
+          "url": "https://www.twse.com.tw/zh/terms/use.html",
+          "checked_at": "2026-07-22",
+          "finding": "The website terms prohibit scripted downloads of website data without consent, but expressly exempt data TWSE has licensed through 政府資料開放平臺 (『但臺灣證券交易所已授權「政府資料開放平臺」提供公眾使用之本網站資料，不在此限』)."
+        }
+      ]
+    },
+    "trial_capture": {
+      "captured_at": "2026-07-23T00:55:38.563Z",
+      "approved_by": "user",
+      "approval": "2026-07-22 user selection of option B; exactly 1 bounded GET of the official daily snapshot, same pattern as the 2308 trial capture",
+      "script": "scripts/p5_stock_day_all_capture.cjs",
+      "transport": "playwright-core chromium headless request context",
+      "provider_calls": 1,
+      "provider_calls_note": "Human-approved bounded trial GET only. The top-level provider_calls_made_by_repository counter tracks P5 activation and remains 0 until activation.",
+      "method": "GET",
+      "url": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
+      "http_status": 200,
+      "content_type": "application/json",
+      "response_bytes": 317735,
+      "response_sha256": "sha256:a7fb7f32a89682516f3dd69e716a2c73c343943a4c31e8f945d66acc3f192cb0",
+      "encoding": "utf-8 (strict decode succeeds)",
+      "raw_file": "outputs/p5-trial-capture/STOCK_DAY_ALL_20260723.json",
+      "schema_probe": {
+        "row_count": 1371,
+        "keys": [
+          "Date",
+          "Code",
+          "Name",
+          "TradeVolume",
+          "TradeValue",
+          "OpeningPrice",
+          "HighestPrice",
+          "LowestPrice",
+          "ClosingPrice",
+          "Change",
+          "Transaction"
+        ],
+        "four_digit_listed_securities": 1091,
+        "stock_2308_present_with_full_ohlcv": true,
+        "ohlcv_mapping": {
+          "date": "Date (ROC calendar, 1150722 = 2026-07-22)",
+          "security_code": "Code",
+          "security_name": "Name",
+          "volume_shares": "TradeVolume",
+          "amount": "TradeValue",
+          "open": "OpeningPrice",
+          "high": "HighestPrice",
+          "low": "LowestPrice",
+          "close": "ClosingPrice",
+          "price_change": "Change",
+          "transaction_count": "Transaction"
+        }
+      },
+      "latest_day_semantics": "All 1371 rows share exactly one Date value (1150722 = 2026-07-22, the most recent completed trading session at fetch time 2026-07-23T08:55+08:00). Confirmed: the endpoint is a single-latest-trading-day full-market snapshot; history is obtained only by accumulating daily captures."
+    },
+    "remaining_before_activation": [
+      "exact_forward_accumulation_work_unit_digest_approved_by_human_before_host_egress"
+    ]
   },
   "option_c_endpoint_assessment": {
     "assessed_at": "2026-07-22",
-    "status": "assessed_pending_fresh_p5_1_contract_pass",
+    "status": "superseded_by_option_b_2026_07_22",
+    "supersede_note": "Retained as a record. The user abandoned option C on 2026-07-22 after the terms-of-use conflict was identified; the terms_of_use human gate is resolved_by_abandoning_option_c.",
     "method": "read_only_web_verification_no_market_data_downloaded",
     "candidate_id": "twse_legacy_mi_index_csv",
     "official_page": "https://www.twse.com.tw/zh/page/trading/exchange/MI_INDEX.html",
@@ -250,7 +418,24 @@
     "example_url_shape": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=csv&date=20210507&type=ALL",
     "response_contract": {
       "content": "CSV with multiple sections; index rows are prefixed with '=' lines, the full-market section starts at the 證券代號 header row; encoding historically Big5/CP950 (must be detected and recorded at trial capture)",
-      "full_market_columns": ["證券代號", "證券名稱", "成交股數", "成交筆數", "成交金額", "開盤價", "最高價", "最低價", "收盤價", "漲跌(+/-)", "漲跌價差", "最後揭示買價", "最後揭示買量", "最後揭示賣價", "最後揭示賣量", "本益比"],
+      "full_market_columns": [
+        "證券代號",
+        "證券名稱",
+        "成交股數",
+        "成交筆數",
+        "成交金額",
+        "開盤價",
+        "最高價",
+        "最低價",
+        "收盤價",
+        "漲跌(+/-)",
+        "漲跌價差",
+        "最後揭示買價",
+        "最後揭示買量",
+        "最後揭示賣價",
+        "最後揭示賣量",
+        "本益比"
+      ],
       "ohlcv_mapping": {
         "security_code": "證券代號",
         "volume_shares": "成交股數",
@@ -375,7 +560,9 @@
       "response_bytes": 3774,
       "response_sha256": "sha256:7644c1a8af784c09f54670fd7413f536b13eb76c54d658058e8873d1aee32117",
       "raw_file": "outputs/p5-trial-capture/holidaySchedule.json",
-      "covered_gregorian_years": ["2026"],
+      "covered_gregorian_years": [
+        "2026"
+      ],
       "roc_year_format": "Date uses ROC year (1150101 = 2026-01-01)",
       "coverage_limitation": "The endpoint returns only the current ROC year; the requested window segment 2023-07-20..2025-12-31 is not covered by this capture.",
       "same_work_unit_binding": "workflow/tqe-p5-twse-work-unit.option-c.draft.json bounded_capture_loop.session_list_source.captured_calendar"
@@ -422,7 +609,8 @@
           "finding": "robots.txt disallows only /epaper/ and /FTSE/; robots policy does not override the 使用條款 automated-download clause."
         }
       ],
-      "conclusion": "The literal TWSE website terms prohibit scripted/crawler downloads without TWSE consent. Option C activation must stay blocked until the user resolves this: obtain TWSE consent or written clarification, treat the site's own CSV download function as the consented method (requires user's explicit risk acceptance recorded in the work-unit), or abandon option C. This finding does not flip any earlier evidence; it adds a human gate."
+      "conclusion": "The literal TWSE website terms prohibit scripted/crawler downloads without TWSE consent. Option C activation must stay blocked until the user resolves this: obtain TWSE consent or written clarification, treat the site's own CSV download function as the consented method (requires user's explicit risk acceptance recorded in the work-unit), or abandon option C. This finding does not flip any earlier evidence; it adds a human gate.",
+      "resolution": "resolved_by_abandoning_option_c (user decision 2026-07-22): the user selected option B instead; the consent question for MI_INDEX no longer blocks P5 because option C is withdrawn."
     },
     "evidence_progress": {
       "as_of": "2026-07-22",
@@ -440,6 +628,6 @@
       ]
     }
   },
-  "hard_stop": "Do not activate P5 with a paid subscription, substitute the latest-day endpoint, or create an implicit unbounded loop until a free public source contract is proven and approved. The option C selection authorizes contract amendment work only; capture starts only after the fresh P5.1 pass and the option_c_endpoint_assessment.required_before_activation list are complete.",
+  "hard_stop": "Do not activate P5 with a paid subscription, substitute the latest-day endpoint for a retrospective bulk pull, or create an implicit unbounded loop. Option B (forward accumulation) is the selected strategy as of 2026-07-22; capture starts only after the exact forward-accumulation work-unit digest is approved by the user. Option C is withdrawn and its artifacts are superseded records.",
   "provider_calls_made_by_repository": 0
 }

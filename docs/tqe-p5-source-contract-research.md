@@ -1,6 +1,8 @@
 # TQE P5.1 TWSE source-contract research
 
-Status: `source_contract_blocked`
+Status: `source_contract_selected_pending_activation` (option B, forward
+accumulation, selected by the user 2026-07-22; formerly
+`source_contract_blocked`)
 
 The product boundary is free-first: paid Data E-Shop subscriptions are not
 admissible, even if their schema and historical coverage fit the research

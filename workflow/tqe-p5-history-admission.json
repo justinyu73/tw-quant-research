@@ -1,11 +1,16 @@
 {
   "schema": "tw-quant-engine-p5-history-admission/v3",
   "phase_role": "next_phase_execution_target",
-  "status": "source_contract_blocked",
-  "preparation_status": "blocked_pending_source_contract_resolution",
-  "current_preparation_step": "p5_2_validate_preapproved_corporate_action_fixture",
+  "status": "approved_pending_first_capture",
+  "status_note": "Changed from source_contract_blocked on 2026-07-22 after the user selected option B (forward accumulation). Execution is still not ready; the exact forward-accumulation work-unit digest awaits user approval.",
+  "preparation_status": "active_work_unit_preparation",
+  "current_preparation_step": "p5_3_exact_human_run_work_unit_digest",
   "execution_ready": false,
-  "work_unit_draft": "workflow/tqe-p5-twse-work-unit.draft.json",
+  "work_unit_draft": "workflow/tqe-p5-forward-accumulation.work-unit.draft.json",
+  "superseded_work_unit_drafts": [
+    "workflow/tqe-p5-twse-work-unit.draft.json",
+    "workflow/tqe-p5-twse-work-unit.option-c.draft.json"
+  ],
   "source_contract_research": "docs/tqe-p5-source-contract-research.md",
   "source_contract": "workflow/tqe-p5-twse-source-contract.json",
   "corporate_action_admission": "workflow/tqe-p5-corporate-action-admission.json",
@@ -13,11 +18,17 @@
   "work_unit_digest_evidence": "workflow/evidence/p5.3-work-unit-digest.acceptance.json",
   "preparation_results": {
     "p5_0_read_only_contract_preflight": "pass",
-    "p5_1_exact_bulk_source_contract": "source_contract_blocked",
+    "p5_1_exact_bulk_source_contract": "pass_option_b_forward_accumulation_source_selected",
     "p5_2_validate_preapproved_corporate_action_fixture": "pass",
-    "p5_3_exact_human_run_work_unit_digest": "template_digest_blocked_by_p5_1"
+    "p5_3_exact_human_run_work_unit_digest": "template_digest_pending_human_approval"
   },
-  "goal": "admit a bounded three-year point-in-time TWSE/TPEx EOD history and explicit session calendar",
+  "goal": "admit a point-in-time TWSE/TPEx EOD history by forward accumulation from the official free daily snapshot, starting at the activation date, with an explicit session calendar; the original three-year retrospective start is deferred until a free official bulk source appears",
+  "goal_revision": {
+    "revised_at": "2026-07-22",
+    "authority": "user selection of decision option B in workflow/tqe-p5-twse-source-contract.json",
+    "previous_goal": "admit a bounded three-year point-in-time TWSE/TPEx EOD history and explicit session calendar",
+    "reason": "No free official bounded three-year bulk source exists, and the per-session alternative (option C) conflicts with the TWSE website terms of use."
+  },
   "network": false,
   "provider_calls": false,
   "live_trading": false,
@@ -25,18 +36,39 @@
   "human_selection": {
     "phase_driver_contract": "amend_before_p5",
     "source_market_scope": {
-      "in_scope": ["TWSE", "TPEx"],
+      "in_scope": [
+        "TWSE",
+        "TPEx"
+      ],
       "active_slice": "TWSE",
       "next_slice": "TPEx_after_twse_acceptance",
-      "source_strategy": "official_bulk_history_source",
-      "source_families": ["twse_daily_close", "tpex_daily_close"],
-      "deferred_scope": ["US_equity", "new_provider", "general_provider_runtime"]
+      "source_strategy": "official_daily_snapshot_forward_accumulation",
+      "source_families": [
+        "twse_daily_close",
+        "tpex_daily_close"
+      ],
+      "deferred_scope": [
+        "US_equity",
+        "new_provider",
+        "general_provider_runtime"
+      ]
     },
     "history_window": {
-      "kind": "three_calendar_years",
-      "start": "2023-07-20",
-      "end": "2026-07-19",
-      "as_of": "2026-07-19T23:59:59+08:00"
+      "kind": "forward_accumulation_from_activation",
+      "start": "activation_date_to_be_set_in_the_approved_work_unit",
+      "end": "ongoing_daily",
+      "accumulation_target": "three_calendar_years_accumulated_by_daily_snapshots",
+      "backfill": "none",
+      "backfill_policy": "wait_for_free_bulk",
+      "backfill_note": "If a free official bounded bulk source appears later, a separate P5.1 pass may backfill 2023-07-20..activation_date; until then no retrospective history is admitted.",
+      "previous_window": {
+        "kind": "three_calendar_years",
+        "start": "2023-07-20",
+        "end": "2026-07-19",
+        "as_of": "2026-07-19T23:59:59+08:00",
+        "superseded_at": "2026-07-22",
+        "superseded_by": "user selection of decision option B"
+      }
     },
     "calendar": {
       "kind": "official_exchange_snapshot",
@@ -62,12 +94,17 @@
       "host_egress": true,
       "request_budget": {
         "minimum_gets": 2,
-        "named_gets": ["bulk_history", "official_calendar"],
+        "named_gets": [
+          "official_calendar_once_at_activation",
+          "daily_snapshot_once_per_trading_day"
+        ],
+        "per_run_gets": "1 (the daily snapshot) after the one-time calendar binding",
         "corporate_action_fetch": "separate_preapproved_fixture_not_fetched_by_this_work_unit"
       },
       "option_c_request_budget_amendment": {
-        "status": "approved_direction_pending_fresh_p5_1_pass",
+        "status": "superseded_by_option_b_2026_07_22",
         "approved_by": "user_selection option C, 2026-07-22, workflow/tqe-p5-twse-source-contract.json decision.user_selection",
+        "withdrawn_by": "user_selection option B, 2026-07-22, workflow/tqe-p5-twse-source-contract.json decision.user_selection_option_b",
         "amended_shape": {
           "calendar_gets": 1,
           "session_gets_max": 750,
@@ -76,7 +113,7 @@
           "enumeration": "one GET per trading session from the approved calendar list, session-by-session in the work-unit"
         },
         "work_unit_draft": "workflow/tqe-p5-twse-work-unit.option-c.draft.json",
-        "note": "The original 2-GET request_budget remains the pre-amendment baseline. The option C amendment takes effect only after the fresh P5.1 contract pass and per-session work-unit digest approval; until then this package stays blocked."
+        "note": "Retained as a record. Option C was withdrawn on 2026-07-22 after the terms-of-use conflict; the forward-accumulation request budget above is the active shape."
       },
       "automatic_provider_expansion": false
     }
@@ -85,7 +122,7 @@
     "in_scope": [
       "TWSE_daily_eod",
       "TPEx_daily_eod_after_twse_acceptance",
-      "three_year_history",
+      "forward_accumulated_history_toward_three_calendar_years",
       "official_calendar_snapshot",
       "adjusted_ohlcv_with_explicit_provenance",
       "bounded_raw_plus_normalized_fixture",
@@ -105,7 +142,7 @@
     ]
   },
   "required_decisions": [
-    "exact_twse_bulk_history_endpoint_and_terms",
+    "exact_twse_daily_snapshot_endpoint_and_terms",
     "exact_twse_calendar_endpoint_version_and_digest",
     "preapproved_corporate_action_fixture_and_factor_provenance",
     "fixture_retention_license_size_and_digest_policy",
@@ -126,14 +163,22 @@
   ],
   "execution_order": [
     "p5_0_read_only_contract_preflight",
-    "p5_1_freeze_twse_bulk_source_and_calendar_contract",
+    "p5_1_freeze_twse_daily_snapshot_source_and_calendar_contract",
     "p5_2_validate_preapproved_corporate_action_fixture",
-    "p5_3_freeze_exact_source_slice_and_as_of",
+    "p5_3_freeze_exact_source_slice_and_activation_date",
     "approve_exact_work_unit_digest",
-    "host_egress_admit_bulk_history_and_calendar_gets",
+    "host_egress_admit_calendar_and_daily_snapshot_gets",
     "retain_raw_normalized_calendar_and_adjustment_evidence",
     "build_range_coverage_read_model",
     "replay_p1_to_p4_gates",
     "human_review"
-  ]
+  ],
+  "work_unit_approval": {
+    "approved_by": "user",
+    "approved_at": "2026-07-22",
+    "approved_digest": "sha256:2eb454e1d5d7442851bae3af4a6930a0fb661dbfeb24a6da46bb8a4b1bcc0ad5",
+    "activation_start_date": "2026-07-23",
+    "evidence": "workflow/evidence/p5.3-forward-accumulation-approval.acceptance.json",
+    "digest_correction": "Recomputed 2026-07-22 after the initially quoted digest was found not to match the file; content unchanged."
+  }
 }

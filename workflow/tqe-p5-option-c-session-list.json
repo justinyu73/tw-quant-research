@@ -1,6 +1,7 @@
 {
   "schema": "tw-quant-engine-p5-option-c-session-list/v1",
-  "status": "partial_calendar_coverage_pending_full_window_enumeration",
+  "status": "superseded_by_option_b_2026_07_22",
+  "supersede_note": "Retained as a record, not deleted. Option C was withdrawn on 2026-07-22; the 2026-segment enumeration and calendar digest remain valid reference evidence.",
   "generated_at": "2026-07-22T21:57:50+00:00",
   "window": {
     "start": "2023-07-20",
