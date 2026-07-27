@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from tw_quant_engine.desktop_sidecar import (  # noqa: E402
+    SIDECAR_INSTRUMENT_READ_MODEL_SCHEMA,
     SIDECAR_INSTRUMENTS_SCHEMA,
     SIDECAR_KLINE_SCHEMA,
     SidecarContractError,
@@ -160,6 +161,77 @@ class DesktopSidecarTests(unittest.TestCase):
     def test_kline_query_requires_both_explicit_parameters(self) -> None:
         with self.assertRaises(HTTPError) as context:
             urlopen(f"{self.base}/kline?instrument=TWSE%3A2330", timeout=5)  # nosec B310 - loopback
+        self.assertEqual(context.exception.code, 400)
+
+    def test_instrument_read_model_equity_sections(self) -> None:
+        status, payload = self._get(f"/instrument?instrument={quote('TWSE:2330')}")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["schema"], SIDECAR_INSTRUMENT_READ_MODEL_SCHEMA)
+        self.assertTrue(payload["read_only"])
+        self.assertEqual(payload["instrument"]["instrument_id"], "TWSE:2330")
+        self.assertNotEqual(payload["asset_class"], "future")
+        sections = payload["sections"]
+        model = self.catalog.models[("TWSE:2330", "1D")]
+        latest = sections["quote"]["latest_bar"]
+        self.assertEqual(latest["trading_date"], model["bars"][-1]["trading_date"])
+        self.assertEqual(latest["close"], model["bars"][-1]["close"])
+        self.assertEqual(sections["quote"]["previous_close"], model["bars"][-2]["close"])
+        self.assertEqual(sections["kline"]["periods_available"], ["1D", "1W", "M", "Q"])
+        self.assertEqual(sections["kline"]["default_period"], "1D")
+        self.assertEqual(sections["kline"]["snapshot_digest"], model["snapshot_digest"])
+        self.assertIsNone(sections["fundamentals"])
+        self.assertIsNone(sections["financials"])
+        self.assertIsNone(sections["futures"])
+        self.assertEqual(sections["evidence"]["fixture_id"], model["provenance"]["fixture_id"])
+        self.assertEqual(sections["evidence"]["source"], "offline-fixture")
+        self.assertEqual(payload["quality"], model["quality"])
+        self.assertEqual(payload["provenance"], model["provenance"])
+        self.assertLessEqual(payload["available_at"], payload["as_of"])
+
+    def test_instrument_read_model_future_sections(self) -> None:
+        status, payload = self._get(f"/instrument?instrument={quote('TAIFEX:TX:202608')}")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["asset_class"], "future")
+        sections = payload["sections"]
+        futures = sections["futures"]
+        self.assertEqual(futures["contract_month"], "202608")
+        self.assertIsNone(futures["expiry"])
+        self.assertIsNone(futures["settlement"])
+        self.assertIsNone(futures["open_interest"])
+        self.assertIsNone(futures["institutional"])
+        self.assertIsNone(sections["fundamentals"])
+        self.assertIsNone(sections["financials"])
+        self.assertEqual(
+            sections["quote"]["latest_bar"]["trading_date"],
+            self.catalog.models[("TAIFEX:TX:202608", "1D")]["bars"][-1]["trading_date"],
+        )
+
+    def test_instrument_read_model_is_deterministic(self) -> None:
+        path = f"/instrument?instrument={quote('TWSE:2330')}"
+        _, first = self._get(path)
+        reloaded = load_catalog(ROOT / "tests" / "fixtures")
+        server = create_server(reloaded, port=0)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            base = f"http://127.0.0.1:{server.server_address[1]}"
+            with urlopen(f"{base}{path}", timeout=5) as response:  # nosec B310 - loopback
+                second = json.loads(response.read().decode("utf-8"))
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+        self.assertEqual(first, second)
+
+    def test_instrument_read_model_rejects_unknown_or_bad_query(self) -> None:
+        with self.assertRaises(HTTPError) as context:
+            urlopen(f"{self.base}/instrument?instrument={quote('TWSE:9999')}", timeout=5)  # nosec B310 - loopback
+        self.assertEqual(context.exception.code, 404)
+        with self.assertRaises(HTTPError) as context:
+            urlopen(f"{self.base}/instrument", timeout=5)  # nosec B310 - loopback
+        self.assertEqual(context.exception.code, 400)
+        with self.assertRaises(HTTPError) as context:
+            urlopen(f"{self.base}/instrument?instrument={quote('TWSE:2330')}&period=1D", timeout=5)  # nosec B310 - loopback
         self.assertEqual(context.exception.code, 400)
 
 

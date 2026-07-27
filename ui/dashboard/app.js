@@ -22,6 +22,9 @@
   var FINANCIAL_REVIEW_LOCAL_STORAGE_KEY = "tw-quant-engine-financial-review.prototype-v1";
   var BACKTEST_SETTINGS_LOCAL_STORAGE_KEY = "tw-quant-engine-backtest-settings.prototype-v1";
   var watchlistModelRequests = {};
+  var klineInstrumentsAttempts = 0;
+  var KLINE_INSTRUMENTS_MAX_ATTEMPTS = 40;
+  var KLINE_INSTRUMENTS_RETRY_MS = 500;
   var notesLoadStarted = false;
   var notesPersistenceAvailable = null;
   var watchlistSearchQuery = "";
@@ -585,7 +588,7 @@
   var sidecarUrlPromise = null;
 
   function sidecarBaseUrl() {
-    var raw = window.__TW_QUANT_SIDECAR_URL__ || sidecarResolvedUrl || "http://127.0.0.1:8767";
+    var raw = sidecarResolvedUrl || window.__TW_QUANT_SIDECAR_URL__ || "http://127.0.0.1:8767";
     try {
       var parsed = new URL(raw);
       if (parsed.protocol !== "http:" || ["127.0.0.1", "localhost", "[::1]", "::1"].indexOf(parsed.hostname) < 0) return "";
@@ -595,13 +598,15 @@
     }
   }
 
-  // Resolve the loopback sidecar URL once at startup: the dev/preview flow
-  // pins it via __TW_QUANT_SIDECAR_URL__, the desktop shell picks a free port
-  // dynamically and reports it through the sidecar_url command, and the 8767
-  // fallback keeps the plain static preview usable.
+  // Resolve the loopback sidecar URL once at startup: inside the desktop
+  // shell the sidecar binds a dynamically reserved port and reports it
+  // through the sidecar_url command, so the shell must always ask first;
+  // only the plain dev/preview flow (no Tauri) uses the URL pinned via
+  // __TW_QUANT_SIDECAR_URL__, and the 8767 fallback keeps the static
+  // preview usable.
   function ensureSidecarUrl() {
     if (sidecarUrlPromise) return sidecarUrlPromise;
-    if (window.__TW_QUANT_SIDECAR_URL__ || !desktopDataUpdateAvailable()) {
+    if (!desktopDataUpdateAvailable()) {
       sidecarUrlPromise = Promise.resolve(sidecarBaseUrl());
       return sidecarUrlPromise;
     }
@@ -1177,6 +1182,14 @@
     if (current) current.outerHTML = markup;
   }
 
+  // The empty-query guidance doubles as the add-button gate, but showing it
+  // as a warning right after a successful add reads like an error. Only
+  // surface it while the user is interacting with the search box.
+  function visibleWatchlistAddIssues(issues) {
+    if (String(watchlistSearchQuery || "").trim() || watchlistSearchFocused) return issues;
+    return issues.filter(function (item) { return item.field !== "query"; });
+  }
+
   function refreshWatchlistAddButtons() {
     var instruments = core.klineInstruments(state.view);
     var items = core.watchlistItemsForActiveGroup(state);
@@ -1185,8 +1198,9 @@
     root.querySelectorAll('[data-action="watchlist-add"]').forEach(function (button) {
       button.disabled = issues.length > 0;
     });
-    refreshFormIssues("watchlist-add-issues", issues);
-    refreshFormIssues("terminal-watchlist-add-issues", issues);
+    var visible = visibleWatchlistAddIssues(issues);
+    refreshFormIssues("watchlist-add-issues", visible);
+    refreshFormIssues("terminal-watchlist-add-issues", visible);
   }
 
   function requestWatchlistModels() {
@@ -1238,31 +1252,49 @@
     if (!view.kline || !view.kline.runtime_fetch) return;
     ensureWatchlistRuntime();
     if (state.klineRuntimeStatus === "idle") {
-      klineRequestInFlight = true;
-      state = core.reduce(state, { type: "KLINE_LOADING" });
-      render();
-      sidecarFetch("/instruments")
-        .then(function (payload) {
-          if (!payload || !Array.isArray(payload.instruments) || !payload.instruments.length) {
-            throw new Error("sidecar returned no instruments");
-          }
-          state = core.reduce(state, { type: "SET_KLINE_INSTRUMENTS", instruments: payload.instruments });
-          render();
-          klineRequestInFlight = false;
-          requestKlineModel();
-          requestWatchlistModels();
-        })
-        .catch(function () {
-          klineRequestInFlight = false;
-          state = core.reduce(state, { type: "KLINE_ERROR" });
-          render();
-        });
+      klineInstrumentsAttempts = 0;
+      loadKlineInstruments();
       return;
     }
     if (state.klineRuntimeStatus === "ready") {
       if (state.activeSection === "market" || state.activeSection === "features") requestKlineModel();
       requestWatchlistModels();
     }
+  }
+
+  // The desktop shell starts the sidecar at the same moment the webview
+  // boots; the python process needs a few seconds to load the full catalog,
+  // so the first /instruments fetch can lose that race. Retry with a bounded
+  // backoff instead of dropping straight into the unrecoverable error state.
+  function loadKlineInstruments() {
+    klineRequestInFlight = true;
+    if (state.klineRuntimeStatus !== "loading") {
+      state = core.reduce(state, { type: "KLINE_LOADING" });
+      render();
+    }
+    sidecarFetch("/instruments")
+      .then(function (payload) {
+        if (!payload || !Array.isArray(payload.instruments) || !payload.instruments.length) {
+          throw new Error("sidecar returned no instruments");
+        }
+        klineInstrumentsAttempts = 0;
+        state = core.reduce(state, { type: "SET_KLINE_INSTRUMENTS", instruments: payload.instruments });
+        render();
+        klineRequestInFlight = false;
+        requestKlineModel();
+        requestWatchlistModels();
+      })
+      .catch(function () {
+        klineRequestInFlight = false;
+        klineInstrumentsAttempts += 1;
+        if (klineInstrumentsAttempts < KLINE_INSTRUMENTS_MAX_ATTEMPTS) {
+          setTimeout(loadKlineInstruments, KLINE_INSTRUMENTS_RETRY_MS);
+          return;
+        }
+        klineInstrumentsAttempts = 0;
+        state = core.reduce(state, { type: "KLINE_ERROR" });
+        render();
+      });
   }
 
   function dataUpdateTargetIds() {
@@ -1354,7 +1386,7 @@
     var canDeleteGroup = activeGroup && activeGroup.id !== "default";
     var selected = instrumentForId(watchlistSearchSelection) || resolveSearchSelection(instruments, watchlistSearchQuery);
     var terminalAddIssues = core.watchlistAddIssues({ query: watchlistSearchQuery, selected: selected, items: items });
-    return '<section class="terminal-watchlist" data-testid="terminal-watchlist"><header class="terminal-panel-heading"><div><span class="eyebrow">我的行情</span><h2>自選清單</h2></div><span class="terminal-count">' + items.length + '</span></header><div class="terminal-watchlist-controls"><div class="symbol-search"><label><span>搜尋代號／名稱</span><input type="search" autocomplete="off" placeholder="例如 2330" value="' + escapeHtml(watchlistSearchQuery) + '" data-action="watchlist-search" data-testid="terminal-watchlist-picker" aria-controls="terminal-watchlist-results"></label>' + symbolSearchResults(instruments, watchlistSearchQuery, items, watchlistSearchSelection, "terminal-watchlist-results", "watchlist-search-pick") + '</div><button class="btn btn-primary btn-sm" type="button" data-action="watchlist-add" data-testid="terminal-watchlist-add"' + (terminalAddIssues.length ? " disabled" : "") + '>加入</button>' + formIssuesMarkup(terminalAddIssues, "terminal-watchlist-add-issues") + '</div><div class="terminal-watchlist-group"><label><span>目前群組</span><select data-action="watchlist-group-select" data-testid="terminal-watchlist-group-select">' + groups.map(function (group) { return '<option value="' + escapeHtml(group.id) + '"' + (group.id === state.activeWatchlistGroupId ? ' selected' : '') + '>' + text(group.name) + '</option>'; }).join("") + '</select></label><button class="btn btn-outline btn-sm" type="button" data-action="watchlist-group-delete" data-group-id="' + escapeHtml(activeGroup && activeGroup.id || "default") + '" data-testid="terminal-watchlist-group-delete"' + (canDeleteGroup ? '' : ' disabled') + '>刪除群組</button></div><div class="terminal-watchlist-list">' + (items.length ? items.map(function (instrumentId) {
+    return '<section class="terminal-watchlist" data-testid="terminal-watchlist"><header class="terminal-panel-heading"><div><span class="eyebrow">我的行情</span><h2>自選清單</h2></div><span class="terminal-count">' + items.length + '</span></header><div class="terminal-watchlist-controls"><div class="symbol-search"><label><span>搜尋代號／名稱</span><input type="search" autocomplete="off" placeholder="例如 2330" value="' + escapeHtml(watchlistSearchQuery) + '" data-action="watchlist-search" data-testid="terminal-watchlist-picker" aria-controls="terminal-watchlist-results"></label>' + symbolSearchResults(instruments, watchlistSearchQuery, items, watchlistSearchSelection, "terminal-watchlist-results", "watchlist-search-pick") + '</div><button class="btn btn-primary btn-sm" type="button" data-action="watchlist-add" data-testid="terminal-watchlist-add"' + (terminalAddIssues.length ? " disabled" : "") + '>加入</button>' + formIssuesMarkup(visibleWatchlistAddIssues(terminalAddIssues), "terminal-watchlist-add-issues") + '</div><div class="terminal-watchlist-group"><label><span>目前群組</span><select data-action="watchlist-group-select" data-testid="terminal-watchlist-group-select">' + groups.map(function (group) { return '<option value="' + escapeHtml(group.id) + '"' + (group.id === state.activeWatchlistGroupId ? ' selected' : '') + '>' + text(group.name) + '</option>'; }).join("") + '</select></label><button class="btn btn-outline btn-sm" type="button" data-action="watchlist-group-delete" data-group-id="' + escapeHtml(activeGroup && activeGroup.id || "default") + '" data-testid="terminal-watchlist-group-delete"' + (canDeleteGroup ? '' : ' disabled') + '>刪除群組</button></div><div class="terminal-watchlist-list">' + (items.length ? items.map(function (instrumentId) {
       var instrument = instrumentForId(instrumentId) || { instrument_id: instrumentId, symbol: instrumentId, display_name: "未在商品清單" };
       var model = core.klineModel(state.view, instrumentId, "1D");
       var bars = model && Array.isArray(model.bars) ? model.bars : [];
@@ -1421,7 +1453,7 @@
       '<div class="watchlist-group-new-control"><label class="watchlist-group-new"><span>新增群組</span><input type="text" maxlength="32" placeholder="例如 半導體" value="' + escapeHtml(watchlistGroupNameQuery) + '" data-action="watchlist-group-name" data-testid="watchlist-group-name"></label>' +
       '<button class="btn btn-outline" type="button" data-action="watchlist-group-create" data-testid="watchlist-group-create"' + (groupNameIssues.length ? ' disabled' : '') + '>建立群組</button>' + formIssuesMarkup(groupNameIssues, "watchlist-group-issues") + '</div></section>' +
       '<section class="watchlist-toolbar-search" aria-label="搜尋並加入商品"><div class="watchlist-picker symbol-search' + (watchlistSearchFocused ? " search-open" : "") + '"><label><span>搜尋商品</span><input type="search" autocomplete="off" placeholder="代號、名稱或市場，例如 2330 / 台積電" value="' + escapeHtml(watchlistSearchQuery) + '" data-action="watchlist-search" data-testid="watchlist-picker" aria-controls="watchlist-symbol-results"></label>' +
-      symbolSearchResults(instruments, watchlistSearchQuery, items, watchlistSearchSelection, "watchlist-symbol-results", "watchlist-search-pick") + '</div><button class="btn btn-primary" type="button" data-action="watchlist-add" data-testid="watchlist-add"' + (watchlistAddIssueList.length ? ' disabled' : '') + '>加入自選</button>' + formIssuesMarkup(watchlistAddIssueList, "watchlist-add-issues") + '</section>' +
+      symbolSearchResults(instruments, watchlistSearchQuery, items, watchlistSearchSelection, "watchlist-symbol-results", "watchlist-search-pick") + '</div><button class="btn btn-primary" type="button" data-action="watchlist-add" data-testid="watchlist-add"' + (watchlistAddIssueList.length ? ' disabled' : '') + '>加入自選</button>' + formIssuesMarkup(visibleWatchlistAddIssues(watchlistAddIssueList), "watchlist-add-issues") + '</section>' +
       '<section class="watchlist-toolbar-actions" aria-label="自選清單操作"><button class="btn btn-outline" type="button" data-action="watchlist-clear" data-testid="watchlist-clear"' + (items.length ? '' : ' disabled') + '>清除草稿</button>' +
       '<button class="btn btn-primary" type="button" data-action="watchlist-save" data-testid="watchlist-save"' + (canSave ? '' : ' disabled') + '>儲存自選清單</button></section>' +
       '<span class="watchlist-state" data-testid="watchlist-state">' + text(watchlistStatus()) + '</span></div></div>' +

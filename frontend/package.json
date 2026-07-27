@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "tauri:dev": "tauri dev",
+    "tauri:dev:wsl": "WEBKIT_DISABLE_DMABUF_RENDERER=1 tauri dev",
     "tauri:build": "tauri build"
   },
   "devDependencies": {
