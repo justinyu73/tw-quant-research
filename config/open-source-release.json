@@ -16,12 +16,7 @@
   },
   "source_release": {
     "license_status": "mit_approved",
-    "internal_files_excluded": [
-      {
-        "path": "AGENTS.md",
-        "reason": "repository-local agent instructions"
-      }
-    ],
+    "internal_files_excluded": [],
     "design_production_records_excluded": [
       {
         "path": "docs/dashboard-visualization-grill.md",

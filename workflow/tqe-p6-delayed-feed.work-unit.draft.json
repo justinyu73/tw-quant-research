@@ -7,6 +7,9 @@
   "goal": "Activate the delayed provider feed per the approved P6 contract: human-initiated bounded capture of delayed quotes into the research read model with explicit delay-label propagation and P5.2-aligned PIT semantics. Not realtime, not streaming, not a persistent connection; no order-decision surface.",
   "contract": "docs/tqe-p6-delayed-feed-contract.md",
   "activation_proposal": "docs/tqe-p6-deferred-capability-activation-proposal.md",
+  "source_contract": "workflow/tqe-p6-delayed-feed-source-contract.json",
+  "runtime_amendment_proposal": "docs/tqe-p6-delayed-feed-runtime-amendment.md",
+  "slice_plan": "docs/tqe-p6-delayed-feed-slice-plan.md",
   "network": true,
   "network_note": "Bounded human-approved capture only, after source contract digest and work-unit digest approval with host-egress admission. Zero network in verification commands.",
   "provider_calls": false,
@@ -23,7 +26,8 @@
     "acceptance evidence JSON with provider_calls accounted per approved request"
   ],
   "activation_requirements": [
-    "human approval of the source contract digest for the chosen endpoint",
+    "human approval of the source contract digest for the chosen endpoint (workflow/tqe-p6-delayed-feed-source-contract.json)",
+    "human approval of the runtime amendment proposal (docs/tqe-p6-delayed-feed-runtime-amendment.md)",
     "human approval of this exact work-unit digest",
     "host_egress_admission",
     "terms_of_use_and_robots_review_recorded_for_the_chosen_endpoint",
