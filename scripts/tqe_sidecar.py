@@ -13,6 +13,16 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+# Frozen (PyInstaller) builds have no OS CA store; the spec bundles certifi,
+# so point the default SSL context at it for the TWSE download path.
+if getattr(sys, "frozen", False):
+    try:
+        import certifi
+
+        os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+    except Exception:
+        pass
+
 from tw_quant_engine.desktop_sidecar import create_server, load_catalog, validate_loopback_host  # noqa: E402
 
 
