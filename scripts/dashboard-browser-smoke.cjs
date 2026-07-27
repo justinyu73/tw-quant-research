@@ -10,12 +10,12 @@ const ROOT = path.resolve(__dirname, "..");
 const PREVIEW_DIR = path.join(ROOT, "outputs", "dashboard-preview");
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
-  overview: "cad25203039d1bac11e1f87acb92ff122c5454cb8c5167026537e0b868d933ef",
-  market_valid: "8f34a2022fb534becba116511ae3f1e6663989156a72e6164e0cbe3e1ff05914",
-  market_partial: "a4c93a346981d89b1e222756abca7f620f033404fdf656a4568230333aa42dcf",
-  market_future: "66116cb375ec28fff21633e701b02f57dc5de01a890bdf044f0016f5b1d47d99",
-  products: "e7d862f16e5d2636b002ef722ceb3f2cf09af3b010282251306475142cce0110",
-  detail_dialog: "cfec7ac38fac8f38d0fdbd408e86f98d12c610c509a1bf7295163dc015718f16",
+  overview: "7fa651c8859b85aeaebbcb669dcbeda51d1329e71f17b09a2160803af4993712",
+  market_valid: "de61997e7e4f4cc107120190db9e12d299cb5e839a1e9547440e57ed5e17fb46",
+  market_partial: "a5f0148a57e8934a008191af93cb8d936b0ccedf1fcd04f73d9b054c96851fd6",
+  market_future: "07724b882849acc499c8cc993a9f7c5bccad34ea0d22be1f3cac11c0c7c14bd8",
+  products: "4c737cff9caf173af98cdac51cffd6a208e2350355b71ab093bb95deeb0604a6",
+  detail_dialog: "0311eb4c2557fed27c5ee1c0480b66a3235787fb4033fc3958fd2d748ee9dce3",
   financial_tracker: "2d22a4f3204002c377113f3458da1c7c58072ebf57593723a50421c0560b2b67",
   formula_builder: "037728b830212a6c0839aceb0ee98c09f706c9689f1899d50e7de0aec2a3ba35",
 };

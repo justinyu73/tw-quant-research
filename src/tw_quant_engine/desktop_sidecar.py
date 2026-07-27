@@ -38,6 +38,7 @@ from .data_update import (
 
 
 SIDECAR_INSTRUMENTS_SCHEMA = "tw-quant-engine-sidecar-instruments/v1"
+SIDECAR_INSTRUMENT_READ_MODEL_SCHEMA = "tw-quant-engine-instrument-read-model/v1"
 SIDECAR_KLINE_SCHEMA = "tw-quant-engine-sidecar-kline/v1"
 SIDECAR_ALERTS_SCHEMA = "tw-quant-engine-sidecar-alerts/v1"
 SIDECAR_VALUATION_SCHEMA = "tw-quant-engine-sidecar-valuation/v1"
@@ -170,6 +171,73 @@ class KlineCatalog:
             "read_only": True,
             "data": copy.deepcopy(model),
             "digest": model["snapshot_digest"],
+        }
+
+    def instrument_response(self, instrument_id: str) -> tuple[int, dict[str, Any]]:
+        """Unified v2 6B read model for one instrument; offline fixtures only.
+
+        sections.fundamentals / sections.financials stay null until their
+        source contracts are separately approved; futures-only fields stay
+        null until the TX slice lands. No personal valuation inputs here.
+        """
+        instrument = next((item for item in self.instruments if item["instrument_id"] == instrument_id), None)
+        if instrument is None:
+            return 404, {"error": "instrument_not_found"}
+        asset_class = str(instrument.get("asset_class") or "")
+        model = self.models.get((instrument_id, "1D"))
+        sections: dict[str, Any] = {
+            "quote": None,
+            "kline": None,
+            "fundamentals": None,
+            "financials": None,
+            "futures": None,
+            "evidence": None,
+        }
+        if asset_class == "future":
+            sections["futures"] = {
+                "contract_month": instrument.get("contract_month"),
+                "expiry": instrument.get("expiry"),
+                "settlement": None,
+                "open_interest": None,
+                "institutional": None,
+            }
+        if isinstance(model, Mapping):
+            bars = model.get("bars") or []
+            sections["quote"] = {
+                "latest_bar": copy.deepcopy(bars[-1]) if bars else None,
+                "previous_close": bars[-2].get("close") if len(bars) >= 2 else None,
+            }
+            periods = [period for period in PERIOD_ORDER if (instrument_id, period) in self.models]
+            sections["kline"] = {
+                "periods_available": periods,
+                "default_period": "1D",
+                "snapshot_digest": model["snapshot_digest"],
+                "route": f"/kline?instrument={instrument_id}&period=1D",
+            }
+            sections["evidence"] = {
+                "fixture_id": model["provenance"]["fixture_id"],
+                "snapshot_digest": model["snapshot_digest"],
+                "source": model["provenance"]["source"],
+            }
+            quality = copy.deepcopy(model["quality"])
+            provenance = copy.deepcopy(model["provenance"])
+            as_of = model["as_of"]
+            available_at = model["available_at"]
+        else:
+            quality = {"status": "unavailable", "reason_codes": ["no_data"]}
+            provenance = None
+            as_of = None
+            available_at = None
+        return 200, {
+            "schema": SIDECAR_INSTRUMENT_READ_MODEL_SCHEMA,
+            "read_only": True,
+            "instrument": copy.deepcopy(instrument),
+            "asset_class": asset_class,
+            "as_of": as_of,
+            "available_at": available_at,
+            "sections": sections,
+            "quality": quality,
+            "provenance": provenance,
         }
 
     def _admitted_market_bars(self) -> dict[str, list[dict[str, Any]] | None]:
@@ -322,7 +390,7 @@ def _request_handler(runtime: dict[str, Any]) -> type[BaseHTTPRequestHandler]:
         def do_OPTIONS(self) -> None:  # noqa: N802
             """Complete the WebView CORS preflight for explicit JSON updates."""
             parsed = urlsplit(self.path)
-            if parsed.path not in {"/data/update", "/instruments", "/data/status", "/health", "/kline"}:
+            if parsed.path not in {"/data/update", "/instruments", "/instrument", "/data/status", "/health", "/kline"}:
                 _json_response(self, 404, {"error": "unknown_route"})
                 return
             self.send_response(204)
@@ -398,6 +466,14 @@ def _request_handler(runtime: dict[str, Any]) -> type[BaseHTTPRequestHandler]:
                     _json_response(self, 400, {"error": "unexpected_query"})
                     return
                 _json_response(self, 200, runtime["catalog"].instruments_response())
+                return
+            if parsed.path == "/instrument":
+                instrument_query = parse_qs(parsed.query, keep_blank_values=True)
+                if set(instrument_query) != {"instrument"} or any(len(values) != 1 or not values[0] for values in instrument_query.values()):
+                    _json_response(self, 400, {"error": "instrument_required"})
+                    return
+                instrument_status, instrument_payload = runtime["catalog"].instrument_response(instrument_query["instrument"][0])
+                _json_response(self, instrument_status, instrument_payload)
                 return
             if parsed.path == "/data/status":
                 data_dir = runtime.get("data_dir")
@@ -490,6 +566,7 @@ __all__ = [
     "KlineCatalog",
     "LOOPBACK_HOSTS",
     "SIDECAR_ALERTS_SCHEMA",
+    "SIDECAR_INSTRUMENT_READ_MODEL_SCHEMA",
     "SIDECAR_INSTRUMENTS_SCHEMA",
     "SIDECAR_VALUATION_SCHEMA",
     "SidecarContractError",
