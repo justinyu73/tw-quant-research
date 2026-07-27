@@ -29,28 +29,29 @@ draft release，完成 Windows／macOS 人為安裝與啟動驗收後才公開�
 ### macOS 未簽章版快速安裝
 
 macOS 若顯示「已損毀，無法打開」，在確認下載檔案的 SHA-256 正確後，使用
-下列終端機指令；它會依 Mac 架構下載正確的 DMG、安裝到 `/Applications`，
+下列終端機指令（兩行）；它會下載正確的 DMG、安裝到 `/Applications`，
 並移除這個 unsigned app 的 quarantine 標記：
 
 ```sh
-REPO="justinyu73/tw-quant-research"; RELEASE="v0.1.8"
-case "$(uname -m)" in arm64) ASSET="TQR-macOS-Apple-Silicon.dmg";; x86_64) ASSET="TQR-macOS-Intel.dmg";; *) echo "不支援的 Mac 架構"; exit 1;; esac
-DOWNLOAD="$HOME/Downloads/tqr-$RELEASE"; mkdir -p "$DOWNLOAD"
-gh release download "$RELEASE" --repo "$REPO" --pattern "$ASSET" --pattern 'SHA256SUMS.txt' --dir "$DOWNLOAD"
-grep -F "  $ASSET" "$DOWNLOAD/SHA256SUMS.txt" | shasum -a 256 -c -
-MOUNT_POINT="$(hdiutil attach -nobrowse -readonly "$DOWNLOAD/$ASSET" | sed -n 's#^.*\(/Volumes/.*\)$#\1#p' | head -n 1)"
-APP_PATH="/Applications/TW Quant Research.app"; sudo ditto "$(find "$MOUNT_POINT" -maxdepth 1 -name '*.app' -print -quit)" "$APP_PATH"; hdiutil detach "$MOUNT_POINT"
-sudo xattr -dr com.apple.quarantine "$APP_PATH"; open "$APP_PATH"
+cd ~/Downloads && gh release download v0.2.1 --repo justinyu73/tw-quant-research --pattern "TQR-macOS-Apple-Silicon.dmg" --clobber
+hdiutil attach -nobrowse "TQR-macOS-Apple-Silicon.dmg" && sudo cp -R "/Volumes/TW Quant Research/TW Quant Research.app" /Applications/ && hdiutil detach "/Volumes/TW Quant Research" && sudo xattr -dr com.apple.quarantine "/Applications/TW Quant Research.app" && open "/Applications/TW Quant Research.app"
 ```
 
-將 `v0.1.8` 換成要安裝的 release tag；需先安裝並登入 GitHub CLI：
+Intel Mac 把兩行的 `TQR-macOS-Apple-Silicon.dmg` 換成 `TQR-macOS-Intel.dmg`。
+可選：安裝前先驗證 SHA-256（同樣在 `~/Downloads` 目錄執行）：
+
+```sh
+gh release download v0.2.1 --repo justinyu73/tw-quant-research --pattern "SHA256SUMS.txt" --clobber && grep -F "  TQR-macOS-Apple-Silicon.dmg" SHA256SUMS.txt | shasum -a 256 -c -
+```
+
+將 `v0.2.1` 換成要安裝的 release tag；需先安裝並登入 GitHub CLI：
 `brew install gh`、`gh auth login`。完整說明見
 [`docs/desktop-release.md`](docs/desktop-release.md)。
 
 ### Windows x64 PowerShell 快速安裝
 
 ```powershell
-$Repo="justinyu73/tw-quant-research"; $Release="v0.1.8"; $Download="$env:USERPROFILE\Downloads\TQR-$Release"
+$Repo="justinyu73/tw-quant-research"; $Release="v0.2.1"; $Download="$env:USERPROFILE\Downloads\TQR-$Release"
 New-Item -ItemType Directory -Force $Download | Out-Null
 gh release download $Release --repo $Repo --pattern "TQR-Windows-x64.msi" --pattern "SHA256SUMS.txt" --dir $Download
 $Installer=Get-ChildItem $Download -Filter *.msi | Select-Object -First 1; $Expected=(Select-String (Join-Path $Download "SHA256SUMS.txt") ([regex]::Escape($Installer.Name)+'$')).Line.Split()[0]; $Actual=(Get-FileHash -Algorithm SHA256 $Installer.FullName).Hash.ToLowerInvariant()
