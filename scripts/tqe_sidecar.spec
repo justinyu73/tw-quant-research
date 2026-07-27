@@ -17,14 +17,18 @@ for market in ("k6a", "k6b"):
 # The frozen app has no OS CA store; bundle certifi so HTTPS (TWSE download)
 # verifies. tqe_sidecar.py points SSL_CERT_FILE at this bundle when frozen.
 certifi_datas = collect_data_files("certifi")
+# Windows has no system IANA tz database; zoneinfo("Asia/Taipei") falls back
+# to the tzdata package, so it must be bundled or the frozen sidecar crashes
+# at import on Windows.
+tzdata_datas = collect_data_files("tzdata")
 
 
 a = Analysis(
     [str(ROOT / "scripts" / "tqe_sidecar.py")],
     pathex=[str(ROOT / "src")],
     binaries=[],
-    datas=fixture_datas + certifi_datas,
-    hiddenimports=collect_submodules("tw_quant_engine") + ["certifi"],
+    datas=fixture_datas + certifi_datas + tzdata_datas,
+    hiddenimports=collect_submodules("tw_quant_engine") + ["certifi", "tzdata"],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
