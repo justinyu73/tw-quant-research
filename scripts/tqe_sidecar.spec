@@ -1,7 +1,7 @@
 # PyInstaller source spec for the later desktop bundle.
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 
 SPEC_DIR = Path(SPECPATH).resolve()
@@ -14,13 +14,17 @@ for market in ("k6a", "k6b"):
     for fixture in sorted(fixture_dir.glob("*.json.gz")):
         fixture_datas.append((str(fixture), f"fixtures/{market}"))
 
+# The frozen app has no OS CA store; bundle certifi so HTTPS (TWSE download)
+# verifies. tqe_sidecar.py points SSL_CERT_FILE at this bundle when frozen.
+certifi_datas = collect_data_files("certifi")
+
 
 a = Analysis(
     [str(ROOT / "scripts" / "tqe_sidecar.py")],
     pathex=[str(ROOT / "src")],
     binaries=[],
-    datas=fixture_datas,
-    hiddenimports=collect_submodules("tw_quant_engine"),
+    datas=fixture_datas + certifi_datas,
+    hiddenimports=collect_submodules("tw_quant_engine") + ["certifi"],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
