@@ -33,8 +33,8 @@ macOS 若顯示「已損毀，無法打開」，在確認下載檔案的 SHA-256
 並移除這個 unsigned app 的 quarantine 標記：
 
 ```sh
-cd ~/Downloads && gh release download v0.2.1 --repo justinyu73/tw-quant-research --pattern "TQR-macOS-Apple-Silicon.dmg" --clobber
-hdiutil attach -nobrowse "TQR-macOS-Apple-Silicon.dmg" && sudo cp -R "/Volumes/TW Quant Research/TW Quant Research.app" /Applications/ && hdiutil detach "/Volumes/TW Quant Research" && sudo xattr -dr com.apple.quarantine "/Applications/TW Quant Research.app" && open "/Applications/TW Quant Research.app"
+sudo xattr -dr com.apple.quarantine "/Applications/TW Quant Research.app" && open       
+"/Applications/TW Quant Research.app" 
 ```
 
 Intel Mac 把兩行的 `TQR-macOS-Apple-Silicon.dmg` 換成 `TQR-macOS-Intel.dmg`。
