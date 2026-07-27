@@ -1,0 +1,126 @@
+{
+  "schema": "tw-quant-engine-p6-delayed-feed-source-contract/v1",
+  "status": "source_contract_pending_trial_capture",
+  "market": "TWSE",
+  "purpose": "delayed_quote_capture_for_human_research",
+  "contract": "docs/tqe-p6-delayed-feed-contract.md",
+  "activation_proposal": "docs/tqe-p6-deferred-capability-activation-proposal.md",
+  "activation_order": "3_in_app_alerts_done -> 5_valuation_analysis_done -> 2_delayed_feed_this_contract",
+  "delay_definition": {
+    "regulatory_anchor": "https://twse-regulation.twse.com.tw/m/LawContent.aspx?FID=FL007129",
+    "regulatory_frame": "TWSE 交易資訊使用管理辦法 延遲資訊: market transaction information delayed by twenty minutes or more relative to realtime",
+    "located_at": "2026-07-22",
+    "required_proof": "First human trial capture during market hours must demonstrate the feed delay empirically (quote timestamp vs server queryTime.sysTime). If the endpoint proves fresher than its labelled delay it is realtime-class: stop, capability 1 territory, do not capture under this contract."
+  },
+  "selected_source": null,
+  "access_policy": {
+    "free_public_sources_only": true,
+    "paid_subscriptions": false,
+    "credentials_or_cookies": false,
+    "human_initiated_bounded_capture_only": true,
+    "persistent_connection": false,
+    "streaming": false,
+    "unattended_poller": false,
+    "local_raw_and_normalized_retention": true,
+    "human_evaluation_required": true,
+    "automatic_order_placement": "prohibited"
+  },
+  "candidate_assessments": [
+    {
+      "candidate_id": "twse_mis_getstockinfo",
+      "role": "primary_delayed_quote_candidate",
+      "method": "GET",
+      "endpoint": "https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_2330.tw",
+      "verification": {
+        "verified_at": "2026-07-22",
+        "method": "read_only_reachability_check",
+        "result": "reachable_http_200_json_no_auth",
+        "observed_fields": {
+          "ohlc_last": ["o", "h", "l", "z"],
+          "previous_close": ["y"],
+          "volume": ["v"],
+          "quote_datetime": ["d", "t"],
+          "five_level_bid_ask": ["a", "b", "f", "g"],
+          "delay_hint": ["userDelay"]
+        }
+      },
+      "decision": "candidate_pending_trial_capture",
+      "reason": "Reachable with a usable quote schema, but the exact delay and per-field freshness semantics are not yet proven; they must be established by the first human trial capture during market hours, not assumed.",
+      "undocumented_endpoint_risk": "No published API contract; terms-of-use review and robots policy review are pre-activation requirements; schema must be probed and recorded at trial capture, P5.1 style."
+    },
+    {
+      "candidate_id": "twse_legacy_mi_index_csv",
+      "role": "post_close_snapshot_alternative",
+      "method": "GET",
+      "endpoint": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=csv&date=YYYYMMDD&type=ALL",
+      "verification": "Assessed in workflow/tqe-p5-twse-source-contract.json (option_c_endpoint_assessment): full-market daily closing CSV, trial capture recorded 2026-07-22.",
+      "decision": "not_admitted_for_delayed_feed",
+      "reason": "Satisfies only the end-of-interval snapshot reading of this capability; it carries no intraday freshness and is already governed by the P5 option-C evidence chain."
+    },
+    {
+      "candidate_id": "tpex_delayed_info",
+      "role": "tpex_delayed_product_page",
+      "endpoint": "https://www.tpex.org.tw/zh-tw/service/data/product/delay.html",
+      "decision": "not_admitted",
+      "reason": "Licensing/product page for TPEx delayed information; no free public endpoint located."
+    },
+    {
+      "candidate_id": "twse_openapi_catalogue",
+      "role": "official_openapi_catalogue",
+      "endpoint": "https://openapi.twse.com.tw/v1/swagger.json",
+      "decision": "not_admitted",
+      "reason": "Fetched 2026-07-22: 143 paths, no delayed-quote endpoint exists; exchangeReport/MI_INDEX20 is the daily top-20-by-volume report, not a delay feed."
+    },
+    {
+      "candidate_id": "twse_mis_fibest",
+      "role": "retired_legacy_page",
+      "endpoint": "https://mis.twse.com.tw/stock/fibest.jsp?stock=2330",
+      "decision": "retired_do_not_use",
+      "reason": "HTTP 404 on 2026-07-22; the legacy page endpoint is retired. Recorded so no work-unit resurrects it."
+    }
+  ],
+  "license_and_retention": {
+    "regulatory_frame": "Delay class defined by TWSE 交易資訊使用管理辦法 (see delay_definition); delayed-data licence terms differ from realtime and from EOD bulk and must be reviewed independently.",
+    "license_review_status": "pending_independent_review",
+    "license_inheritance_from_p5_eod": "prohibited",
+    "raw_evidence": "caller_owned_external_evidence",
+    "normalized_fixture": "repo_allowed_only_after_exact_source_and_terms_review",
+    "redistribution_beyond_local_machine": "prohibited"
+  },
+  "request_budget": {
+    "shape": "named_bounded_gets_per_capture_run",
+    "serialization": "serialized with a conservative delay and a hard session cap",
+    "exact_gets": "to_be_enumerated_in_the_work_unit_before_digest_approval",
+    "implicit_unbounded_loop": "prohibited"
+  },
+  "resolution_required": [
+    "terms_of_use_and_robots_review_recorded_for_twse_mis_getstockinfo",
+    "first_human_trial_capture_during_market_hours_proving_delay_semantics",
+    "delay_and_per_field_freshness_proven_not_assumed",
+    "independent_delayed_data_licence_review_recorded",
+    "request_budget_enumerated_in_the_work_unit",
+    "versioned_digest_policy_sha256_bytes_retrieval_timestamp_bound_to_the_same_work_unit",
+    "approve_exact_human_run_work_unit_digest",
+    "host_egress_admission_before_any_capture"
+  ],
+  "fail_closed_rules": [
+    "no_approved_source_contract_digest_and_work_unit_digest_no_capture_no_host_egress",
+    "schema_or_encoding_probe_failure_at_capture_reject_capture_do_not_normalize",
+    "feed_fresher_than_contractual_delay_realtime_class_stop_do_not_capture",
+    "feed_drops_or_exceeds_staleness_threshold_label_stale_never_present_as_current",
+    "consumer_surface_cannot_carry_delay_label_do_not_admit_feed_data",
+    "ambiguity_with_order_decision_input_feature_degrades_to_inert"
+  ],
+  "decision": {
+    "status": "pending_human_decision",
+    "decided_by": null,
+    "decided_at": null,
+    "next_action": {
+      "kind": "pre_activation_evidence",
+      "owner": "user_and_agent",
+      "action": "Complete the resolution_required list for twse_mis_getstockinfo (terms/robots review, market-hours trial capture proving delay semantics, independent licence review), then human approval of this source contract digest and workflow/tqe-p6-delayed-feed.work-unit.draft.json digest with host-egress admission before any capture."
+    }
+  },
+  "hard_stop": "Do not capture under this contract before the source contract digest and work-unit digest are human-approved with host-egress admission. A feed proven fresher than its contractual delay is realtime-class and out of scope (capability 1 stays deferred_not_approved). Automatic order placement remains prohibited.",
+  "provider_calls_made_by_repository": 0
+}
