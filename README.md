@@ -28,24 +28,27 @@ draft release，完成 Windows／macOS 人為安裝與啟動驗收後才公開�
 
 ### macOS 未簽章版快速安裝
 
-macOS 若顯示「已損毀，無法打開」，在確認下載檔案的 SHA-256 正確後，使用
-下列終端機指令（兩行）；它會下載正確的 DMG、安裝到 `/Applications`，
-並移除這個 unsigned app 的 quarantine 標記：
+Build 未經 Apple Developer ID 簽章。從 Releases 下載對應的 DMG：Apple
+Silicon 用 `TQR-macOS-Apple-Silicon.dmg`，Intel Mac 用
+`TQR-macOS-Intel.dmg`。打開 DMG、把 `TW Quant Research.app` 拖進
+`/Applications` 後，若 macOS 顯示「已損毀，無法打開」，在終端機執行
+一次以下指令，移除這個 app 的 quarantine 標記：
 
 ```sh
-sudo xattr -dr com.apple.quarantine "/Applications/TW Quant Research.app" && open       
-"/Applications/TW Quant Research.app" 
+xattr -dr com.apple.quarantine "/Applications/TW Quant Research.app"
 ```
 
-Intel Mac 把兩行的 `TQR-macOS-Apple-Silicon.dmg` 換成 `TQR-macOS-Intel.dmg`。
-可選：安裝前先驗證 SHA-256（同樣在 `~/Downloads` 目錄執行）：
+可選：安裝前先驗證 SHA-256。在 DMG 所在目錄（例如 `~/Downloads`）下載
+checksum 檔並核對（Apple Silicon 範例，把 `v0.2.1` 換成要安裝的 tag）：
 
 ```sh
-gh release download v0.2.1 --repo justinyu73/tw-quant-research --pattern "SHA256SUMS.txt" --clobber && grep -F "  TQR-macOS-Apple-Silicon.dmg" SHA256SUMS.txt | shasum -a 256 -c -
+cd ~/Downloads
+gh release download v0.2.1 --repo justinyu73/tw-quant-research --pattern "SHA256SUMS.txt" --clobber
+grep "TQR-macOS-Apple-Silicon.dmg" SHA256SUMS.txt | shasum -a 256 -c -
 ```
 
-將 `v0.2.1` 換成要安裝的 release tag；需先安裝並登入 GitHub CLI：
-`brew install gh`、`gh auth login`。完整說明見
+輸出 `TQR-macOS-Apple-Silicon.dmg: OK` 即表示檔案完整。需先安裝並登入
+GitHub CLI：`brew install gh`、`gh auth login`。完整說明見
 [`docs/desktop-release.md`](docs/desktop-release.md)。
 
 ### Windows x64 PowerShell 快速安裝
@@ -120,7 +123,7 @@ sidecar 產生；公開 release 前仍須完成兩個平台的實機啟動驗收
 簽章與 macOS notarization，下載的 unsigned build 可能出現平台安全性提示。
 Finder 顯示「已損毀」也可能是 Gatekeeper 的 quarantine 提示，請先依
 [`docs/desktop-release.md`](docs/desktop-release.md) 驗證 SHA-256，再執行
-`sudo xattr -dr com.apple.quarantine "/Applications/TW Quant Research.app"`。
+`xattr -dr com.apple.quarantine "/Applications/TW Quant Research.app"`。
 
 ## 目錄
 

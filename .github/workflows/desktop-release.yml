@@ -166,28 +166,44 @@ jobs:
           bounded local fixtures and does not provide live feeds, order routes,
           or automatic execution.
 
-          Download the installer matching your platform:
+          ## Download
 
-          - Windows x64 MSI: `TQR-Windows-x64.msi`
-          - Windows x64 NSIS: `TQR-Windows-x64-setup.exe`
-          - macOS Intel: `TQR-macOS-Intel.dmg`
-          - macOS Apple Silicon: `TQR-macOS-Apple-Silicon.dmg`
-          - Source: `TQR-source.tar.gz`
+          | Platform | Installer |
+          |----------|-----------|
+          | macOS Apple Silicon | `TQR-macOS-Apple-Silicon.dmg` |
+          | macOS Intel | `TQR-macOS-Intel.dmg` |
+          | Windows x64 | `TQR-Windows-x64-setup.exe` (NSIS) or `TQR-Windows-x64.msi` |
+          | Source | `TQR-source.tar.gz` |
 
-          macOS note: this release is unsigned. If macOS reports the app as
-          damaged, remove the quarantine flag once after install:
+          ## ⚠️ Note for macOS users
+
+          Builds are unsigned (no Apple Developer ID). After dragging
+          `TW Quant Research.app` into Applications, clear the quarantine
+          flag once in Terminal:
 
           ```sh
           xattr -dr com.apple.quarantine "/Applications/TW Quant Research.app"
           ```
 
-          Updates: after installing v0.2.0 or later, use 設定 → 檢查更新 for
-          signed in-app updates; fresh installs always come from this page.
+          ## Verifying downloads
 
-          In-app updates: the desktop app checks this release's `latest.json`
-          when the user explicitly asks in Settings. Update payloads
-          (`*.app.tar.gz`, `*-setup.exe`) are minisign-signed; the app verifies
-          the signature against the embedded public key before installing.
+          All artifacts are listed with their SHA-256 in `SHA256SUMS.txt`.
+          Verify in your download directory (Apple Silicon DMG example):
+
+          ```sh
+          cd ~/Downloads
+          grep "TQR-macOS-Apple-Silicon.dmg" SHA256SUMS.txt | shasum -a 256 -c -
+          ```
+
+          Expected output: `TQR-macOS-Apple-Silicon.dmg: OK`.
+
+          ## Updates
+
+          After installing v0.2.0 or later, use 設定 → 檢查更新 for signed
+          in-app updates; fresh installs always come from this page. Update
+          payloads (`*.app.tar.gz`, `*-setup.exe`) are minisign-signed; the
+          app verifies the signature against the embedded public key before
+          installing.
 
           Release assets are limited to platform installers, signed updater
           payloads, the public source archive, and SHA-256 checksums. Complete
