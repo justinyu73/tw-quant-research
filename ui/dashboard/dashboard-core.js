@@ -8,17 +8,18 @@
   "use strict";
 
   var SECTIONS = Object.freeze([
-    { id: "overview", label: "市場首頁" },
-    { id: "market", label: "行情分析" },
-    { id: "products", label: "我的自選" },
-    { id: "features", label: "技術指標" },
-    { id: "research", label: "因子與公式" },
-    { id: "fundamentals", label: "財務追蹤" },
-    { id: "stories", label: "研究筆記" },
-    { id: "backtest", label: "驗證報告" },
+    { id: "home", label: "Home" },
+    { id: "watchlist", label: "Watchlist" },
+    { id: "company", label: "Company" },
+    { id: "valuation", label: "Valuation" },
+    { id: "buyplan", label: "Buy Plan" },
+    { id: "review", label: "Review" },
     { id: "evidence", label: "資料來源" },
     { id: "settings", label: "設定" }
   ]);
+  // Only the first six are primary navigation; evidence/settings stay reachable
+  // from inside a page so provenance is never lost.
+  var PRIMARY_SECTION_IDS = Object.freeze(["home", "watchlist", "company", "valuation", "buyplan", "review"]);
 
   var WATCHLIST_SCHEMA = "tw-quant-engine-watchlist/v1";
   var ALERT_STORE_SCHEMA = "tqe-in-app-alerts/v1";
@@ -40,7 +41,7 @@
     var kline = view && view.kline ? view.kline : {};
     return {
       view: clone(view || {}),
-      activeSection: "overview",
+      activeSection: "home",
       selectedProductIndex: null,
       dialogOpen: false,
       selectedKlineInstrumentId: kline.default_instrument_id || null,
@@ -101,7 +102,10 @@
         status: "idle",
         message: ""
       },
-      valuationIndicatorPeriods: { zscore: 20, price_percentile: 60, ma_deviation: 20 }
+      valuationIndicatorPeriods: { zscore: 20, price_percentile: 60, ma_deviation: 20 },
+      companyResearch: {},
+      watchlistFilters: { industry: "", fundamental_state: "", thesis_state: "", stage: "", held: "" },
+      watchlistSort: "discount"
     };
   }
 
@@ -257,6 +261,22 @@
   function reduce(state, action) {
     var current = state || createInitialState({});
     var event = action || {};
+    if (event.type === "SET_WATCHLIST_FILTER") {
+      var filters = Object.assign({}, current.watchlistFilters);
+      filters[event.field] = typeof event.value === "string" ? event.value : "";
+      return Object.assign({}, current, { watchlistFilters: filters });
+    }
+    if (event.type === "SET_WATCHLIST_SORT") {
+      return Object.assign({}, current, { watchlistSort: event.value });
+    }
+    if (event.type === "SET_COMPANY_RECORD") {
+      var records = Object.assign({}, current.companyResearch);
+      var record = Object.assign(defaultCompanyRecord(event.instrumentId), records[event.instrumentId] || {});
+      record[event.field] = event.value;
+      record.updated_at = event.now || record.updated_at;
+      records[event.instrumentId] = record;
+      return Object.assign({}, current, { companyResearch: records });
+    }
     if (event.type === "SELECT_SECTION" && sectionExists(event.section)) {
       return Object.assign({}, current, {
         activeSection: event.section,
@@ -268,7 +288,7 @@
       var products = Array.isArray(current.view.products) ? current.view.products : [];
       if (Number.isInteger(event.index) && event.index >= 0 && event.index < products.length) {
         return Object.assign({}, current, {
-          activeSection: "products",
+          activeSection: "watchlist",
           selectedProductIndex: event.index,
           dialogOpen: true
         });
@@ -279,7 +299,7 @@
       if (instrumentPeriods.length) {
         var periodExists = instrumentPeriods.indexOf(current.selectedKlinePeriod) >= 0;
         return Object.assign({}, current, {
-          activeSection: "market",
+          activeSection: "company",
           selectedKlineInstrumentId: event.instrumentId,
           selectedKlinePeriod: periodExists ? current.selectedKlinePeriod : instrumentPeriods[0]
         });
@@ -287,11 +307,11 @@
     }
     if (event.type === "SELECT_KLINE_PERIOD") {
       if (klinePeriods(current.view, current.selectedKlineInstrumentId).indexOf(event.period) >= 0) {
-        return Object.assign({}, current, { activeSection: "market", selectedKlinePeriod: event.period });
+        return Object.assign({}, current, { activeSection: "company", selectedKlinePeriod: event.period });
       }
     }
     if (event.type === "TOGGLE_KLINE_INDICATOR" && ["ma", "ema", "rsi", "macd", "kd", "atr", "volume"].indexOf(event.indicator) >= 0) {
-      return Object.assign({}, current, { activeSection: "market", activeKlineIndicator: event.indicator });
+      return Object.assign({}, current, { activeSection: "company", activeKlineIndicator: event.indicator });
     }
     if (event.type === "SET_VALUATION_INPUT" && ["eps", "peLow", "peHigh", "safetyMargin"].indexOf(event.field) >= 0) {
       return Object.assign({}, current, {
@@ -781,8 +801,240 @@
     }).slice(0, Number(filter.max_rows) || 20);
   }
 
+
+  // Buy-zone ladder per the value-investing spec: every band is a ratio of the
+  // Base fair value, never of a price high, momentum score, or market signal.
+  var DEFAULT_BUY_ZONE_RATIOS = Object.freeze({ watch: 0.90, first: 0.85, second: 0.80, sweet: 0.75, extreme: 0.65 });
+
+  function buyZoneRatios(state) {
+    var custom = state && state.buyZoneRatios;
+    return custom ? Object.assign({}, DEFAULT_BUY_ZONE_RATIOS, custom) : DEFAULT_BUY_ZONE_RATIOS;
+  }
+
+  function buyZonePrices(baseValue, ratios) {
+    var r = ratios || DEFAULT_BUY_ZONE_RATIOS;
+    return {
+      watch: baseValue * r.watch,
+      first: baseValue * r.first,
+      second: baseValue * r.second,
+      sweet: baseValue * r.sweet,
+      extreme: baseValue * r.extreme
+    };
+  }
+
+  function stageForPrice(price, baseValue, ratios) {
+    if (!isFiniteNumber(price) || !isFiniteNumber(baseValue) || baseValue <= 0) return "unknown";
+    var zone = buyZonePrices(baseValue, ratios);
+    if (price <= zone.extreme) return "extreme";
+    if (price <= zone.sweet) return "sweet";
+    if (price <= zone.second) return "second";
+    if (price <= zone.first) return "first";
+    if (price <= zone.watch) return "near";
+    return "watch";
+  }
+
+  var STAGE_LABELS = Object.freeze({
+    extreme: "極端錯價", sweet: "甜蜜區", second: "第二階段",
+    first: "第一階段", near: "接近買進區", watch: "觀察", unknown: "未定"
+  });
+
+  function isFiniteNumber(value) {
+    return typeof value === "number" && isFinite(value);
+  }
+
+  function valuationResults(state) {
+    var valuation = state && state.valuation;
+    return valuation && Array.isArray(valuation.results) ? valuation.results : [];
+  }
+
+  function opportunityRows(state) {
+    var ratios = buyZoneRatios(state);
+    return valuationResults(state).filter(function (result) {
+      return result && result.status === "ok" && isFiniteNumber(result.fair_value) && isFiniteNumber(result.current_price);
+    }).map(function (result) {
+      var stage = stageForPrice(result.current_price, result.fair_value, ratios);
+      return {
+        symbol: result.security_id,
+        name: result.label || "",
+        price: result.current_price,
+        base_value: result.fair_value,
+        discount: (result.current_price - result.fair_value) / result.fair_value,
+        stage: stage,
+        stage_label: STAGE_LABELS[stage]
+      };
+    }).sort(function (a, b) { return a.discount - b.discount; });
+  }
+
+  function buyStageSummary(state) {
+    var rows = opportunityRows(state);
+    return {
+      first: rows.filter(function (row) { return row.stage === "first" || row.stage === "second"; }).length,
+      sweet: rows.filter(function (row) { return row.stage === "sweet" || row.stage === "extreme"; }).length,
+      pending: 0,
+      invalid: 0
+    };
+  }
+
+  function buyPlanStatusRows(state) {
+    return opportunityRows(state).map(function (row) {
+      return { symbol: row.symbol, stage: row.stage, stage_label: row.stage_label };
+    });
+  }
+
+
+  // Per-company research record: the human's own thesis/status fields. Kept in
+  // one store keyed by instrument so a company page reads one object.
+  var COMPANY_RESEARCH_SCHEMA = "tqr-company-research/v1";
+  var INDUSTRY_OPTIONS = Object.freeze(["Power Infrastructure", "Server Interconnect", "Passive Components", "Memory", "Edge AI", "Other"]);
+  var FUNDAMENTAL_STATES = Object.freeze(["成長", "穩定", "轉弱", "未評估"]);
+  var THESIS_STATES = Object.freeze(["成立", "待確認", "失效", "未評估"]);
+  var POSITION_STATES = Object.freeze(["觀察", "買進", "持有", "暫停"]);
+
+  function defaultCompanyRecord(instrumentId) {
+    return {
+      instrument_id: instrumentId,
+      industry: "Other",
+      fundamental_state: "未評估",
+      thesis_state: "未評估",
+      position_state: "觀察",
+      next_event: "",
+      held: false,
+      updated_at: ""
+    };
+  }
+
+  function companyRecord(state, instrumentId) {
+    var store = state && state.companyResearch ? state.companyResearch : {};
+    return Object.assign(defaultCompanyRecord(instrumentId), store[instrumentId] || {});
+  }
+
+  function normalizeCompanyResearch(payload) {
+    if (!payload || payload.schema !== COMPANY_RESEARCH_SCHEMA || !payload.records || typeof payload.records !== "object") return {};
+    var out = {};
+    Object.keys(payload.records).forEach(function (key) {
+      if (typeof key !== "string" || !/^[A-Za-z0-9:_.-]{1,64}$/.test(key)) return;
+      var record = payload.records[key];
+      if (!record || typeof record !== "object") return;
+      var merged = defaultCompanyRecord(key);
+      if (INDUSTRY_OPTIONS.indexOf(record.industry) >= 0) merged.industry = record.industry;
+      if (FUNDAMENTAL_STATES.indexOf(record.fundamental_state) >= 0) merged.fundamental_state = record.fundamental_state;
+      if (THESIS_STATES.indexOf(record.thesis_state) >= 0) merged.thesis_state = record.thesis_state;
+      if (POSITION_STATES.indexOf(record.position_state) >= 0) merged.position_state = record.position_state;
+      if (typeof record.next_event === "string") merged.next_event = record.next_event.slice(0, 120);
+      merged.held = record.held === true;
+      if (typeof record.updated_at === "string") merged.updated_at = record.updated_at.slice(0, 40);
+      out[key] = merged;
+    });
+    return out;
+  }
+
+  function companyResearchPayload(state) {
+    return { schema: COMPANY_RESEARCH_SCHEMA, version: 1, records: (state && state.companyResearch) || {} };
+  }
+
+
+  function baseValueFor(state, securityId) {
+    var hit = valuationResults(state).find(function (result) {
+      return result && result.security_id === securityId && result.status === "ok" && isFiniteNumber(result.fair_value);
+    });
+    return hit ? hit.fair_value : null;
+  }
+
+  function latestCloseFor(state, instrumentId) {
+    var model = klineModel(state && state.view, instrumentId, "1D");
+    var bars = model && Array.isArray(model.bars) ? model.bars : [];
+    var latest = bars.length ? bars[bars.length - 1] : null;
+    return latest && isFiniteNumber(latest.close) ? latest.close : null;
+  }
+
+  // One watchlist row = market price + the human's own valuation + the human's
+  // own status fields. Nothing here is derived from price momentum.
+  function watchlistViewRows(state) {
+    var ratios = buyZoneRatios(state);
+    var instruments = klineInstruments(state && state.view);
+    return watchlistItemsForActiveGroup(state).map(function (instrumentId) {
+      var instrument = instruments.find(function (item) { return item.instrument_id === instrumentId; }) || {};
+      var securityId = instrumentId.indexOf(":") >= 0 ? instrumentId.split(":")[1] : instrumentId;
+      var price = latestCloseFor(state, instrumentId);
+      var baseValue = baseValueFor(state, securityId);
+      var zone = isFiniteNumber(baseValue) ? buyZonePrices(baseValue, ratios) : null;
+      var stage = zone ? stageForPrice(price, baseValue, ratios) : "unknown";
+      var record = companyRecord(state, instrumentId);
+      return {
+        instrument_id: instrumentId,
+        symbol: instrument.symbol || securityId,
+        name: instrument.display_name || "",
+        industry: record.industry,
+        price: price,
+        base_value: baseValue,
+        discount: isFiniteNumber(price) && isFiniteNumber(baseValue) ? (price - baseValue) / baseValue : null,
+        first_price: zone ? zone.first : null,
+        sweet_price: zone ? zone.sweet : null,
+        distance_to_first: zone && isFiniteNumber(price) ? (price - zone.first) / zone.first : null,
+        fundamental_state: record.fundamental_state,
+        thesis_state: record.thesis_state,
+        position_state: record.position_state,
+        next_event: record.next_event,
+        held: record.held,
+        updated_at: record.updated_at,
+        stage: stage,
+        stage_label: STAGE_LABELS[stage]
+      };
+    });
+  }
+
+  function filterWatchlistRows(rows, filters) {
+    var f = filters || {};
+    return rows.filter(function (row) {
+      if (f.industry && row.industry !== f.industry) return false;
+      if (f.fundamental_state && row.fundamental_state !== f.fundamental_state) return false;
+      if (f.thesis_state && row.thesis_state !== f.thesis_state) return false;
+      if (f.stage && row.stage !== f.stage) return false;
+      if (f.held === "held" && !row.held) return false;
+      if (f.held === "not_held" && row.held) return false;
+      return true;
+    });
+  }
+
+  // Nulls always sort last: an unvalued company must never look like the best
+  // opportunity just because it has no number yet.
+  function sortWatchlistRows(rows, sortKey) {
+    var key = { discount: "discount", distance: "distance_to_first", updated: "updated_at" }[sortKey] || "discount";
+    return rows.slice().sort(function (a, b) {
+      var left = a[key];
+      var right = b[key];
+      var leftMissing = left === null || left === undefined || left === "";
+      var rightMissing = right === null || right === undefined || right === "";
+      if (leftMissing && rightMissing) return 0;
+      if (leftMissing) return 1;
+      if (rightMissing) return -1;
+      if (key === "updated_at") return left < right ? 1 : left > right ? -1 : 0;
+      return left - right;
+    });
+  }
+
   return Object.freeze({
     SECTIONS: SECTIONS,
+    PRIMARY_SECTION_IDS: PRIMARY_SECTION_IDS,
+    COMPANY_RESEARCH_SCHEMA: COMPANY_RESEARCH_SCHEMA,
+    INDUSTRY_OPTIONS: INDUSTRY_OPTIONS,
+    FUNDAMENTAL_STATES: FUNDAMENTAL_STATES,
+    THESIS_STATES: THESIS_STATES,
+    POSITION_STATES: POSITION_STATES,
+    defaultCompanyRecord: defaultCompanyRecord,
+    companyRecord: companyRecord,
+    normalizeCompanyResearch: normalizeCompanyResearch,
+    companyResearchPayload: companyResearchPayload,
+    watchlistViewRows: watchlistViewRows,
+    filterWatchlistRows: filterWatchlistRows,
+    sortWatchlistRows: sortWatchlistRows,
+    DEFAULT_BUY_ZONE_RATIOS: DEFAULT_BUY_ZONE_RATIOS,
+    buyZonePrices: buyZonePrices,
+    stageForPrice: stageForPrice,
+    STAGE_LABELS: STAGE_LABELS,
+    opportunityRows: opportunityRows,
+    buyStageSummary: buyStageSummary,
+    buyPlanStatusRows: buyPlanStatusRows,
     ALERT_STORE_SCHEMA: ALERT_STORE_SCHEMA,
     VALUATION_STORE_SCHEMA: VALUATION_STORE_SCHEMA,
     createInitialState: createInitialState,

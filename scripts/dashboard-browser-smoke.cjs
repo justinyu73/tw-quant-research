@@ -10,14 +10,10 @@ const ROOT = path.resolve(__dirname, "..");
 const PREVIEW_DIR = path.join(ROOT, "outputs", "dashboard-preview");
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
-  overview: "7fa651c8859b85aeaebbcb669dcbeda51d1329e71f17b09a2160803af4993712",
-  market_valid: "de61997e7e4f4cc107120190db9e12d299cb5e839a1e9547440e57ed5e17fb46",
-  market_partial: "a5f0148a57e8934a008191af93cb8d936b0ccedf1fcd04f73d9b054c96851fd6",
-  market_future: "07724b882849acc499c8cc993a9f7c5bccad34ea0d22be1f3cac11c0c7c14bd8",
-  products: "4c737cff9caf173af98cdac51cffd6a208e2350355b71ab093bb95deeb0604a6",
-  detail_dialog: "0311eb4c2557fed27c5ee1c0480b66a3235787fb4033fc3958fd2d748ee9dce3",
-  financial_tracker: "2d22a4f3204002c377113f3458da1c7c58072ebf57593723a50421c0560b2b67",
-  formula_builder: "037728b830212a6c0839aceb0ee98c09f706c9689f1899d50e7de0aec2a3ba35",
+  home: "ab3546148471254d72516ff191215be9c87ecd786bb6484160e767e7cccda10c",
+  company: "6cdd07a4aeb4277361929f4bc535ca24c2a63bd6941ca3216abde05e8d579104",
+  watchlist: "a1ea7618c089fc255efadcc4667332e2af3ee5cadb099a77a8019934c94d3814",
+  valuation: "df8b5c893e9d6615c0a9699f7fa7704ed25b1e054b2e610a989a10eeb41c9c66",
 };
 
 function freePort() {
@@ -175,239 +171,181 @@ async function main() {
     assert.equal(await page.locator("#app .app-shell").count(), 1);
     assert.equal(await page.locator(".sidebar").count(), 1);
     assert.equal(await page.locator(".card").count() > 0, true);
-    assert.equal(await page.locator('[data-testid="watchlist-toolbar"]').count(), 1);
-    assert.equal(await page.locator('[data-testid="data-update-panel"]').count(), 1);
-    assert.equal(await page.locator('[data-testid="data-update-scope"]').inputValue(), "watchlist");
-    assert.equal(await page.locator('[data-testid="data-update-scope"] option').count(), 2);
-    assert.equal(await page.locator('[data-testid="data-update-button"]').isDisabled(), true);
-    assert.match(await page.locator('[data-testid="data-update-status"]').innerText(), /瀏覽器預覽不下載/);
     assert.equal(await page.locator(".read-only-pill").innerText(), "研究唯讀");
-    assert.equal(await page.locator(".page-title").innerText(), "市場首頁");
-    const overviewText = await page.locator("#app").innerText();
-    assert.doesNotMatch(overviewText, /READ ONLY|Research modules|admitted rows|unadmitted|Instrument/);
-    assert.equal(await page.evaluate(() => typeof window.LightweightCharts), "object");
 
+    // IA contract: exactly the six primary value-research sections, in order.
+    assert.equal(await page.locator(".sidebar .nav-link").count(), 6);
+    assert.deepEqual(
+      await page.locator(".sidebar .nav-link .nav-text").allInnerTexts(),
+      ["Home", "Watchlist", "Company", "Valuation", "Buy Plan", "Review"],
+    );
+    for (const removed of ["research", "backtest", "features", "products", "market", "fundamentals", "stories", "overview"]) {
+      assert.equal(await page.locator(`.sidebar [data-section="${removed}"]`).count(), 0, `retired section still in nav: ${removed}`);
+    }
+
+    assert.equal(await page.locator(".page-title").innerText(), "Home");
+    assert.equal(await page.locator('[data-testid="investment-summary"] article').count(), 5);
+    assert.match(await page.locator('[data-testid="summary-tracked"]').innerText(), /追蹤標的/);
+    assert.equal(await page.locator('[data-testid="opportunity-empty"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="buyplan-status-empty"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="fundamental-changes"]').count(), 1);
+    assert.equal(await page.evaluate(() => typeof window.LightweightCharts), "object");
     await settle(page);
-    screenshots.overview = screenshotHash(await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, "overview.png"),
+    screenshots.home = screenshotHash(await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, "home.png"),
       fullPage: true,
       animations: "disabled",
     }));
 
+    // Company: quote, thesis, fundamental snapshot, trend table, price reference.
     const globalSearch = page.locator('[data-testid="global-search"]');
     await globalSearch.fill("2330");
     await page.locator('[data-testid="global-search-results"] .symbol-search-result').filter({ hasText: "2330" }).first().click();
-    assert.equal(await page.locator(".page-title").innerText(), "行情分析");
-
-    await page.locator('[data-action="section"][data-section="market"]').first().click();
-    assert.equal(await page.locator(".page-title").innerText(), "行情分析");
+    assert.equal(await page.locator(".page-title").innerText(), "Company");
     await page.locator('[data-testid="kline-chart"]').waitFor();
     assert.equal(await page.locator('[data-testid="kline-period-label"]').innerText(), "1D");
     assert.equal(await page.locator('[data-testid="kline-chart"] canvas').count() > 0, true);
     assert.equal(await page.locator('[data-testid="kline-instrument"]').inputValue(), "TWSE:2330");
     assert.equal(await page.locator('[data-testid="quote-bar"] .terminal-quote-price strong').innerText(), "2,440");
-    assert.equal(await page.locator('[data-testid="terminal-watchlist"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="note-composer"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="financial-tracker"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="trend-table-empty"]').count(), 1);
     assert.match(await page.locator('[data-testid="kline-coverage"]').innerText(), /360 \/ 交易日 360/);
-    assert.match(await page.locator('[data-testid="kline-coverage"]').innerText(), /EMA 可用/);
-    assert.notEqual(await page.locator('[data-testid="technical-value-ema-20-"]').innerText(), "—");
+
+    await page.locator('[data-testid="note-title"]').fill("2330 研究觀察");
+    await page.locator('[data-testid="note-body"]').fill("價格與技術線先記錄，等待下一次財報核對。");
+    await page.locator('[data-testid="note-submit"]').click();
+    assert.equal(await page.locator('[data-testid="note-card"]').count(), 1);
+    assert.match(await page.locator('[data-testid="note-card"]').innerText(), /2330 研究觀察/);
+
+    await page.locator('[data-testid="financial-review-industry"]').selectOption("Memory");
+    await page.locator('[data-testid="financial-review-score"]').selectOption("4");
+    await page.locator('[data-testid="financial-review-note"]').fill("等待下一次公告，確認毛利率與庫存。");
+    await page.locator('[data-testid="financial-review-save"]').click();
+    assert.match(await page.locator('[data-testid="financial-review-status"]').innerText(), /已儲存/);
     await settle(page);
-    screenshots.market_valid = screenshotHash(await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, "market-valid.png"),
+    screenshots.company = screenshotHash(await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, "company.png"),
       fullPage: true,
       animations: "disabled",
     }));
 
-    const terminalWatchlistPicker = page.locator('[data-testid="terminal-watchlist-picker"]');
-    await terminalWatchlistPicker.fill("2330");
-    const terminalWatchlistResult = page.locator('[data-testid="terminal-watchlist-results"] .symbol-search-result').filter({ hasText: "2330" }).first();
-    await terminalWatchlistResult.waitFor();
-    await terminalWatchlistResult.click();
-    assert.equal(await page.locator('[data-testid="terminal-watchlist-add"]').isDisabled(), false);
-    await page.locator('[data-testid="terminal-watchlist-add"]').click();
-    assert.equal(await page.locator('[data-testid="terminal-watchlist"] .terminal-watchlist-row').count(), 1);
-    assert.equal(await page.locator('[data-testid="kline-watchlist-toggle"]').innerText(), "移出自選");
-    await page.locator('[data-testid="kline-watchlist-toggle"]').click();
-    assert.equal(await page.locator('[data-testid="kline-watchlist-toggle"]').innerText(), "加入自選");
+    // Watchlist: the primary work surface.
+    await page.locator('[data-action="section"][data-section="watchlist"]').first().click();
+    assert.equal(await page.locator(".page-title").innerText(), "Watchlist");
+    await page.locator('[data-testid="watchlist-toolbar"]').waitFor();
+    assert.equal(await page.locator('[data-testid="watchlist-empty"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="data-update-panel"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="data-update-scope"]').inputValue(), "watchlist");
+    assert.equal(await page.locator('[data-testid="data-update-button"]').isDisabled(), true);
+    assert.match(await page.locator('[data-testid="data-update-status"]').innerText(), /瀏覽器預覽不下載/);
 
-    // Exact symbol input must be sufficient; selecting a dropdown result is optional.
-    await terminalWatchlistPicker.fill("2308");
-    assert.equal(await page.locator('[data-testid="terminal-watchlist-add"]').isDisabled(), false);
-    await page.locator('[data-testid="terminal-watchlist-add"]').click();
-    assert.equal(await page.locator('[data-testid="terminal-watchlist"] .terminal-watchlist-row').count(), 1);
-    await page.locator('[data-action="watchlist-remove"][data-instrument-id="TWSE:2308"]').click();
-    assert.equal(await page.locator('[data-testid="terminal-watchlist"] .terminal-watchlist-row').count(), 0);
-
-    await page.locator('[data-action="section"][data-section="features"]').first().click();
-    await page.locator('[data-testid="feature-workbench"]').waitFor();
-    assert.equal(await page.locator('[data-testid="technical-snapshot"]').count(), 1);
-    assert.notEqual(await page.locator('[data-testid="technical-value-ema-20-"]').innerText(), "—");
-    assert.equal(await page.locator('[data-testid="feature-workbench"] .technical-reading').count(), 4);
-    await page.locator('[data-action="section"][data-section="market"]').first().click();
-    await page.locator('[data-testid="kline-chart"]').waitFor();
-
-    await page.locator('[data-testid="kline-fit"]').click();
-    await page.locator('[data-testid="kline-zoom-in"]').click();
-    await page.locator('[data-testid="kline-zoom-out"]').click();
-    await page.locator('[data-testid="kline-indicator-rsi"]').click();
-    await page.locator('[data-testid="kline-chart"]').waitFor();
-    await page.locator('[data-testid="kline-drawing"]').click();
-    assert.equal(await page.locator('[data-testid="kline-drawing"]').getAttribute("aria-pressed"), "true");
-    const chartBox = await page.locator('[data-testid="kline-chart"]').boundingBox();
-    assert.ok(chartBox, "chart frame should have a bounding box");
-    await page.mouse.click(chartBox.x + chartBox.width / 2, chartBox.y + 100);
-    assert.equal(await page.locator('[data-testid="kline-drawing-clear"]').isDisabled(), false);
-    await page.locator('[data-testid="kline-drawing-clear"]').click();
-    await page.locator('[data-testid="kline-template"]').click();
-    assert.match(await page.locator('[data-testid="kline-template"]').innerText(), /研究模板/);
-
-    await page.locator('[data-testid="kline-period-M"]').click();
-    await page.locator('[data-testid="kline-chart"]').waitFor();
-    assert.equal(await page.locator('[data-testid="kline-period-label"]').innerText(), "M");
-    assert.match(await page.locator('[data-testid="kline-state"]').innerText(), /部分可用/);
-    await settle(page);
-    screenshots.market_partial = screenshotHash(await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, "market-partial.png"),
-      fullPage: true,
-      animations: "disabled",
-    }));
-
-    await page.locator('[data-testid="kline-instrument"]').fill("TX:202608");
-    await page.locator('[data-testid="kline-symbol-results"] .symbol-search-result').filter({ hasText: "TX:202608" }).first().click();
-    await page.locator('[data-testid="kline-chart"]').waitFor();
-    assert.match(await page.locator('[data-testid="kline-state"]').innerText(), /部分可用/);
-    await settle(page);
-    screenshots.market_future = screenshotHash(await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, "market-future.png"),
-      fullPage: true,
-      animations: "disabled",
-    }));
-
-    await page.locator('[data-testid="kline-watchlist-toggle"]').click();
-    assert.equal(await page.locator('[data-testid="kline-watchlist-toggle"]').innerText(), "移出自選");
-    await page.locator('[data-action="section"][data-section="overview"]').first().click();
-    await page.locator('[data-testid="watchlist-table"]').waitFor();
-    assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 1);
-    assert.match(await page.locator('[data-testid="watchlist-state"]').innerText(), /瀏覽器預覽草稿/);
-    assert.equal(await page.locator('[data-testid="watchlist-save"]').isDisabled(), false);
     const watchlistPicker = page.locator('[data-testid="watchlist-picker"]');
     await watchlistPicker.click();
     assert.equal(await watchlistPicker.evaluate((element) => document.activeElement === element), true);
     await watchlistPicker.type("2330");
-    assert.equal(await watchlistPicker.inputValue(), "2330");
     await page.locator('[data-testid="watchlist-symbol-results"] .symbol-search-result').filter({ hasText: "2330" }).first().click();
     await page.locator('[data-testid="watchlist-add"]').click();
-    assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 2);
+    await page.locator('[data-testid="watchlist-table"]').waitFor();
+    assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 1);
+    assert.deepEqual(
+      await page.locator('[data-testid="watchlist-table"] thead th').allInnerTexts(),
+      ["代號", "公司／產業", "現價", "合理價值", "折價", "第一買進價", "甜蜜價", "基本面", "投資假設", "下一事件", "買進階段", ""],
+    );
+    assert.equal(await page.locator('[data-testid="watchlist-filters"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="watchlist-sort"]').inputValue(), "discount");
+    // No valuation yet: value-derived columns must be em dashes, never inferred.
+    assert.equal(await page.locator('[data-testid="watchlist-base-value"]').first().innerText(), "—");
+    assert.equal(await page.locator('[data-testid="watchlist-discount"]').first().innerText(), "—");
     await watchlistPicker.fill("2308");
     assert.equal(await page.locator('[data-testid="watchlist-add"]').isDisabled(), false);
     await page.locator('[data-testid="watchlist-add"]').click();
-    assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 3);
-    await page.locator('[data-action="watchlist-remove"][data-instrument-id="TWSE:2308"]').click();
     assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 2);
+    await page.locator('[data-action="watchlist-remove"][data-instrument-id="TWSE:2308"]').click();
+    assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 1);
     await page.locator('[data-testid="watchlist-save"]').click();
     assert.match(await page.locator('[data-testid="watchlist-state"]').innerText(), /已儲存至瀏覽器預覽/);
     await page.reload({ waitUntil: "networkidle" });
+    await page.locator('[data-action="section"][data-section="watchlist"]').first().click();
     await page.locator('[data-testid="watchlist-table"]').waitFor();
-    assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 2);
+    assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 1);
 
     await page.locator('[data-testid="watchlist-group-name"]').fill("半導體");
     await page.locator('[data-testid="watchlist-group-create"]').click();
-    const createdGroupId = await page.locator('[data-testid="watchlist-group-select"]').inputValue();
-    assert.notEqual(createdGroupId, "default");
+    assert.notEqual(await page.locator('[data-testid="watchlist-group-select"]').inputValue(), "default");
     const watchlistGroupDelete = page.locator('[data-testid="watchlist-toolbar"] [data-testid="watchlist-group-delete"]');
     assert.equal(await watchlistGroupDelete.isDisabled(), false);
     page.once("dialog", (dialog) => dialog.accept());
     await watchlistGroupDelete.click();
     assert.equal(await page.locator('[data-testid="watchlist-group-select"]').inputValue(), "default");
     assert.equal(await watchlistGroupDelete.isDisabled(), true);
-    await page.locator('[data-testid="watchlist-group-name"]').fill("半導體");
-    await page.locator('[data-testid="watchlist-group-create"]').click();
-    assert.notEqual(await page.locator('[data-testid="watchlist-group-select"]').inputValue(), "default");
-    await page.locator('[data-action="section"][data-section="research"]').first().click();
-    await page.locator('[data-testid="research-results"]').waitFor();
-    await page.locator('[data-testid="formula-builder"]').waitFor();
-    assert.equal(await page.locator('[data-testid="formula-rule"]').count(), 1);
-    await page.locator('[data-testid="formula-add"]').click();
-    assert.equal(await page.locator('[data-testid="formula-rule"]').count(), 2);
-    await page.locator('[data-testid="formula-rule"]').nth(1).locator('[data-field="category"]').selectOption("估值");
-    await page.locator('[data-testid="formula-rule"]').nth(1).locator('[data-field="value"]').fill("30%");
-    assert.equal(await page.locator('[data-testid="formula-rule"]').nth(1).locator('[data-field="value"]').inputValue(), "30%");
     await settle(page);
-    screenshots.formula_builder = screenshotHash(await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, "formula-builder.png"),
-      fullPage: true,
-      animations: "disabled",
-    }));
-    await page.locator('[data-testid="screen-builder"]').waitFor();
-    await page.locator('[data-testid="screen-builder"] .screen-condition').first().click();
-    assert.match(await page.locator('[data-testid="screen-builder"]').innerText(), /已選 1/);
-    assert.equal(await page.locator('[data-testid="research-status"]').innerText(), "目前顯示 1 筆已納入資料");
-    await page.locator('[data-action="research-add-group"]').first().click();
-    assert.equal(await page.locator('[data-action="research-add-group"]').first().innerText(), "已在群組");
-    await page.locator('[data-testid="research-market"]').fill("TWSE");
-    await page.locator('[data-testid="research-apply"]').click();
-    assert.equal(await page.locator('[data-testid="research-results"] tbody tr').count(), 1);
-    assert.match(await page.locator('[data-testid="screen-spec"]').innerText(), /TWSE/);
-    assert.match(await page.locator('[data-testid="strategy-spec"]').innerText(), /research_only/);
-
-    await page.locator('[data-action="section"][data-section="stories"]').first().click();
-    await page.locator('[data-testid="note-composer"]').waitFor();
-    await page.locator('[data-testid="note-title"]').fill("2330 研究觀察");
-    await page.locator('[data-testid="note-body"]').fill("價格與技術線先記錄，等待下一次財報核對。");
-    await page.locator('[data-testid="note-submit"]').click();
-    assert.equal(await page.locator('[data-testid="note-card"]').count(), 1, `note count=${await page.locator('[data-testid="note-count"]').innerText()} title=${await page.locator('[data-testid="note-title"]').inputValue()}`);
-    assert.match(await page.locator('[data-testid="note-card"]').innerText(), /2330 研究觀察/);
-
-    await page.locator('[data-action="section"][data-section="fundamentals"]').first().click();
-    await page.locator('[data-testid="financial-tracker"]').waitFor();
-    await page.locator('[data-testid="financial-review-industry"]').selectOption("Memory");
-    await page.locator('[data-testid="financial-review-score"]').selectOption("4");
-    await page.locator('[data-testid="financial-review-note"]').fill("等待下一次公告，確認毛利率與庫存。 ");
-    await page.locator('[data-testid="financial-review-save"]').click();
-    assert.match(await page.locator('[data-testid="financial-review-status"]').innerText(), /已儲存/);
-    await settle(page);
-    screenshots.financial_tracker = screenshotHash(await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, "financial-tracker.png"),
+    screenshots.watchlist = screenshotHash(await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, "watchlist.png"),
       fullPage: true,
       animations: "disabled",
     }));
 
-    await page.locator('[data-action="section"][data-section="products"]').first().click();
-    await page.locator(".page-title").waitFor();
-    assert.equal(await page.locator(".page-title").innerText(), "我的自選");
+    // Valuation is now its own page, not a card buried under the chart.
+    await page.locator('[data-action="section"][data-section="valuation"]').first().click();
+    assert.equal(await page.locator(".page-title").innerText(), "Valuation");
+    await page.locator('[data-testid="valuation-panel"]').waitFor();
+    assert.equal(await page.locator('[data-testid="valuation-empty"]').count(), 1);
+    await page.locator('[data-testid="valuation-ws-label"]').fill("2330 本益比合理價");
+    await page.locator('[data-testid="valuation-ws-eps"]').fill("40");
+    await page.locator('[data-testid="valuation-ws-target-pe"]').fill("20");
+    await page.locator('[data-testid="valuation-ws-safety-margin"]').fill("15");
+    await page.locator('[data-testid="valuation-add"]').click();
+    assert.equal(await page.locator('[data-testid="valuation-worksheet"]').count(), 1);
+    await page.locator('[data-testid="valuation-evaluate"]').click();
+    await page.locator('[data-testid="valuation-result-card"]').first().waitFor();
+    assert.equal(await page.locator('[data-testid="valuation-fair-value"]').first().innerText(), "800");
     await settle(page);
-    screenshots.products = screenshotHash(await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, "products.png"),
+    screenshots.valuation = screenshotHash(await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, "valuation.png"),
       fullPage: true,
       animations: "disabled",
     }));
 
-    await page.locator('[data-action="product"]').first().click();
-    await page.locator('[role="dialog"]').waitFor();
-    assert.equal(await page.locator('[role="dialog"]').isVisible(), true);
-    const dialogText = await page.locator('[role="dialog"]').textContent();
-    assert.ok(dialogText.includes("唯讀資料列詳情"), `dialog text: ${dialogText}`);
-    await settle(page);
-    screenshots.detail_dialog = screenshotHash(await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, "detail-dialog.png"),
-      fullPage: true,
-      animations: "disabled",
-    }));
+    // Valuation feeds Watchlist and Home: the discount ladder must appear only
+    // once the human has supplied a fair value.
+    await page.locator('[data-action="section"][data-section="watchlist"]').first().click();
+    await page.locator('[data-testid="watchlist-table"]').waitFor();
+    assert.equal(await page.locator('[data-testid="watchlist-base-value"]').first().innerText(), "800");
+    assert.notEqual(await page.locator('[data-testid="watchlist-discount"]').first().innerText(), "—");
+    assert.equal(await page.locator('[data-testid="watchlist-stage"]').first().innerText(), "觀察");
 
-    await page.keyboard.press("Escape");
-    await page.locator('[role="dialog"]').waitFor({ state: "detached" });
-    assert.equal(await page.locator('[role="dialog"]').count(), 0);
-    await page.locator('[data-action="section"][data-section="backtest"]').first().click();
-    await page.locator('[data-testid="backtest-settings"]').waitFor();
-    await page.locator('[data-testid="backtest-fill-time"]').selectOption("次日 VWAP");
-    await page.locator('[data-testid="backtest-max-positions"]').fill("12");
-    await page.locator('[data-testid="backtest-settings-save"]').click();
-    assert.match(await page.locator('[data-testid="backtest-settings-status"]').innerText(), /已儲存/);
-    const firstEquityDate = await page.locator(".subsection .table tbody tr").first().locator("td").first().innerText();
-    assert.notEqual(firstEquityDate, "—", "equity curve date must be rendered from the read model");
+    await page.locator('[data-action="section"][data-section="home"]').first().click();
+    await page.locator('[data-testid="opportunity-list"]').waitFor();
+    assert.equal(await page.locator('[data-testid="opportunity-row"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="buyplan-status"] li').count(), 1);
+
+    // Buy Plan and Review are declared but not yet built; they must say so
+    // rather than render a fake surface.
+    await page.locator('[data-action="section"][data-section="buyplan"]').first().click();
+    assert.equal(await page.locator(".page-title").innerText(), "Buy Plan");
+    assert.equal(await page.locator('[data-testid="buyplan-empty"]').count(), 1);
+    await page.locator('[data-action="section"][data-section="review"]').first().click();
+    assert.equal(await page.locator(".page-title").innerText(), "Review");
+    assert.equal(await page.locator('[data-testid="review-empty"]').count(), 1);
+
+    // No trading, ranking, or factor-mining affordance may survive. Checked on
+    // actionable controls only: a disclaimer that names 下單 is the opposite of
+    // an affordance and must not fail this gate.
+    const controlLabels = await page.locator("#app button, #app a").allInnerTexts();
+    for (const label of controlLabels) {
+      assert.doesNotMatch(label, /下單|送單|回測|因子|驗證報告|技術指標|AI 信心|強力買進|建議立即買進/, `retired affordance: ${label}`);
+    }
+
     page.once("dialog", (dialog) => dialog.accept());
     await page.locator('[data-action="reset"]').click();
-    assert.equal(await page.locator(".page-title").innerText(), "市場首頁");
+    assert.equal(await page.locator(".page-title").innerText(), "Home");
+
+    // The watchlist command area owns the responsive contract, so measure it on
+    // its own page rather than on Home.
+    await page.locator('[data-action="section"][data-section="watchlist"]').first().click();
     await page.locator('[data-testid="watchlist-toolbar"]').waitFor();
+
     const responsive = [];
     for (const size of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 1024, height: 768 }, { width: 820, height: 768 }, { width: 720, height: 768 }, { width: 390, height: 844 }]) {
       await page.setViewportSize(size);
