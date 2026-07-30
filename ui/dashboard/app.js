@@ -119,6 +119,65 @@
   var valuationLoadStarted = false;
   var valuationEvaluateInFlight = false;
   var valuationDraft = defaultValuationDraft();
+  var BUY_PLAN_LOCAL_STORAGE_KEY = "tqr-buy-plans.v1";
+  var buyPlanDraft = defaultBuyPlanDraft();
+  var buyPlansLoaded = false;
+
+  function defaultBuyPlanDraft() {
+    return { totalBudget: "", allocFirst: "20", allocSecond: "25", allocSweet: "30", allocReserve: "25", maxPositionPct: "" };
+  }
+
+  function buyPlanDraftFrom(plan) {
+    return {
+      totalBudget: plan.total_budget ? String(plan.total_budget) : "",
+      allocFirst: String(plan.allocations.first),
+      allocSecond: String(plan.allocations.second),
+      allocSweet: String(plan.allocations.sweet),
+      allocReserve: String(plan.allocations.reserve),
+      maxPositionPct: plan.max_position_pct ? String(plan.max_position_pct) : ""
+    };
+  }
+
+  function loadBuyPlans() {
+    if (buyPlansLoaded) return;
+    buyPlansLoaded = true;
+    try {
+      var raw = window.localStorage.getItem(BUY_PLAN_LOCAL_STORAGE_KEY);
+      if (raw) state = core.reduce(state, { type: "LOAD_BUY_PLANS", payload: JSON.parse(raw) });
+    } catch (error) {
+      // A corrupt or unavailable store leaves the plans empty rather than
+      // guessing values the human never entered.
+    }
+  }
+
+  function persistBuyPlans() {
+    try {
+      window.localStorage.setItem(BUY_PLAN_LOCAL_STORAGE_KEY, JSON.stringify(core.buyPlanStorePayload(state)));
+    } catch (error) {
+      // Browser preview without storage still keeps the in-memory plan.
+    }
+  }
+
+  function saveBuyPlanFromDraft() {
+    var instrumentId = state.selectedKlineInstrumentId;
+    if (!instrumentId || core.buyPlanFormIssues(buyPlanDraft).length) return;
+    state = core.reduce(state, {
+      type: "SET_BUY_PLAN",
+      instrumentId: instrumentId,
+      plan: {
+        total_budget: Number(buyPlanDraft.totalBudget),
+        allocations: {
+          first: Number(buyPlanDraft.allocFirst),
+          second: Number(buyPlanDraft.allocSecond),
+          sweet: Number(buyPlanDraft.allocSweet),
+          reserve: Number(buyPlanDraft.allocReserve)
+        },
+        max_position_pct: buyPlanDraft.maxPositionPct === "" ? 0 : Number(buyPlanDraft.maxPositionPct)
+      }
+    });
+    persistBuyPlans();
+    render();
+  }
 
   function defaultValuationDraft() {
     return {
@@ -1863,9 +1922,52 @@
     return pageHeader("Valuation", "Bear／Base／Bull · 合理本益比 · 買進區間") + valuationMarkup();
   }
 
+  function buyPlanAllocField(key, label, testid) {
+    var field = "alloc" + key.charAt(0).toUpperCase() + key.slice(1);
+    return '<label><span>' + text(label) + '（%）</span><input type="number" min="0" max="100" step="1" inputmode="decimal" value="' + escapeHtml(buyPlanDraft[field]) + '" data-action="buyplan-input" data-field="' + field + '" data-testid="' + testid + '"></label>';
+  }
+
   function buyPlanPageMarkup() {
+    var instrument = selectedKlineInstrument();
+    var instrumentId = state.selectedKlineInstrumentId;
+    var symbol = instrument && instrument.symbol;
+    if (!instrumentId || !symbol) {
+      return pageHeader("Buy Plan", "總預算 · 分段價格 · 分段比例 · 到價提示") +
+        card("分段買進計畫", "先選一家公司", '<div class="empty-state" data-testid="buyplan-no-instrument"><strong>尚未選擇公司。</strong><span>在 Watchlist 或 Company 選定標的後，才能為它建立分段買進計畫。</span></div>', "");
+    }
+    var issues = core.buyPlanFormIssues(buyPlanDraft);
+    var tranches = core.buyPlanTranches(state, instrumentId);
+    var hasZone = tranches.some(function (item) { return item.price !== null; });
+    var rows = tranches.map(function (item) {
+      var reachedLabel = item.reached === null ? "—" : item.reached ? "已到價" : "未到價";
+      return '<tr data-testid="buyplan-tranche" data-tranche="' + item.key + '"><td>' + text(item.label) + '</td>' +
+        '<td class="cell-mono">' + (item.price === null ? "—" : core.formatNumber(item.price)) + '</td>' +
+        '<td class="cell-mono">' + text(item.allocation_pct) + '%</td>' +
+        '<td class="cell-mono">' + (item.amount === null ? "—" : core.formatNumber(item.amount)) + '</td>' +
+        '<td data-testid="buyplan-reached">' + text(reachedLabel) + '</td></tr>';
+    }).join("");
+
+    var reached = tranches.filter(function (item) { return item.reached === true; });
+    var prompt = reached.length
+      ? '<div class="buyplan-prompt" data-testid="buyplan-prompt"><strong>價格已進入' + text(reached[reached.length - 1].label) + '區間。</strong><span>請確認投資假設是否仍成立，再由你自己決定是否買進。系統不代為判斷。</span></div>'
+      : '<div class="buyplan-prompt muted" data-testid="buyplan-prompt-idle"><strong>尚未進入任何分段區間。</strong><span>到價時這裡只會提示你回頭檢查 Thesis。</span></div>';
+
     return pageHeader("Buy Plan", "總預算 · 分段價格 · 分段比例 · 到價提示") +
-      card("分段買進計畫", "價格到達只提示，不給買賣建議", '<div class="empty-state" data-testid="buyplan-empty"><strong>Buy Plan 尚未建置。</strong><span>這個區塊將在下一個節點實作：總預算、分段價格與比例、保留資金、最大部位。</span></div>', "");
+      card("分段買進計畫", text(symbol) + " · 價格由 Valuation 的買進區間帶入", 
+        '<div class="buyplan-form" data-testid="buyplan-form">' +
+        '<label><span>總預算</span><input type="number" min="0" step="1000" inputmode="decimal" value="' + escapeHtml(buyPlanDraft.totalBudget) + '" data-action="buyplan-input" data-field="totalBudget" data-testid="buyplan-budget"></label>' +
+        buyPlanAllocField("first", "第一階段", "buyplan-alloc-first") +
+        buyPlanAllocField("second", "第二階段", "buyplan-alloc-second") +
+        buyPlanAllocField("sweet", "甜蜜區", "buyplan-alloc-sweet") +
+        buyPlanAllocField("reserve", "保留資金", "buyplan-alloc-reserve") +
+        '<label><span>投資組合上限（%）</span><input type="number" min="0" max="100" step="1" inputmode="decimal" value="' + escapeHtml(buyPlanDraft.maxPositionPct) + '" data-action="buyplan-input" data-field="maxPositionPct" data-testid="buyplan-max-position"></label>' +
+        '<div class="buyplan-actions"><button class="btn btn-primary" type="button" data-action="buyplan-save" data-testid="buyplan-save"' + (issues.length ? " disabled" : "") + '>儲存買進計畫</button>' +
+        formIssuesMarkup(issues, "buyplan-issues") + '</div></div>', "") +
+      card("分段狀態", hasZone ? "價格對照 Valuation 的買進區間" : "尚未建立估值", 
+        (hasZone ? "" : '<div class="empty-state" data-testid="buyplan-no-valuation"><strong>此標的尚未建立 Base 合理價值。</strong><span>分段價格一律由估值推導，不從市價或歷史高點回推。</span></div>') +
+        '<div class="table-responsive"><table class="table" data-testid="buyplan-table"><thead><tr><th>階段</th><th>價格</th><th>比例</th><th>金額</th><th>到價</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+        prompt +
+        '<p class="valuation-note">到價只提示你回頭檢查投資假設。這裡不提供、也不會出現「建議買進」「強力買進」或任何信心分數；沒有下單、模擬下單或券商連線。</p>', "");
   }
 
   function reviewPageMarkup() {
@@ -1933,6 +2035,10 @@
       persistValuation();
     }
     if (action === "valuation-evaluate") evaluateValuation();
+    if (action === "buyplan-save") {
+      saveBuyPlanFromDraft();
+      return;
+    }
     if (action === "theme-set") applyTheme(target.getAttribute("data-theme"));
     if (action === "update-check") {
       checkAppUpdate();
@@ -2116,6 +2222,11 @@
       refreshSearchResults("global-search-results", symbolSearchResults(core.klineInstruments(state.view), klineSearchQuery, [], state.selectedKlineInstrumentId, "global-search-results", "global-search-pick"));
       return;
     }
+    if (target.getAttribute("data-action") === "buyplan-input") {
+      buyPlanDraft[target.getAttribute("data-field")] = target.value;
+      render();
+      return;
+    }
     if (target.getAttribute("data-action") === "watchlist-filter") {
       state = core.reduce(state, { type: "SET_WATCHLIST_FILTER", field: target.getAttribute("data-field"), value: target.value });
       render();
@@ -2202,6 +2313,7 @@
   });
 
   loadPrototypeDrafts();
+  loadBuyPlans();
   ensureNotesRuntime();
   ensureAlertsRuntime();
   ensureValuationRuntime();

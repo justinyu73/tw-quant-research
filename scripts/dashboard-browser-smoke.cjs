@@ -11,8 +11,9 @@ const PREVIEW_DIR = path.join(ROOT, "outputs", "dashboard-preview");
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
   home: "ab3546148471254d72516ff191215be9c87ecd786bb6484160e767e7cccda10c",
-  company: "ebb133c3dba5d2962963ce0c05cd8288f94fbed093f588d5c20acf438173ad37",
+  company: "43136568b969a805ca06847130614a5a1037c05cfc9971f720efc35d30493417",
   watchlist: "a1ea7618c089fc255efadcc4667332e2af3ee5cadb099a77a8019934c94d3814",
+  buyplan: "c5661d6af376650cd1b3f6fe946b7080467189c43f938d6db108eccf4390bdd2",
   valuation: "a6aabd57ef723156baea4e2be2a7298c85b3b846e92dc933c32d9c16b09c902e",
 };
 
@@ -337,7 +338,27 @@ async function main() {
     // rather than render a fake surface.
     await page.locator('[data-action="section"][data-section="buyplan"]').first().click();
     assert.equal(await page.locator(".page-title").innerText(), "Buy Plan");
-    assert.equal(await page.locator('[data-testid="buyplan-empty"]').count(), 1);
+    await page.locator('[data-testid="buyplan-form"]').waitFor();
+    // Tranche prices come from the valuation ladder, not from the market price.
+    assert.equal(await page.locator('[data-testid="buyplan-tranche"]').count(), 4);
+    assert.equal(await page.locator('[data-tranche="first"] td').nth(1).innerText(), "680");
+    assert.equal(await page.locator('[data-tranche="sweet"] td').nth(1).innerText(), "600");
+    assert.equal(await page.locator('[data-testid="buyplan-prompt-idle"]').count(), 1);
+    // Allocations must total 100% before the plan can be saved.
+    await page.locator('[data-testid="buyplan-budget"]').fill("1000000");
+    await page.locator('[data-testid="buyplan-alloc-reserve"]').fill("20");
+    assert.equal(await page.locator('[data-testid="buyplan-save"]').isDisabled(), true);
+    await page.locator('[data-testid="buyplan-alloc-reserve"]').fill("25");
+    assert.equal(await page.locator('[data-testid="buyplan-save"]').isDisabled(), false);
+    await page.locator('[data-testid="buyplan-save"]').click();
+    assert.equal(await page.locator('[data-tranche="first"] td').nth(3).innerText(), "200,000");
+    assert.equal(await page.locator('[data-tranche="sweet"] td').nth(3).innerText(), "300,000");
+    await settle(page);
+    screenshots.buyplan = screenshotHash(await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, "buyplan.png"),
+      fullPage: true,
+      animations: "disabled",
+    }));
     await page.locator('[data-action="section"][data-section="review"]').first().click();
     assert.equal(await page.locator(".page-title").innerText(), "Review");
     assert.equal(await page.locator('[data-testid="review-empty"]').count(), 1);

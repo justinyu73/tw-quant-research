@@ -102,7 +102,8 @@
       valuationIndicatorPeriods: { zscore: 20, price_percentile: 60, ma_deviation: 20 },
       companyResearch: {},
       watchlistFilters: { industry: "", fundamental_state: "", thesis_state: "", stage: "", held: "" },
-      watchlistSort: "discount"
+      watchlistSort: "discount",
+      buyPlans: {}
     };
   }
 
@@ -278,6 +279,16 @@
       record.updated_at = event.now || record.updated_at;
       records[event.instrumentId] = record;
       return Object.assign({}, current, { companyResearch: records });
+    }
+    if (event.type === "SET_BUY_PLAN") {
+      var plans = Object.assign({}, current.buyPlans);
+      plans[event.instrumentId] = Object.assign(defaultBuyPlan(event.instrumentId), event.plan, {
+        instrument_id: event.instrumentId
+      });
+      return Object.assign({}, current, { buyPlans: plans });
+    }
+    if (event.type === "LOAD_BUY_PLANS") {
+      return Object.assign({}, current, { buyPlans: normalizeBuyPlans(event.payload) });
     }
     if (event.type === "SELECT_SECTION" && sectionExists(event.section)) {
       return Object.assign({}, current, {
@@ -1015,6 +1026,110 @@
     });
   }
 
+
+  var BUY_PLAN_SCHEMA = "tqr-buy-plans/v1";
+  var ALLOCATION_KEYS = ["first", "second", "sweet", "reserve"];
+
+  function defaultBuyPlan(instrumentId) {
+    return {
+      instrument_id: instrumentId,
+      total_budget: 0,
+      allocations: { first: 20, second: 25, sweet: 30, reserve: 25 },
+      max_position_pct: 0
+    };
+  }
+
+  function buyPlan(state, instrumentId) {
+    var store = state && state.buyPlans ? state.buyPlans : {};
+    var stored = store[instrumentId];
+    if (!stored) return defaultBuyPlan(instrumentId);
+    return Object.assign(defaultBuyPlan(instrumentId), stored, {
+      allocations: Object.assign(defaultBuyPlan(instrumentId).allocations, stored.allocations || {})
+    });
+  }
+
+  function buyPlanFormIssues(draft) {
+    var data = draft || {};
+    var issues = [];
+    if (!numberTextIsFinite(data.totalBudget) || numberText(data.totalBudget) <= 0) {
+      issues.push(issue("totalBudget", "總預算需為大於 0 的數字"));
+    }
+    var total = 0;
+    ALLOCATION_KEYS.forEach(function (key) {
+      var field = "alloc" + key.charAt(0).toUpperCase() + key.slice(1);
+      if (!numberTextIsFinite(data[field]) || numberText(data[field]) < 0 || numberText(data[field]) > 100) {
+        issues.push(issue(field, "分段比例需為 0 到 100 之間的數字（%）"));
+      } else {
+        total += numberText(data[field]);
+      }
+    });
+    if (issues.length === 0 && Math.abs(total - 100) > 1e-9) {
+      issues.push(issue("allocFirst", "分段比例與保留資金合計需為 100%，目前為 " + total + "%"));
+    }
+    if (data.maxPositionPct !== "" && data.maxPositionPct !== undefined &&
+        (!numberTextIsFinite(data.maxPositionPct) || numberText(data.maxPositionPct) < 0 || numberText(data.maxPositionPct) > 100)) {
+      issues.push(issue("maxPositionPct", "投資組合上限需為 0 到 100 之間的數字（%）"));
+    }
+    return issues;
+  }
+
+  // A tranche is "reached" purely by price vs the valuation ladder. Reaching it
+  // is a prompt to re-check the thesis, never an instruction to buy.
+  function buyPlanTranches(state, instrumentId) {
+    var plan = buyPlan(state, instrumentId);
+    var rows = watchlistViewRows(state);
+    var row = rows.find(function (item) { return item.instrument_id === instrumentId; });
+    var ratios = buyZoneRatios(state);
+    var zone = row && isFiniteNumber(row.base_value) ? buyZonePrices(row.base_value, ratios) : null;
+    var price = row ? row.price : null;
+    return [
+      { key: "first", label: "第一階段", price: zone ? zone.first : null },
+      { key: "second", label: "第二階段", price: zone ? zone.second : null },
+      { key: "sweet", label: "甜蜜區", price: zone ? zone.sweet : null }
+    ].map(function (tranche) {
+      var pct = plan.allocations[tranche.key];
+      return Object.assign({}, tranche, {
+        allocation_pct: pct,
+        amount: plan.total_budget > 0 ? plan.total_budget * pct / 100 : null,
+        reached: isFiniteNumber(price) && isFiniteNumber(tranche.price) ? price <= tranche.price : null
+      });
+    }).concat([{
+      key: "reserve",
+      label: "保留資金",
+      price: null,
+      allocation_pct: plan.allocations.reserve,
+      amount: plan.total_budget > 0 ? plan.total_budget * plan.allocations.reserve / 100 : null,
+      reached: null
+    }]);
+  }
+
+  function buyPlanStorePayload(state) {
+    return { schema: BUY_PLAN_SCHEMA, version: 1, plans: (state && state.buyPlans) || {} };
+  }
+
+  function normalizeBuyPlans(payload) {
+    if (!payload || payload.schema !== BUY_PLAN_SCHEMA || !payload.plans || typeof payload.plans !== "object") return {};
+    var out = {};
+    Object.keys(payload.plans).forEach(function (key) {
+      if (!/^[A-Za-z0-9:_.-]{1,64}$/.test(key)) return;
+      var plan = payload.plans[key];
+      if (!plan || typeof plan !== "object") return;
+      var merged = defaultBuyPlan(key);
+      if (typeof plan.total_budget === "number" && plan.total_budget >= 0) merged.total_budget = plan.total_budget;
+      if (typeof plan.max_position_pct === "number" && plan.max_position_pct >= 0 && plan.max_position_pct <= 100) {
+        merged.max_position_pct = plan.max_position_pct;
+      }
+      if (plan.allocations && typeof plan.allocations === "object") {
+        ALLOCATION_KEYS.forEach(function (name) {
+          var value = plan.allocations[name];
+          if (typeof value === "number" && value >= 0 && value <= 100) merged.allocations[name] = value;
+        });
+      }
+      out[key] = merged;
+    });
+    return out;
+  }
+
   return Object.freeze({
     SECTIONS: SECTIONS,
     PRIMARY_SECTION_IDS: PRIMARY_SECTION_IDS,
@@ -1030,6 +1145,14 @@
     watchlistViewRows: watchlistViewRows,
     filterWatchlistRows: filterWatchlistRows,
     sortWatchlistRows: sortWatchlistRows,
+    BUY_PLAN_SCHEMA: BUY_PLAN_SCHEMA,
+    ALLOCATION_KEYS: ALLOCATION_KEYS,
+    defaultBuyPlan: defaultBuyPlan,
+    buyPlan: buyPlan,
+    buyPlanFormIssues: buyPlanFormIssues,
+    buyPlanTranches: buyPlanTranches,
+    buyPlanStorePayload: buyPlanStorePayload,
+    normalizeBuyPlans: normalizeBuyPlans,
     DEFAULT_BUY_ZONE_RATIOS: DEFAULT_BUY_ZONE_RATIOS,
     buyZonePrices: buyZonePrices,
     stageForPrice: stageForPrice,
