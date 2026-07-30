@@ -1,8 +1,10 @@
-# Validation settings specification
+# Validation settings specification (superseded)
 
-Authority: [`tqr-research-platform-spec.md#validation-settings-and-report-contract`](tqr-research-platform-spec.md#validation-settings-and-report-contract)
-Decision: `TQR-VALIDATION-002`
-Status: active
+Status: superseded
+Superseded_by: [`tqr-research-platform-spec.md`](tqr-research-platform-spec.md)
+Decision: `TQR-VALIDATION-002` -> `TQR-REVIEW-003`
 
-The canonical section defines PIT-safe signal/fill timing, settings fields, and
-the difference between a saved research report and a trading system.
+The backtest/validation settings surface was removed from the product. The value
+research workspace replaces it with the Review contract: a monthly/quarterly
+human thesis review, not a reproducible strategy backtest. The full history
+remains in git.

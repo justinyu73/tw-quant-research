@@ -1,8 +1,8 @@
 # Field dictionary
 
-Authority: [`tqr-research-platform-spec.md#field-dictionary`](tqr-research-platform-spec.md#field-dictionary)
-Decision: `TQR-IA-002`
+Authority: [`tqr-research-platform-spec.md#data-availability-vocabulary`](tqr-research-platform-spec.md#data-availability-vocabulary)
+Decision: `TQR-IA-003`
 Status: active
 
-The canonical field dictionary defines availability states, planned price and
-fundamental fields, manual-review fields, and prohibited placeholder values.
+The canonical specification defines availability states, the unavailable
+fundamental fields, and the prohibition on estimating any of them from price.

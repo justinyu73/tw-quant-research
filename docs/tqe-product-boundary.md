@@ -60,8 +60,9 @@ Decision: `TQR-UIUX-001`
 Status: active
 
 The desktop product uses one research-terminal shell across all pages. The
-information architecture is fixed as `行情：市場首頁／行情分析／我的自選／技術指標`、
-`研究計畫：因子與公式／財務追蹤／驗證報告`、`記錄：研究筆記／資料來源`。 Each page keeps the
+information architecture is fixed as six primary sections:
+`Home／Watchlist／Company／Valuation／Buy Plan／Review`; provenance and settings stay
+reachable from inside a page. Each page keeps the
 same page header, content width, card header, control row, table overflow, and
 status treatment; only the page-specific read model changes.
 
@@ -89,17 +90,18 @@ hierarchy and responsive contract.
 
 ## Research planning and tracking prototype v1
 
-Decision: `TQR-IA-002`
+Decision: `TQR-IA-003` (supersedes `TQR-IA-002`)
 Status: active
 Authority: [`docs/tqr-research-platform-spec.md`](tqr-research-platform-spec.md)
 
-This decision adds the P1 personal-research prototype without widening the
-product into an automatic strategy service. It defines three usable work
-areas: a watchlist comparison surface, a formula/condition draft editor, and
-a validation-settings/report surface. Financial tracking adds human-entered
-industry, observation status, score, and notes as local prototype drafts;
-official financial fields remain unavailable until their free-source and PIT
-contracts are admitted.
+This decision defines the value research workspace without widening the product
+into an automatic strategy service. The work areas are a watchlist comparison
+surface ordered by discount to Base fair value, a Bear/Base/Bull valuation
+worksheet with a staged buy ladder, a staged buy plan, and a monthly/quarterly
+thesis review. The formula/condition draft editor and the validation-settings
+report surface are retired. Financial tracking keeps human-entered industry,
+observation status, score, and notes as local drafts; official financial fields
+remain unavailable until their free-source and PIT contracts are admitted.
 
 The detailed IA, field availability, formula editor, validation settings,
 wireframes, and acceptance criteria have exactly one authority: the linked

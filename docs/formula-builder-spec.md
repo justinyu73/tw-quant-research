@@ -1,8 +1,9 @@
-# Formula builder specification
+# Formula builder specification (superseded)
 
-Authority: [`tqr-research-platform-spec.md#formula-and-factor-draft-contract`](tqr-research-platform-spec.md#formula-and-factor-draft-contract)
-Decision: `TQR-FORMULA-002`
-Status: active
+Status: superseded
+Superseded_by: [`tqr-research-platform-spec.md`](tqr-research-platform-spec.md)
+Decision: `TQR-FORMULA-002` -> `TQR-IA-003`
 
-The linked authority defines formula-row structure, operator vocabulary,
-comparison types, factor modes, and the no-automatic-execution boundary.
+The formula/factor draft editor was removed from the product. Factor mining,
+multi-factor models, and alpha ranking are explicitly out of scope for the value
+research workspace. The full history remains in git.
