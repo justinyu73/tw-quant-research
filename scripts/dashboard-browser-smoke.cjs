@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
+const os = require("node:os");
 const { spawn, spawnSync } = require("node:child_process");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -11,7 +12,7 @@ const PREVIEW_DIR = path.join(ROOT, "outputs", "dashboard-preview");
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
   home: "ab3546148471254d72516ff191215be9c87ecd786bb6484160e767e7cccda10c",
-  company: "401b3866d3aded7039877edaa401c34bdda76e15fac60a748a3569ce05d5acf1",
+  company: "b719e2716277a4104fa04e68409b20bacae64ef3a9a92bd22cc45060ab0b1f55",
   watchlist: "b74507e759fdc49f1266135af344f126f98edf373ea053094df4791b54e5e002",
   buyplan: "238a83ecdc5329f75de4e4ad140cb3c6721584aea051dfabaeeb61129f70bf80",
   review: "76df1ada2b07f10a73a031571a902f0d220f2f0f5a386f1de6b26f1f097dcae7",
@@ -130,7 +131,15 @@ async function assertNoOverlap(page, selectors, label) {
 async function main() {
   const sidecarPort = await freePort();
   const sidecarBaseUrl = `http://127.0.0.1:${sidecarPort}`;
-  const sidecar = spawn("python3", ["scripts/tqe_sidecar.py", "--host", "127.0.0.1", "--port", String(sidecarPort)], {
+  // Give the sidecar a data dir holding the committed fundamentals series, so
+  // the smoke exercises the populated path as well as the empty one. Offline:
+  // the series is a fixture, never a live capture.
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "tqr-smoke-"));
+  fs.copyFileSync(
+    path.join(ROOT, "tests/fixtures/tqr-fundamentals/series.fixture.json"),
+    path.join(dataDir, "fundamentals-series.json"),
+  );
+  const sidecar = spawn("python3", ["scripts/tqe_sidecar.py", "--host", "127.0.0.1", "--port", String(sidecarPort), "--data-dir", dataDir], {
     cwd: ROOT,
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -221,7 +230,17 @@ async function main() {
     await page.locator('[data-testid="thesis-check"]').click();
     assert.doesNotMatch(await page.locator('[data-testid="thesis-last-checked"]').innerText(), /尚未檢查/);
     assert.equal(await page.locator('[data-testid="financial-tracker"]').count(), 1);
-    assert.equal(await page.locator('[data-testid="trend-table-empty"]').count(), 1);
+    // Fundamentals come from the locally accumulated series, with honest depth.
+    await page.locator('[data-testid="fundamental-snapshot"]').waitFor();
+    assert.equal(await page.locator('[data-testid="fundamental-eps"] strong').innerText(), "15.42");
+    assert.equal(await page.locator('[data-testid="fundamental-gross-margin"] strong').innerText(), "60.00%");
+    assert.equal(await page.locator('[data-testid="fundamental-revenue-yoy"] strong').innerText(), "47.62%");
+    assert.match(await page.locator('[data-testid="fundamental-provenance"]').innerText(), /非公司公告時間/);
+    assert.equal(await page.locator('[data-testid="trend-coverage-quarters"]').innerText(), "1 / 8");
+    assert.equal(await page.locator('[data-testid="trend-coverage-months"]').innerText(), "2 / 12");
+    assert.equal(await page.locator('[data-testid="trend-quarter-row"]').count(), 1);
+    // Only captured periods appear; the table must not pad to 12 rows.
+    assert.equal(await page.locator('[data-testid="trend-month-row"]').count(), 2);
     assert.match(await page.locator('[data-testid="kline-coverage"]').innerText(), /360 \/ 交易日 360/);
 
     await page.locator('[data-testid="note-title"]').fill("2330 研究觀察");

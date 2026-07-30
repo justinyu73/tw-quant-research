@@ -2,7 +2,7 @@
 
 Authority: [`tqr-research-platform-spec.md`](tqr-research-platform-spec.md)
 Decision: `TQR-FUNDAMENTALS-SOURCE-001`
-Status: `probe_complete_pending_human_approval`
+Status: `twse_implemented_forward_accumulation` (TPEx deferred)
 Verified: 2026-07-31 (live probe, `scripts/probe_fundamentals_sources.py`)
 
 Machine-readable record:
@@ -110,3 +110,29 @@ Writes `workflow/tqr-fundamentals-source-contract.json` and one bounded sample
 row per source under `tests/fixtures/tqr-fundamentals/`. This is the only code
 path in the repo that contacts these endpoints; the sidecar and dashboard never
 do.
+
+## Implementation status (2026-07-31)
+
+TWSE only, per the human decision to prove the normalization contract before
+adding TPEx.
+
+| Piece | Where |
+| --- | --- |
+| Normalization + forward accumulation | `src/tw_quant_engine/fundamentals.py` |
+| Human-run capture | `scripts/capture_twse_fundamentals.py` |
+| Read model route | `GET /fundamentals?security_id=` |
+| Offline tests | `tests/test_tqr_fundamentals.py` (16 cases) |
+
+Live capture on 2026-07-31 normalized 1,082 monthly-revenue rows (period
+2026-06) and 1,045 income-statement rows (period 2026Q1) with zero drops. A
+second immediate run reported `added: 0, restated: 0, unchanged: 2127`,
+confirming that an advancing batch export date alone never creates a duplicate
+period.
+
+Cross-check: the recomputed 台泥 2026-06 revenue YoY of 32.3988% matches the
+source's own `營業收入-去年同月增減(%)` column of 32.39878166305348, so the ratio
+convention is correct while remaining independently computed.
+
+TPEx (`mopsfin_t187ap05_O`, `mopsfin_t187ap06_O_ci`) stays unimplemented. Its
+`SecuritiesCompanyCode` / `Year` / `Season` / `Date` naming needs its own mapping
+entry before admission.

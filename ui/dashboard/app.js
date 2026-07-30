@@ -122,6 +122,8 @@
   var BUY_PLAN_LOCAL_STORAGE_KEY = "tqr-buy-plans.v1";
   var buyPlanDraft = defaultBuyPlanDraft();
   var buyPlansLoaded = false;
+  var fundamentalsCache = {};
+  var fundamentalsRequests = {};
   var THESIS_LOCAL_STORAGE_KEY = "tqr-theses.v1";
   var REVIEW_LOCAL_STORAGE_KEY = "tqr-reviews.v1";
   var researchStoresLoaded = false;
@@ -1949,13 +1951,95 @@
       quoteHeaderMarkup() +
       card("Thesis 投資假設", "為什麼研究這家公司；什麼情況代表假設失效", thesisMarkup(), "") +
       card("研究筆記", "支持、反證與下一個檢查點", notesMarkup(), "") +
-      card("Fundamental Snapshot", "核心財報欄位與人工覆核", financialTrackerMarkup(), "") +
+      card("Fundamental Snapshot", "已擷取期別的核心財報欄位", fundamentalSnapshotMarkup(), "") +
+      card("人工覆核", "產業、觀察狀態與備註", financialTrackerMarkup(), "") +
       card("Trend Table", "最近 8 季與最近 12 個月", trendTableMarkup(), "") +
       card("Price Reference", "歷史價格位置 · 前高前低 · 回檔幅度；不參與價值判斷", klineMarkup(), "");
   }
 
+  function fundamentalsFor(securityId) {
+    return fundamentalsCache[securityId] || null;
+  }
+
+  function ensureFundamentals() {
+    var instrument = selectedKlineInstrument();
+    var symbol = instrument && instrument.symbol;
+    if (!symbol || fundamentalsCache[symbol] !== undefined || fundamentalsRequests[symbol]) return;
+    fundamentalsRequests[symbol] = true;
+    sidecarFetch("/fundamentals?security_id=" + encodeURIComponent(symbol))
+      .then(function (payload) {
+        fundamentalsCache[symbol] = payload && payload.schema === "tw-quant-engine-sidecar-fundamentals/v1" ? payload : null;
+        render();
+      })
+      .catch(function () {
+        // No local series yet, or the sidecar is unavailable. The panel keeps
+        // its explicit unavailable state rather than inventing a number.
+        fundamentalsCache[symbol] = null;
+        render();
+      });
+  }
+
+  function pctCell(value) {
+    return value === null || value === undefined ? "—" : core.formatPercent(value);
+  }
+
+  function fundamentalSnapshotMarkup() {
+    var instrument = selectedKlineInstrument();
+    var symbol = instrument && instrument.symbol;
+    var data = symbol ? fundamentalsFor(symbol) : null;
+    var revenue = data && data.monthly_revenue.observations[0];
+    var income = data && data.income_statement.observations[0];
+    if (!revenue && !income) {
+      return '<div class="empty-state" data-testid="fundamental-snapshot-empty"><strong>此標的尚無已擷取的基本面期別。</strong><span>執行 <code>scripts/capture_twse_fundamentals.py</code> 擷取一期後才會顯示；不以價格推估，也不補 0。</span></div>';
+    }
+    function tile(label, value, hint, testid) {
+      return '<article class="fundamental-metric" data-testid="' + testid + '"><span>' + text(label) + '</span><strong>' + text(value) + '</strong><small>' + text(hint) + '</small></article>';
+    }
+    var revenueValues = revenue ? revenue.values : {};
+    var incomeValues = income ? income.values : {};
+    return '<div class="fundamental-metric-grid" data-testid="fundamental-snapshot">' +
+      tile("月營收 YoY", revenue ? pctCell(revenueValues.revenue_yoy) : "—", revenue ? revenue.period : "未擷取", "fundamental-revenue-yoy") +
+      tile("月營收 MoM", revenue ? pctCell(revenueValues.revenue_mom) : "—", revenue ? revenue.period : "未擷取", "fundamental-revenue-mom") +
+      tile("EPS", income && incomeValues.eps !== null ? core.formatNumber(incomeValues.eps) : "—", income ? income.period : "未擷取", "fundamental-eps") +
+      tile("毛利率", income ? pctCell(incomeValues.gross_margin) : "—", income ? income.period : "未擷取", "fundamental-gross-margin") +
+      tile("營益率", income ? pctCell(incomeValues.operating_margin) : "—", income ? income.period : "未擷取", "fundamental-operating-margin") +
+      tile("淨利率", income ? pctCell(incomeValues.net_margin) : "—", income ? income.period : "未擷取", "fundamental-net-margin") +
+      '</div>' +
+      '<p class="valuation-note" data-testid="fundamental-provenance">來源 ' + text(data.attribution) + '｜available_at 採交易所整批出表日（保守上界），非公司公告時間；published_at 未接入。</p>';
+  }
+
   function trendTableMarkup() {
-    return '<div class="empty-state" data-testid="trend-table-empty"><strong>季度與月營收趨勢尚未接入。</strong><span>需要月營收與季報的免費官方來源、正規化與 PIT 契約後才會顯示；缺資料不補 0、不從價格推估。</span></div>';
+    var instrument = selectedKlineInstrument();
+    var symbol = instrument && instrument.symbol;
+    var data = symbol ? fundamentalsFor(symbol) : null;
+    if (!data) {
+      return '<div class="empty-state" data-testid="trend-table-empty"><strong>季度與月營收趨勢尚未擷取。</strong><span>免費官方來源每次只發布一期，序列以 forward accumulation 累積；缺資料不補 0、不內插、不延用前期。</span></div>';
+    }
+    var quarters = data.income_statement.observations;
+    var months = data.monthly_revenue.observations;
+    var quarterRows = quarters.length ? quarters.map(function (item) {
+      var v = item.values;
+      return '<tr data-testid="trend-quarter-row"><td>' + text(item.period) + '</td>' +
+        '<td class="cell-mono">' + core.formatNumber(v.revenue) + '</td>' +
+        '<td class="cell-mono">' + pctCell(v.gross_margin) + '</td>' +
+        '<td class="cell-mono">' + pctCell(v.operating_margin) + '</td>' +
+        '<td class="cell-mono">' + pctCell(v.net_margin) + '</td>' +
+        '<td class="cell-mono">' + (v.eps === null ? "—" : core.formatNumber(v.eps)) + '</td></tr>';
+    }).join("") : '<tr><td colspan="6">尚無已擷取的季別。</td></tr>';
+    var monthRows = months.length ? months.map(function (item) {
+      var v = item.values;
+      return '<tr data-testid="trend-month-row"><td>' + text(item.period) + '</td>' +
+        '<td class="cell-mono">' + core.formatNumber(v.monthly_revenue) + '</td>' +
+        '<td class="cell-mono">' + pctCell(v.revenue_mom) + '</td>' +
+        '<td class="cell-mono">' + pctCell(v.revenue_yoy) + '</td>' +
+        '<td class="cell-mono">' + pctCell(v.cumulative_yoy) + '</td></tr>';
+    }).join("") : '<tr><td colspan="5">尚無已擷取的月份。</td></tr>';
+    return '<div class="trend-coverage" data-testid="trend-coverage">' +
+      '<span>季報深度 <strong data-testid="trend-coverage-quarters">' + text(data.income_statement.coverage.label) + '</strong></span>' +
+      '<span>月營收深度 <strong data-testid="trend-coverage-months">' + text(data.monthly_revenue.coverage.label) + '</strong></span>' +
+      '<span class="muted">forward accumulation：每次擷取只會多一期</span></div>' +
+      '<div class="table-responsive"><table class="table" data-testid="trend-quarters"><thead><tr><th>季度</th><th>營收</th><th>毛利率</th><th>營益率</th><th>淨利率</th><th>EPS</th></tr></thead><tbody>' + quarterRows + '</tbody></table></div>' +
+      '<div class="table-responsive"><table class="table" data-testid="trend-months"><thead><tr><th>月份</th><th>營收</th><th>月增</th><th>年增</th><th>累計年增</th></tr></thead><tbody>' + monthRows + '</tbody></table></div>';
   }
 
   function valuationPageMarkup() {
@@ -2095,6 +2179,7 @@
     root.innerHTML = '<div class="app-shell"><aside class="sidebar"><div class="sidebar-brand"><img class="brand-logo" src="./tqr-logo.svg" alt="Value Research Workspace"><span class="brand-name">Value Research <small>台股價值投資研究工作台</small></span></div><nav class="sidebar-nav" aria-label="主導覽">' + navMarkup() + '</nav><div class="sidebar-footer"><div class="sidebar-note"><span class="read-only-icon">唯</span><p><strong>免費優先 · 本機記錄</strong><span>財報決定價值、估值決定買進價格；市場只提供成交機會。</span></p></div></div></aside><main class="main">' + systemTopbarMarkup() + '<div class="page-wrapper" id="main-content" tabindex="-1">' + mainMarkup() + '</div><footer class="footer"><span>資料格式 ' + text(view.schema) + '</span><span>本機資料 · 人工估值 · 最後決策保留人工</span></footer></main></div>' + detailDialog();
     renderKlineChart();
     ensureKlineRuntime();
+    ensureFundamentals();
   }
 
   root.addEventListener("click", function (event) {
