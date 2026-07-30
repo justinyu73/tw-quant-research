@@ -145,6 +145,23 @@ Thesis is structured, not free text: 投資摘要, 成長驅動, 競爭優勢, �
 風險, Thesis 失效條件, plus a last-checked date. Free-form research notes sit
 below it and never feed a calculation.
 
+### Trend Table depth
+
+Source contract: [`tqr-fundamentals-source-contract.md`](tqr-fundamentals-source-contract.md)
+Decision: `TQR-FUNDAMENTALS-SOURCE-001`
+Verified: 2026-07-31
+
+Every admitted free endpoint returns a **latest-period snapshot only** (one
+distinct period per response). "最近 8 季" and "最近 12 個月" therefore cannot be
+produced from one fetch. The table renders whatever periods have actually been
+captured, labelled `n of 8`; it must never pad, interpolate, or carry a period
+forward. Until a capture path is approved it keeps its `unavailable` empty state.
+
+`available_at` for these sources is the exchange's batch export date (出表日期 /
+`Date`), which is later than the true filing date and therefore PIT-safe.
+`published_at` stays null; labelling the export date as a company publication
+time is prohibited.
+
 Price Reference (K line) is the last block on the page and exists only to show
 historical price position, prior highs/lows, and drawdown. MACD, RSI, KD, and
 Bollinger bands are off by default, may be enabled manually, and never
