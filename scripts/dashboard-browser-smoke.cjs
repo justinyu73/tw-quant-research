@@ -11,9 +11,10 @@ const PREVIEW_DIR = path.join(ROOT, "outputs", "dashboard-preview");
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
   home: "ab3546148471254d72516ff191215be9c87ecd786bb6484160e767e7cccda10c",
-  company: "43136568b969a805ca06847130614a5a1037c05cfc9971f720efc35d30493417",
+  company: "be50a72aa156ee3aa40b7491265db367cafa6a844814b9a40ac7e841912d8529",
   watchlist: "a1ea7618c089fc255efadcc4667332e2af3ee5cadb099a77a8019934c94d3814",
   buyplan: "c5661d6af376650cd1b3f6fe946b7080467189c43f938d6db108eccf4390bdd2",
+  review: "27968cbd2f946ab5d00457119832fdc9f1a75590362d025604fa2e397f72490c",
   valuation: "a6aabd57ef723156baea4e2be2a7298c85b3b846e92dc933c32d9c16b09c902e",
 };
 
@@ -209,6 +210,13 @@ async function main() {
     assert.equal(await page.locator('[data-testid="kline-instrument"]').inputValue(), "TWSE:2330");
     assert.equal(await page.locator('[data-testid="quote-bar"] .terminal-quote-price strong').innerText(), "2,440");
     assert.equal(await page.locator('[data-testid="note-composer"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="thesis-form"]').count(), 1);
+    for (const field of ["summary", "growth_driver", "moat", "industry_position", "risk", "invalidation"]) {
+      assert.equal(await page.locator(`[data-testid="thesis-${field}"]`).count(), 1, `thesis field missing: ${field}`);
+    }
+    await page.locator('[data-testid="thesis-invalidation"]').fill("連續兩季營收年增轉負");
+    await page.locator('[data-testid="thesis-check"]').click();
+    assert.doesNotMatch(await page.locator('[data-testid="thesis-last-checked"]').innerText(), /尚未檢查/);
     assert.equal(await page.locator('[data-testid="financial-tracker"]').count(), 1);
     assert.equal(await page.locator('[data-testid="trend-table-empty"]').count(), 1);
     assert.match(await page.locator('[data-testid="kline-coverage"]').innerText(), /360 \/ 交易日 360/);
@@ -361,7 +369,26 @@ async function main() {
     }));
     await page.locator('[data-action="section"][data-section="review"]').first().click();
     assert.equal(await page.locator(".page-title").innerText(), "Review");
-    assert.equal(await page.locator('[data-testid="review-empty"]').count(), 1);
+    await page.locator('[data-testid="review-form"]').waitFor();
+    assert.equal(await page.locator('[data-testid="review-history-empty"]').count(), 1);
+    // Every question must be answered before a review can be recorded.
+    assert.equal(await page.locator('[data-testid="review-save"]').isDisabled(), true);
+    for (const field of ["revenue", "eps", "margin", "outlook", "thesis"]) {
+      await page.locator(`[data-testid="review-${field}"]`).selectOption("符合");
+    }
+    assert.equal(await page.locator('[data-testid="review-save"]').isDisabled(), true);
+    await page.locator('[data-testid="review-outcome-select"]').selectOption("維持估值");
+    assert.equal(await page.locator('[data-testid="review-save"]').isDisabled(), false);
+    await page.locator('[data-testid="review-save"]').click();
+    await page.locator('[data-testid="review-history"]').waitFor();
+    assert.equal(await page.locator('[data-testid="review-row"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="review-outcome"]').first().innerText(), "維持估值");
+    await settle(page);
+    screenshots.review = screenshotHash(await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, "review.png"),
+      fullPage: true,
+      animations: "disabled",
+    }));
 
     // No trading, ranking, or factor-mining affordance may survive. Checked on
     // actionable controls only: a disclaimer that names 下單 is the opposite of

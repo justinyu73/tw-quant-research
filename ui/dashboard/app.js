@@ -122,6 +122,45 @@
   var BUY_PLAN_LOCAL_STORAGE_KEY = "tqr-buy-plans.v1";
   var buyPlanDraft = defaultBuyPlanDraft();
   var buyPlansLoaded = false;
+  var THESIS_LOCAL_STORAGE_KEY = "tqr-theses.v1";
+  var REVIEW_LOCAL_STORAGE_KEY = "tqr-reviews.v1";
+  var researchStoresLoaded = false;
+  var reviewDraft = defaultReviewDraft();
+
+  function defaultReviewDraft() {
+    return { revenue: "", eps: "", margin: "", outlook: "", thesis: "", outcome: "", review_date: todayIso(), note: "" };
+  }
+
+  function loadResearchStores() {
+    if (researchStoresLoaded) return;
+    researchStoresLoaded = true;
+    try {
+      var theses = window.localStorage.getItem(THESIS_LOCAL_STORAGE_KEY);
+      if (theses) state = core.reduce(state, { type: "LOAD_THESES", payload: JSON.parse(theses) });
+      var reviews = window.localStorage.getItem(REVIEW_LOCAL_STORAGE_KEY);
+      if (reviews) state = core.reduce(state, { type: "LOAD_REVIEWS", payload: JSON.parse(reviews) });
+    } catch (error) {
+      // Corrupt stores leave thesis/review empty rather than inventing content.
+    }
+  }
+
+  function persistResearchStores() {
+    try {
+      window.localStorage.setItem(THESIS_LOCAL_STORAGE_KEY, JSON.stringify(core.thesisStorePayload(state)));
+      window.localStorage.setItem(REVIEW_LOCAL_STORAGE_KEY, JSON.stringify(core.reviewStorePayload(state)));
+    } catch (error) {
+      // Browser preview without storage keeps the in-memory records.
+    }
+  }
+
+  function saveReviewFromDraft() {
+    var instrumentId = state.selectedKlineInstrumentId;
+    if (!instrumentId || core.reviewFormIssues(reviewDraft).length) return;
+    state = core.reduce(state, { type: "ADD_REVIEW", instrumentId: instrumentId, review: Object.assign({}, reviewDraft) });
+    reviewDraft = defaultReviewDraft();
+    persistResearchStores();
+    render();
+  }
 
   function defaultBuyPlanDraft() {
     return { totalBudget: "", allocFirst: "20", allocSecond: "25", allocSweet: "30", allocReserve: "25", maxPositionPct: "" };
@@ -1908,7 +1947,8 @@
   function companyPageMarkup() {
     return pageHeader("Company", "公司研究工作區 · Thesis · 財報 · 趨勢 · 價格參考") +
       quoteHeaderMarkup() +
-      card("Thesis 投資假設", "為什麼研究這家公司；什麼情況代表假設失效", notesMarkup(), "") +
+      card("Thesis 投資假設", "為什麼研究這家公司；什麼情況代表假設失效", thesisMarkup(), "") +
+      card("研究筆記", "支持、反證與下一個檢查點", notesMarkup(), "") +
       card("Fundamental Snapshot", "核心財報欄位與人工覆核", financialTrackerMarkup(), "") +
       card("Trend Table", "最近 8 季與最近 12 個月", trendTableMarkup(), "") +
       card("Price Reference", "歷史價格位置 · 前高前低 · 回檔幅度；不參與價值判斷", klineMarkup(), "");
@@ -1970,9 +2010,59 @@
         '<p class="valuation-note">到價只提示你回頭檢查投資假設。這裡不提供、也不會出現「建議買進」「強力買進」或任何信心分數；沒有下單、模擬下單或券商連線。</p>', "");
   }
 
+  function thesisMarkup() {
+    var instrumentId = state.selectedKlineInstrumentId;
+    if (!instrumentId) {
+      return '<div class="empty-state" data-testid="thesis-no-instrument"><strong>尚未選擇公司。</strong><span>選定標的後即可記錄投資假設。</span></div>';
+    }
+    var thesis = core.thesisFor(state, instrumentId);
+    var fields = core.THESIS_FIELDS.map(function (pair) {
+      return '<label class="thesis-field"><span>' + text(pair[1]) + '</span>' +
+        '<textarea rows="3" maxlength="2000" data-action="thesis-input" data-field="' + pair[0] + '" data-testid="thesis-' + pair[0] + '">' + escapeHtml(thesis[pair[0]]) + '</textarea></label>';
+    }).join("");
+    return '<section class="thesis-form" data-testid="thesis-form">' + fields +
+      '<div class="thesis-footer"><span data-testid="thesis-last-checked">最後檢查日期：' + text(thesis.last_checked || "尚未檢查") + '</span>' +
+      '<button class="btn btn-primary" type="button" data-action="thesis-check" data-testid="thesis-check">標記今日已檢查</button></div>' +
+      '<p class="valuation-note">Thesis 是你自己的判斷記錄，不會被任何計算覆寫；失效條件請寫成可驗證的事實，例如「連續兩季營收年增轉負」。</p></section>';
+  }
+
   function reviewPageMarkup() {
+    var instrumentId = state.selectedKlineInstrumentId;
+    var instrument = selectedKlineInstrument();
+    if (!instrumentId || !instrument) {
+      return pageHeader("Review", "月／季審查 · 假設是否仍成立") +
+        card("投資審查", "先選一家公司", '<div class="empty-state" data-testid="review-no-instrument"><strong>尚未選擇公司。</strong><span>在 Watchlist 或 Company 選定標的後才能建立審查記錄。</span></div>', "");
+    }
+    var issues = core.reviewFormIssues(reviewDraft);
+    var questions = core.REVIEW_QUESTIONS.map(function (pair) {
+      return '<label><span>' + text(pair[1]) + '</span><select data-action="review-input" data-field="' + pair[0] + '" data-testid="review-' + pair[0] + '">' +
+        '<option value="">未回答</option>' +
+        core.REVIEW_ANSWERS.map(function (answer) {
+          return '<option value="' + escapeHtml(answer) + '"' + (reviewDraft[pair[0]] === answer ? " selected" : "") + '>' + text(answer) + '</option>';
+        }).join("") + '</select></label>';
+    }).join("");
+    var history = core.reviewsFor(state, instrumentId);
+    var historyMarkup = history.length ? '<div class="table-responsive"><table class="table" data-testid="review-history"><thead><tr><th>審查日</th><th>營收</th><th>EPS</th><th>毛利率</th><th>展望</th><th>假設</th><th>結果</th></tr></thead><tbody>' +
+      history.map(function (entry) {
+        return '<tr data-testid="review-row"><td>' + text(entry.review_date) + '</td>' +
+          core.REVIEW_QUESTIONS.map(function (pair) { return '<td>' + text(entry[pair[0]]) + '</td>'; }).join("") +
+          '<td data-testid="review-outcome">' + text(entry.outcome) + '</td></tr>';
+      }).join("") + '</tbody></table></div>'
+      : '<div class="empty-state" data-testid="review-history-empty"><strong>尚無審查記錄。</strong><span>每月或每季回答上方問題，留下你當時的判斷依據。</span></div>';
+
     return pageHeader("Review", "月／季審查 · 假設是否仍成立") +
-      card("投資審查", "避免買進後忘記原本理由", '<div class="empty-state" data-testid="review-empty"><strong>Review 尚未建置。</strong><span>這個區塊將在後續節點實作：營收‧EPS‧毛利率‧展望是否符合預期，以及審查結果。</span></div>', "");
+      card("本次審查", text(instrument.symbol) + " · 避免買進後忘記原本理由",
+        '<div class="review-form" data-testid="review-form">' + questions +
+        '<label><span>審查結果</span><select data-action="review-input" data-field="outcome" data-testid="review-outcome-select">' +
+        '<option value="">未選擇</option>' +
+        core.REVIEW_OUTCOMES.map(function (outcome) {
+          return '<option value="' + escapeHtml(outcome) + '"' + (reviewDraft.outcome === outcome ? " selected" : "") + '>' + text(outcome) + '</option>';
+        }).join("") + '</select></label>' +
+        '<label><span>審查日期</span><input type="date" value="' + escapeHtml(reviewDraft.review_date) + '" data-action="review-input" data-field="review_date" data-testid="review-date"></label>' +
+        '<label class="review-note"><span>備註</span><textarea rows="3" maxlength="1000" data-action="review-input" data-field="note" data-testid="review-note">' + escapeHtml(reviewDraft.note) + '</textarea></label>' +
+        '<div class="review-actions"><button class="btn btn-primary" type="button" data-action="review-save" data-testid="review-save"' + (issues.length ? " disabled" : "") + '>儲存審查</button>' +
+        formIssuesMarkup(issues, "review-issues") + '</div></div>', "") +
+      card("審查歷史", "每一次結論都留下日期與依據", historyMarkup, "");
   }
 
   function evidencePageMarkup() {
@@ -2035,6 +2125,16 @@
       persistValuation();
     }
     if (action === "valuation-evaluate") evaluateValuation();
+    if (action === "review-save") {
+      saveReviewFromDraft();
+      return;
+    }
+    if (action === "thesis-check") {
+      state = core.reduce(state, { type: "SET_THESIS_FIELD", instrumentId: state.selectedKlineInstrumentId, field: "last_checked", value: todayIso() });
+      persistResearchStores();
+      render();
+      return;
+    }
     if (action === "buyplan-save") {
       saveBuyPlanFromDraft();
       return;
@@ -2222,6 +2322,16 @@
       refreshSearchResults("global-search-results", symbolSearchResults(core.klineInstruments(state.view), klineSearchQuery, [], state.selectedKlineInstrumentId, "global-search-results", "global-search-pick"));
       return;
     }
+    if (target.getAttribute("data-action") === "thesis-input") {
+      state = core.reduce(state, { type: "SET_THESIS_FIELD", instrumentId: state.selectedKlineInstrumentId, field: target.getAttribute("data-field"), value: target.value });
+      persistResearchStores();
+      return;
+    }
+    if (target.getAttribute("data-action") === "review-input") {
+      reviewDraft[target.getAttribute("data-field")] = target.value;
+      render();
+      return;
+    }
     if (target.getAttribute("data-action") === "buyplan-input") {
       buyPlanDraft[target.getAttribute("data-field")] = target.value;
       render();
@@ -2314,6 +2424,7 @@
 
   loadPrototypeDrafts();
   loadBuyPlans();
+  loadResearchStores();
   ensureNotesRuntime();
   ensureAlertsRuntime();
   ensureValuationRuntime();

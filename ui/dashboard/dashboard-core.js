@@ -103,7 +103,9 @@
       companyResearch: {},
       watchlistFilters: { industry: "", fundamental_state: "", thesis_state: "", stage: "", held: "" },
       watchlistSort: "discount",
-      buyPlans: {}
+      buyPlans: {},
+      theses: {},
+      reviews: {}
     };
   }
 
@@ -289,6 +291,26 @@
     }
     if (event.type === "LOAD_BUY_PLANS") {
       return Object.assign({}, current, { buyPlans: normalizeBuyPlans(event.payload) });
+    }
+    if (event.type === "SET_THESIS_FIELD") {
+      var theses = Object.assign({}, current.theses);
+      var thesis = Object.assign(defaultThesis(), theses[event.instrumentId] || {});
+      thesis[event.field] = typeof event.value === "string" ? event.value.slice(0, 2000) : "";
+      theses[event.instrumentId] = thesis;
+      return Object.assign({}, current, { theses: theses });
+    }
+    if (event.type === "LOAD_THESES") {
+      return Object.assign({}, current, { theses: normalizeThesisStore(event.payload) });
+    }
+    if (event.type === "ADD_REVIEW") {
+      var reviews = Object.assign({}, current.reviews);
+      var list = Array.isArray(reviews[event.instrumentId]) ? reviews[event.instrumentId].slice() : [];
+      list.unshift(clone(event.review));
+      reviews[event.instrumentId] = list.slice(0, 50);
+      return Object.assign({}, current, { reviews: reviews });
+    }
+    if (event.type === "LOAD_REVIEWS") {
+      return Object.assign({}, current, { reviews: normalizeReviewStore(event.payload) });
     }
     if (event.type === "SELECT_SECTION" && sectionExists(event.section)) {
       return Object.assign({}, current, {
@@ -879,12 +901,12 @@
   }
 
   function buyStageSummary(state) {
-    var rows = opportunityRows(state);
+    var rows = watchlistViewRows(state);
     return {
       first: rows.filter(function (row) { return row.stage === "first" || row.stage === "second"; }).length,
       sweet: rows.filter(function (row) { return row.stage === "sweet" || row.stage === "extreme"; }).length,
-      pending: 0,
-      invalid: 0
+      pending: rows.filter(function (row) { return row.thesis_state === "待確認" || row.fundamental_state === "轉弱"; }).length,
+      invalid: rows.filter(function (row) { return row.thesis_state === "失效"; }).length
     };
   }
 
@@ -1130,6 +1152,94 @@
     return out;
   }
 
+
+  var THESIS_FIELDS = Object.freeze([
+    ["summary", "投資摘要"],
+    ["growth_driver", "成長驅動"],
+    ["moat", "競爭優勢"],
+    ["industry_position", "產業位置"],
+    ["risk", "風險"],
+    ["invalidation", "Thesis 失效條件"]
+  ]);
+  var REVIEW_SCHEMA = "tqr-reviews/v1";
+  var REVIEW_QUESTIONS = Object.freeze([
+    ["revenue", "營收是否符合預期？"],
+    ["eps", "EPS 是否符合預期？"],
+    ["margin", "毛利率是否改變？"],
+    ["outlook", "公司展望是否改變？"],
+    ["thesis", "原始投資假設是否仍成立？"]
+  ]);
+  var REVIEW_ANSWERS = Object.freeze(["符合", "偏離", "待確認"]);
+  var REVIEW_OUTCOMES = Object.freeze(["維持估值", "上調合理價值", "下調合理價值", "暫停買進", "投資假設失效"]);
+
+  function defaultThesis() {
+    var out = { last_checked: "" };
+    THESIS_FIELDS.forEach(function (pair) { out[pair[0]] = ""; });
+    return out;
+  }
+
+  function thesisFor(state, instrumentId) {
+    var store = state && state.theses ? state.theses : {};
+    return Object.assign(defaultThesis(), store[instrumentId] || {});
+  }
+
+  function reviewsFor(state, instrumentId) {
+    var store = state && state.reviews ? state.reviews : {};
+    var list = store[instrumentId];
+    return Array.isArray(list) ? list : [];
+  }
+
+  function reviewFormIssues(draft) {
+    var data = draft || {};
+    var issues = [];
+    REVIEW_QUESTIONS.forEach(function (pair) {
+      if (REVIEW_ANSWERS.indexOf(data[pair[0]]) < 0) issues.push(issue(pair[0], pair[1] + "尚未回答"));
+    });
+    if (REVIEW_OUTCOMES.indexOf(data.outcome) < 0) issues.push(issue("outcome", "尚未選擇審查結果"));
+    if (!String(data.review_date || "").trim()) issues.push(issue("review_date", "需記錄審查日期"));
+    return issues;
+  }
+
+  function normalizeReviewStore(payload) {
+    if (!payload || payload.schema !== REVIEW_SCHEMA || !payload.reviews || typeof payload.reviews !== "object") return {};
+    var out = {};
+    Object.keys(payload.reviews).forEach(function (key) {
+      if (!/^[A-Za-z0-9:_.-]{1,64}$/.test(key)) return;
+      var list = payload.reviews[key];
+      if (!Array.isArray(list)) return;
+      out[key] = list.filter(function (entry) {
+        return entry && typeof entry === "object" && REVIEW_OUTCOMES.indexOf(entry.outcome) >= 0 &&
+          typeof entry.review_date === "string" && entry.review_date;
+      }).map(function (entry) { return clone(entry); }).slice(0, 50);
+    });
+    return out;
+  }
+
+  function reviewStorePayload(state) {
+    return { schema: REVIEW_SCHEMA, version: 1, reviews: (state && state.reviews) || {} };
+  }
+
+  function thesisStorePayload(state) {
+    return { schema: "tqr-theses/v1", version: 1, theses: (state && state.theses) || {} };
+  }
+
+  function normalizeThesisStore(payload) {
+    if (!payload || payload.schema !== "tqr-theses/v1" || !payload.theses || typeof payload.theses !== "object") return {};
+    var out = {};
+    Object.keys(payload.theses).forEach(function (key) {
+      if (!/^[A-Za-z0-9:_.-]{1,64}$/.test(key)) return;
+      var entry = payload.theses[key];
+      if (!entry || typeof entry !== "object") return;
+      var merged = defaultThesis();
+      THESIS_FIELDS.forEach(function (pair) {
+        if (typeof entry[pair[0]] === "string") merged[pair[0]] = entry[pair[0]].slice(0, 2000);
+      });
+      if (typeof entry.last_checked === "string") merged.last_checked = entry.last_checked.slice(0, 40);
+      out[key] = merged;
+    });
+    return out;
+  }
+
   return Object.freeze({
     SECTIONS: SECTIONS,
     PRIMARY_SECTION_IDS: PRIMARY_SECTION_IDS,
@@ -1153,6 +1263,18 @@
     buyPlanTranches: buyPlanTranches,
     buyPlanStorePayload: buyPlanStorePayload,
     normalizeBuyPlans: normalizeBuyPlans,
+    THESIS_FIELDS: THESIS_FIELDS,
+    REVIEW_QUESTIONS: REVIEW_QUESTIONS,
+    REVIEW_ANSWERS: REVIEW_ANSWERS,
+    REVIEW_OUTCOMES: REVIEW_OUTCOMES,
+    defaultThesis: defaultThesis,
+    thesisFor: thesisFor,
+    reviewsFor: reviewsFor,
+    reviewFormIssues: reviewFormIssues,
+    reviewStorePayload: reviewStorePayload,
+    normalizeReviewStore: normalizeReviewStore,
+    thesisStorePayload: thesisStorePayload,
+    normalizeThesisStore: normalizeThesisStore,
     DEFAULT_BUY_ZONE_RATIOS: DEFAULT_BUY_ZONE_RATIOS,
     buyZonePrices: buyZonePrices,
     stageForPrice: stageForPrice,
