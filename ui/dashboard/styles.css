@@ -1016,3 +1016,65 @@ input, select, textarea, button { font-family: inherit; }
 [data-theme="dark"] input,
 [data-theme="dark"] select,
 [data-theme="dark"] textarea { color: var(--text); background: var(--surface-secondary); border-color: var(--border); }
+
+/* ---- Value research workspace: scenario valuation, thesis, buy plan, review ---- */
+
+.valuation-form { grid-template-columns: minmax(0, 1fr); }
+.valuation-form label > span { color: var(--text-muted); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; }
+.valuation-form input, .valuation-form select { width: 100%; min-width: 0; height: 34px; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--surface); font-size: 12px; }
+.valuation-field { display: grid; gap: 4px; }
+
+.valuation-scenario-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.valuation-scenario { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border-light); border-radius: var(--radius); background: var(--surface-secondary); }
+.valuation-scenario h4 { margin: 0; font-size: 12px; font-weight: 700; }
+.valuation-scenario label { display: grid; gap: 4px; }
+
+.valuation-ratio-row, .valuation-basis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 12px; border: 1px solid var(--border-light); border-radius: var(--radius); background: var(--surface-secondary); }
+.valuation-ratio-row h4, .valuation-basis h4 { grid-column: 1 / -1; margin: 0; font-size: 12px; font-weight: 700; }
+.valuation-ratio-row label, .valuation-basis label { display: grid; gap: 4px; min-width: 0; }
+.valuation-actions { display: grid; gap: 8px; justify-items: start; }
+
+.valuation-result { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.valuation-result > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.valuation-scenario-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.valuation-scenario-grid > div, .valuation-zone-grid > div { display: grid; gap: 2px; padding: 8px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--surface-secondary); }
+.valuation-scenario-grid strong, .valuation-zone-grid strong { font-family: var(--font-mono, ui-monospace, monospace); font-size: 15px; }
+.valuation-price { font-size: 20px; }
+.valuation-zone-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.valuation-compare { display: flex; flex-wrap: wrap; gap: 16px; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); color: var(--text-muted); font-size: 11px; }
+.valuation-compare strong { color: var(--text); font-family: var(--font-mono, ui-monospace, monospace); }
+.valuation-result-params { display: block; color: var(--text-muted); font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
+.valuation-note { margin-top: 12px; color: var(--text-muted); font-size: 10px; line-height: 1.55; }
+
+.watchlist-filter-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.watchlist-filter-bar label { display: grid; gap: 4px; min-width: 130px; color: var(--text-muted); font-size: 10px; font-weight: 700; }
+.watchlist-filter-bar select { height: 32px; padding: 0 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--surface); font-size: 12px; }
+.tone-down { color: #b4232a; }
+.tone-up { color: #17794a; }
+
+.thesis-form { display: grid; gap: 12px; }
+.thesis-field { display: grid; gap: 4px; }
+.thesis-field > span { color: var(--text-muted); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; }
+.thesis-field textarea, .review-form textarea { width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--surface); font-family: inherit; font-size: 12px; line-height: 1.5; resize: vertical; }
+.thesis-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; color: var(--text-muted); font-size: 11px; }
+
+.buyplan-form, .review-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.buyplan-form label, .review-form label { display: grid; gap: 4px; min-width: 0; color: var(--text-muted); font-size: 10px; font-weight: 700; }
+.buyplan-form input, .review-form input, .review-form select { width: 100%; min-width: 0; height: 34px; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--surface); font-size: 12px; }
+.buyplan-actions, .review-actions { grid-column: 1 / -1; display: grid; gap: 8px; justify-items: start; }
+.review-note { grid-column: 1 / -1; }
+.buyplan-prompt { display: grid; gap: 4px; margin-top: 12px; padding: 12px; border: 1px solid #d6b45a; border-radius: var(--radius); background: #fdf8e8; font-size: 11px; line-height: 1.55; }
+.buyplan-prompt.muted { border-color: var(--border-light); background: var(--surface-secondary); color: var(--text-muted); }
+.buyplan-status-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.buyplan-status-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--surface-secondary); font-size: 11px; }
+
+@media (max-width: 1100px) {
+  .valuation-scenario-row, .valuation-scenario-grid { grid-template-columns: minmax(0, 1fr); }
+  .valuation-zone-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .valuation-ratio-row, .valuation-basis, .buyplan-form, .review-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .valuation-zone-grid, .valuation-ratio-row, .valuation-basis, .buyplan-form, .review-form { grid-template-columns: minmax(0, 1fr); }
+  .watchlist-filter-bar label { min-width: 100%; }
+}
