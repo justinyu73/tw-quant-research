@@ -23,10 +23,13 @@
 
   var WATCHLIST_SCHEMA = "tw-quant-engine-watchlist/v1";
   var ALERT_STORE_SCHEMA = "tqe-in-app-alerts/v1";
-  var VALUATION_STORE_SCHEMA = "tqe-fair-value-worksheets/v1";
+  var VALUATION_STORE_SCHEMA = "tqr-scenario-valuation-worksheets/v1";
+  var VALUATION_WORKSHEET_SCHEMA = "tqr-scenario-valuation-worksheet/v1";
+  var VALUATION_FORMULA_VERSION = "tqr-scenario-valuation/v1";
   var MAX_ALERTS = 50;
   var MAX_WORKSHEETS = 50;
-  var VALUATION_MODEL_TYPES = ["pe_multiple", "dividend_discount_simple", "growth_adjusted_pe"];
+  var VALUATION_SCENARIOS = ["bear", "base", "bull"];
+  var BUY_ZONE_ORDER = ["watch", "first", "second", "sweet", "extreme"];
   var VALUATION_INDICATOR_TYPES = ["zscore", "price_percentile", "ma_deviation"];
 
   function clone(value) {
@@ -79,12 +82,6 @@
         exit: "not_configured",
         execution: "research_only",
         status: "not_admitted"
-      },
-      valuationInputs: {
-        eps: "",
-        peLow: "",
-        peHigh: "",
-        safetyMargin: ""
       },
       notes: [],
       noteDraft: { title: "", body: "", tags: "" },
@@ -229,12 +226,17 @@
     var seen = {};
     return definitions.filter(function (definition) {
       if (!definition || typeof definition !== "object") return false;
-      if (definition.schema !== "tqe-fair-value-worksheet/v1") return false;
       var id = definition.worksheet_id;
       if (typeof id !== "string" || !id || id.length > 64 || !/^[A-Za-z0-9:_.-]+$/.test(id) || seen[id]) return false;
       if (!definition.target || typeof definition.target.security_id !== "string") return false;
-      if (!definition.model || VALUATION_MODEL_TYPES.indexOf(definition.model.type) < 0) return false;
-      if (typeof definition.safety_margin !== "number" || !(definition.safety_margin >= 0 && definition.safety_margin < 1)) return false;
+      if (definition.schema !== VALUATION_WORKSHEET_SCHEMA) return false;
+      if (!definition.scenarios || VALUATION_SCENARIOS.some(function (name) {
+        var entry = definition.scenarios[name];
+        return !entry || !(entry.eps > 0) || !(entry.pe > 0);
+      })) return false;
+      if (!definition.basis || typeof definition.basis.eps_period !== "string" || !definition.basis.eps_period) return false;
+      var ratios = definition.buy_zone_ratios;
+      if (!ratios || BUY_ZONE_ORDER.some(function (key) { return !(ratios[key] > 0 && ratios[key] <= 1); })) return false;
       seen[id] = true;
       return true;
     }).map(function (definition) { return clone(definition); }).slice(0, MAX_WORKSHEETS);
@@ -244,7 +246,7 @@
     if (!Array.isArray(results)) return [];
     return results.filter(function (result) {
       return result && typeof result === "object" && typeof result.worksheet_id === "string" &&
-        result.formula_version === "tqe-fair-value/v1" && result.research_only === true &&
+        result.formula_version === VALUATION_FORMULA_VERSION && result.research_only === true &&
         (result.status === "ok" || result.status === "insufficient_data");
     }).map(function (result) { return clone(result); }).slice(0, MAX_WORKSHEETS);
   }
@@ -312,13 +314,6 @@
     }
     if (event.type === "TOGGLE_KLINE_INDICATOR" && ["ma", "ema", "rsi", "macd", "kd", "atr", "volume"].indexOf(event.indicator) >= 0) {
       return Object.assign({}, current, { activeSection: "company", activeKlineIndicator: event.indicator });
-    }
-    if (event.type === "SET_VALUATION_INPUT" && ["eps", "peLow", "peHigh", "safetyMargin"].indexOf(event.field) >= 0) {
-      return Object.assign({}, current, {
-        valuationInputs: Object.assign({}, current.valuationInputs, {
-          [event.field]: typeof event.value === "string" ? event.value : ""
-        })
-      });
     }
     if (event.type === "SET_NOTE_DRAFT" && ["title", "body", "tags"].indexOf(event.field) >= 0) {
       return Object.assign({}, current, {
@@ -744,29 +739,36 @@
     var data = draft || {};
     var symbol = context && context.symbol;
     var issues = [];
-    if (!symbol) issues.push(issue("target", "尚未選擇標的；請先在上方行情區選擇商品"));
+    if (!symbol) issues.push(issue("target", "尚未選擇標的；請先在 Company 頁選擇公司"));
     if (!String(data.label || "").trim()) issues.push(issue("label", "工作表名稱不可空白（120 字以內）"));
-    var model = data.model || "pe_multiple";
-    if (model === "pe_multiple") {
-      if (!numberTextIsFinite(data.eps) || numberText(data.eps) <= 0) issues.push(issue("eps", "預估 EPS 需為大於 0 的數字，例如 10"));
-      if (!numberTextIsFinite(data.targetPe) || numberText(data.targetPe) <= 0) issues.push(issue("targetPe", "目標本益比需為大於 0 的數字，例如 15"));
-    } else if (model === "dividend_discount_simple") {
-      if (!numberTextIsFinite(data.dps) || numberText(data.dps) <= 0) issues.push(issue("dps", "預估每股股利需為大於 0 的數字，例如 5"));
-      if (!numberTextIsFinite(data.growthRate)) issues.push(issue("growthRate", "股利成長率 g 需為數字（小數），例如 0.03"));
-      else if (numberText(data.growthRate) <= -1) issues.push(issue("growthRate", "股利成長率 g 需大於 -1"));
-      if (!numberTextIsFinite(data.discountRate) || numberText(data.discountRate) <= 0) issues.push(issue("discountRate", "折現率 r 需為大於 0 的數字（小數），例如 0.08"));
-      else if (numberTextIsFinite(data.growthRate) && numberText(data.discountRate) <= numberText(data.growthRate)) issues.push(issue("discountRate", "折現率 r 必須大於股利成長率 g"));
-    } else if (model === "growth_adjusted_pe") {
-      if (!numberTextIsFinite(data.eps) || numberText(data.eps) <= 0) issues.push(issue("eps", "預估 EPS 需為大於 0 的數字，例如 10"));
-      if (!numberTextIsFinite(data.growthPct)) issues.push(issue("growthPct", "預估成長率需為數字（%），例如 12"));
-      if (!numberTextIsFinite(data.peg)) issues.push(issue("peg", "PEG 倍數需為數字，例如 1.0"));
-      if (numberTextIsFinite(data.growthPct) && numberTextIsFinite(data.peg) && numberText(data.growthPct) * numberText(data.peg) <= 0) {
-        issues.push(issue("growthPct", "預估成長率與 PEG 倍數的乘積需為正數"));
+    [["bear", "Bear"], ["base", "Base"], ["bull", "Bull"]].forEach(function (pair) {
+      var epsField = pair[0] + "Eps";
+      var peField = pair[0] + "Pe";
+      if (!numberTextIsFinite(data[epsField]) || numberText(data[epsField]) <= 0) {
+        issues.push(issue(epsField, pair[1] + " EPS 需為大於 0 的數字，例如 10"));
+      }
+      if (!numberTextIsFinite(data[peField]) || numberText(data[peField]) <= 0) {
+        issues.push(issue(peField, pair[1] + " 合理本益比需為大於 0 的數字，例如 15"));
+      }
+    });
+    var ratioFields = ["ratioWatch", "ratioFirst", "ratioSecond", "ratioSweet", "ratioExtreme"];
+    var ratios = ratioFields.map(function (field) { return numberText(data[field]); });
+    ratioFields.forEach(function (field, index) {
+      if (!numberTextIsFinite(data[field]) || ratios[index] <= 0 || ratios[index] > 100) {
+        issues.push(issue(field, "買進區間比例需為 0 到 100 之間的數字（%）"));
+      }
+    });
+    if (ratios.every(function (value) { return isFinite(value); })) {
+      for (var i = 1; i < ratios.length; i += 1) {
+        if (ratios[i] > ratios[i - 1]) {
+          issues.push(issue(ratioFields[i], "買進區間比例需由觀察區往極端錯價遞減"));
+          break;
+        }
       }
     }
-    if (!numberTextIsFinite(data.safetyMargin) || numberText(data.safetyMargin) < 0 || numberText(data.safetyMargin) >= 100) {
-      issues.push(issue("safetyMargin", "安全邊際需為 0 以上、小於 100 的數字（%），例如 15"));
-    }
+    if (!String(data.epsPeriod || "").trim()) issues.push(issue("epsPeriod", "需記錄使用哪一期 EPS，例如 2026Q1"));
+    if (["actual", "estimate"].indexOf(data.epsKind) < 0) issues.push(issue("epsKind", "需標示 EPS 為實際值或預估值"));
+    if (!String(data.valuationDate || "").trim()) issues.push(issue("valuationDate", "需記錄估值日期"));
     return issues;
   }
 
@@ -850,15 +852,15 @@
   function opportunityRows(state) {
     var ratios = buyZoneRatios(state);
     return valuationResults(state).filter(function (result) {
-      return result && result.status === "ok" && isFiniteNumber(result.fair_value) && isFiniteNumber(result.current_price);
+      return result && result.status === "ok" && isFiniteNumber(result.base_value) && isFiniteNumber(result.current_price);
     }).map(function (result) {
-      var stage = stageForPrice(result.current_price, result.fair_value, ratios);
+      var stage = result.stage || stageForPrice(result.current_price, result.base_value, ratios);
       return {
         symbol: result.security_id,
         name: result.label || "",
         price: result.current_price,
-        base_value: result.fair_value,
-        discount: (result.current_price - result.fair_value) / result.fair_value,
+        base_value: result.base_value,
+        discount: (result.current_price - result.base_value) / result.base_value,
         stage: stage,
         stage_label: STAGE_LABELS[stage]
       };
@@ -935,9 +937,9 @@
 
   function baseValueFor(state, securityId) {
     var hit = valuationResults(state).find(function (result) {
-      return result && result.security_id === securityId && result.status === "ok" && isFiniteNumber(result.fair_value);
+      return result && result.security_id === securityId && result.status === "ok" && isFiniteNumber(result.base_value);
     });
-    return hit ? hit.fair_value : null;
+    return hit ? hit.base_value : null;
   }
 
   function latestCloseFor(state, instrumentId) {
@@ -1037,6 +1039,7 @@
     buyPlanStatusRows: buyPlanStatusRows,
     ALERT_STORE_SCHEMA: ALERT_STORE_SCHEMA,
     VALUATION_STORE_SCHEMA: VALUATION_STORE_SCHEMA,
+    VALUATION_WORKSHEET_SCHEMA: VALUATION_WORKSHEET_SCHEMA,
     createInitialState: createInitialState,
     reduce: reduce,
     selectedProduct: selectedProduct,

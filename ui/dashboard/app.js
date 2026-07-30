@@ -18,7 +18,7 @@
   var NOTES_LOCAL_STORAGE_KEY = "tw-quant-engine-research-notes.v1";
   var ALERTS_LOCAL_STORAGE_KEY = "tqe-in-app-alerts.v1";
   var ALERTS_SESSION_STORAGE_KEY = "tqe-in-app-alerts.session";
-  var VALUATION_LOCAL_STORAGE_KEY = "tqe-fair-value-worksheets.v1";
+  var VALUATION_LOCAL_STORAGE_KEY = "tqr-scenario-valuation-worksheets.v1";
   var FINANCIAL_REVIEW_LOCAL_STORAGE_KEY = "tw-quant-engine-financial-review.prototype-v1";
   var watchlistModelRequests = {};
   var klineInstrumentsAttempts = 0;
@@ -123,17 +123,17 @@
   function defaultValuationDraft() {
     return {
       label: "",
-      model: "pe_multiple",
-      eps: "",
-      targetPe: "",
-      dps: "",
-      growthRate: "",
-      discountRate: "",
-      growthPct: "",
-      peg: "",
-      safetyMargin: "15",
-      notes: ""
+      bearEps: "", bearPe: "",
+      baseEps: "", basePe: "",
+      bullEps: "", bullPe: "",
+      ratioWatch: "90", ratioFirst: "85", ratioSecond: "80", ratioSweet: "75", ratioExtreme: "65",
+      epsPeriod: "", epsKind: "estimate", peRationale: "",
+      financialDataDate: "", valuationDate: todayIso(), changeReason: ""
     };
+  }
+
+  function todayIso() {
+    return new Date().toISOString().slice(0, 10);
   }
 
   function defaultAlertDraft() {
@@ -859,36 +859,40 @@
     var instrument = selectedKlineInstrument();
     var symbol = instrument && instrument.symbol;
     if (!symbol || !String(valuationDraft.label || "").trim()) return null;
-    var model = null;
-    if (valuationDraft.model === "pe_multiple") {
-      var eps = Number(valuationDraft.eps);
-      var targetPe = Number(valuationDraft.targetPe);
-      if (!(eps > 0) || !(targetPe > 0)) return null;
-      model = { type: "pe_multiple", eps: eps, target_pe: targetPe };
-    } else if (valuationDraft.model === "dividend_discount_simple") {
-      var dps = Number(valuationDraft.dps);
-      var growth = Number(valuationDraft.growthRate);
-      var discount = Number(valuationDraft.discountRate);
-      if (!(dps > 0) || !Number.isFinite(growth) || !(discount > 0) || growth <= -1 || discount <= growth) return null;
-      model = { type: "dividend_discount_simple", dps: dps, growth_rate: growth, discount_rate: discount };
-    } else {
-      var growthEps = Number(valuationDraft.eps);
-      var growthPct = Number(valuationDraft.growthPct);
-      var peg = Number(valuationDraft.peg);
-      if (!(growthEps > 0) || !Number.isFinite(growthPct) || !Number.isFinite(peg) || growthPct * peg <= 0) return null;
-      model = { type: "growth_adjusted_pe", eps: growthEps, growth_pct: growthPct, peg: peg };
+    function scenario(prefix) {
+      var eps = Number(valuationDraft[prefix + "Eps"]);
+      var pe = Number(valuationDraft[prefix + "Pe"]);
+      if (!(eps > 0) || !(pe > 0)) return null;
+      return { eps: eps, pe: pe };
     }
-    var safetyPercent = Number(valuationDraft.safetyMargin);
-    var safetyMargin = Number.isFinite(safetyPercent) ? safetyPercent / 100 : 0;
-    if (!(safetyMargin >= 0 && safetyMargin < 1)) return null;
+    var bear = scenario("bear");
+    var base = scenario("base");
+    var bull = scenario("bull");
+    if (!bear || !base || !bull) return null;
+    function ratio(field) {
+      var value = Number(valuationDraft[field]) / 100;
+      return value > 0 && value <= 1 ? value : null;
+    }
+    var ratios = {
+      watch: ratio("ratioWatch"), first: ratio("ratioFirst"), second: ratio("ratioSecond"),
+      sweet: ratio("ratioSweet"), extreme: ratio("ratioExtreme")
+    };
+    if (Object.keys(ratios).some(function (key) { return ratios[key] === null; })) return null;
     return {
-      schema: "tqe-fair-value-worksheet/v1",
-      worksheet_id: "ws-" + Date.now(),
+      schema: core.VALUATION_WORKSHEET_SCHEMA,
+      worksheet_id: "tqr-" + symbol + "-" + Date.now(),
       label: String(valuationDraft.label).trim().slice(0, 120),
       target: { security_id: symbol },
-      model: model,
-      safety_margin: safetyMargin,
-      assumption_notes: String(valuationDraft.notes || "").slice(0, 500),
+      scenarios: { bear: bear, base: base, bull: bull },
+      buy_zone_ratios: ratios,
+      basis: {
+        eps_period: String(valuationDraft.epsPeriod || "").trim().slice(0, 200),
+        eps_kind: valuationDraft.epsKind === "actual" ? "actual" : "estimate",
+        pe_rationale: String(valuationDraft.peRationale || "").trim().slice(0, 200),
+        financial_data_date: String(valuationDraft.financialDataDate || "").trim().slice(0, 200),
+        valuation_date: String(valuationDraft.valuationDate || "").trim().slice(0, 200),
+        change_reason: String(valuationDraft.changeReason || "").trim().slice(0, 200)
+      },
       created_at: new Date().toISOString()
     };
   }
@@ -1531,29 +1535,8 @@
       '<div class="kline-provenance"><span>來源：' + text(model && model.source) + '</span><span>資料快照：' + text(model && model.snapshot_digest) + '</span><span>時區：' + text(model && model.timezone) + '</span></div></section>', "");
   }
 
-  function valuationModelLabel(type) {
-    if (type === "pe_multiple") return "本益比法";
-    if (type === "dividend_discount_simple") return "股利折價簡式";
-    if (type === "growth_adjusted_pe") return "成長調整本益比";
-    return type || "未知模型";
-  }
 
-  function valuationModelSummary(model) {
-    if (!model) return "";
-    if (model.type === "pe_multiple") return "FV = EPS " + core.formatNumber(model.eps) + " × 目標 PE " + core.formatNumber(model.target_pe);
-    if (model.type === "dividend_discount_simple") return "FV = 股利 " + core.formatNumber(model.dps) + " × (1+" + core.formatNumber(model.growth_rate) + ") ÷ (" + core.formatNumber(model.discount_rate) + "−" + core.formatNumber(model.growth_rate) + ")";
-    if (model.type === "growth_adjusted_pe") return "FV = EPS " + core.formatNumber(model.eps) + " × (成長 " + core.formatNumber(model.growth_pct) + "% × PEG " + core.formatNumber(model.peg) + ")";
-    return "";
-  }
 
-  function valuationComparisonBadges(result) {
-    var comparison = result && result.comparison;
-    if (!comparison) return '<span class="status status-unavailable">資料不足</span>';
-    var vsFair = comparison.vs_fair_value === "above" ? "高於合理價" : comparison.vs_fair_value === "below" ? "低於合理價" : "等於合理價";
-    var vsZone = comparison.vs_buy_zone_ceiling === "below" ? "低於買入區上限" : "高於或等於買入區上限";
-    return '<span class="status status-draft" data-testid="valuation-vs-fair">' + text(vsFair) + '（' + core.formatPercent(comparison.gap_to_fair_value_pct) + '）</span>' +
-      '<span class="status status-draft" data-testid="valuation-vs-zone">' + text(vsZone) + '（' + core.formatPercent(comparison.gap_to_buy_zone_ceiling_pct) + '）</span>';
-  }
 
   function valuationIndicatorTile(type, label, note) {
     var indicators = state.valuation && Array.isArray(state.valuation.indicators) ? state.valuation.indicators : [];
@@ -1567,64 +1550,100 @@
       '<small>' + text(note) + '</small></div>';
   }
 
+  function valuationScenarioField(prefix, label) {
+    return '<div class="valuation-scenario" data-testid="valuation-scenario-' + prefix + '"><h4>' + text(label) + '</h4>' +
+      '<label><span>EPS</span><input type="number" step="0.01" inputmode="decimal" value="' + escapeHtml(valuationDraft[prefix + "Eps"]) + '" data-action="valuation-ws-input" data-field="' + prefix + 'Eps" data-testid="valuation-ws-' + prefix + '-eps"></label>' +
+      '<label><span>合理本益比</span><input type="number" step="0.1" inputmode="decimal" value="' + escapeHtml(valuationDraft[prefix + "Pe"]) + '" data-action="valuation-ws-input" data-field="' + prefix + 'Pe" data-testid="valuation-ws-' + prefix + '-pe"></label>' +
+      '</div>';
+  }
+
+  function valuationRatioField(field, label, testid) {
+    return '<label><span>' + text(label) + '（%）</span><input type="number" min="1" max="100" step="0.5" inputmode="decimal" value="' + escapeHtml(valuationDraft[field]) + '" data-action="valuation-ws-input" data-field="' + field + '" data-testid="' + testid + '"></label>';
+  }
+
+  function valuationBasisMarkup() {
+    return '<div class="valuation-basis" data-testid="valuation-basis"><h4>估值依據</h4>' +
+      '<label><span>使用哪一期 EPS</span><input type="text" maxlength="200" placeholder="例如 2026Q1" value="' + escapeHtml(valuationDraft.epsPeriod) + '" data-action="valuation-ws-input" data-field="epsPeriod" data-testid="valuation-basis-period"></label>' +
+      '<label><span>EPS 類型</span><select data-action="valuation-ws-input" data-field="epsKind" data-testid="valuation-basis-kind">' +
+      '<option value="actual"' + (valuationDraft.epsKind === "actual" ? " selected" : "") + '>實際值</option>' +
+      '<option value="estimate"' + (valuationDraft.epsKind !== "actual" ? " selected" : "") + '>預估值</option></select></label>' +
+      '<label><span>PE 選擇理由</span><input type="text" maxlength="200" placeholder="例如 近五年區間中位" value="' + escapeHtml(valuationDraft.peRationale) + '" data-action="valuation-ws-input" data-field="peRationale" data-testid="valuation-basis-rationale"></label>' +
+      '<label><span>財報資料日期</span><input type="date" value="' + escapeHtml(valuationDraft.financialDataDate) + '" data-action="valuation-ws-input" data-field="financialDataDate" data-testid="valuation-basis-financial-date"></label>' +
+      '<label><span>估值日期</span><input type="date" value="' + escapeHtml(valuationDraft.valuationDate) + '" data-action="valuation-ws-input" data-field="valuationDate" data-testid="valuation-basis-date"></label>' +
+      '<label><span>估值修改原因</span><input type="text" maxlength="200" placeholder="例如 季報公布後上調 EPS" value="' + escapeHtml(valuationDraft.changeReason) + '" data-action="valuation-ws-input" data-field="changeReason" data-testid="valuation-basis-reason"></label>' +
+      '</div>';
+  }
+
+  function valuationResultCard(result) {
+    if (result.status !== "ok") {
+      return '<article class="valuation-result" data-testid="valuation-result-card"><header><strong>' + text(result.label) + '</strong><span class="status status-draft">資料不足</span></header>' +
+        '<p class="valuation-insufficient" data-testid="valuation-insufficient">此標的目前沒有已納入的收盤資料，不做任何推估。</p></article>';
+    }
+    var values = result.scenario_values || {};
+    var zone = result.buy_zone || {};
+    var comparison = result.comparison || {};
+    var basis = result.basis || {};
+    return '<article class="valuation-result" data-testid="valuation-result-card">' +
+      '<header><strong>' + text(result.label) + '</strong><span class="status status-draft">' + text(result.security_id) + '</span></header>' +
+      '<div class="valuation-scenario-grid">' +
+      '<div><span class="detail-label">Bear</span><strong>' + core.formatNumber(values.bear) + '</strong></div>' +
+      '<div><span class="detail-label">Base 合理價值</span><strong class="valuation-price" data-testid="valuation-base-value">' + core.formatNumber(values.base) + '</strong></div>' +
+      '<div><span class="detail-label">Bull</span><strong>' + core.formatNumber(values.bull) + '</strong></div>' +
+      '</div>' +
+      '<div class="valuation-zone-grid" data-testid="valuation-zone">' +
+      '<div><span class="detail-label">觀察區</span><strong>' + core.formatNumber(zone.watch) + '</strong></div>' +
+      '<div><span class="detail-label">第一階段</span><strong data-testid="valuation-zone-first">' + core.formatNumber(zone.first) + '</strong></div>' +
+      '<div><span class="detail-label">第二階段</span><strong>' + core.formatNumber(zone.second) + '</strong></div>' +
+      '<div><span class="detail-label">甜蜜價</span><strong data-testid="valuation-zone-sweet">' + core.formatNumber(zone.sweet) + '</strong></div>' +
+      '<div><span class="detail-label">極端錯價</span><strong>' + core.formatNumber(zone.extreme) + '</strong></div>' +
+      '</div>' +
+      '<div class="valuation-compare"><span>現價 <strong>' + core.formatNumber(result.current_price) + '</strong></span>' +
+      '<span>折價 <strong data-testid="valuation-discount">' + core.formatPercent(comparison.discount_pct) + '</strong></span>' +
+      '<span>目前階段 <strong data-testid="valuation-stage">' + text(core.STAGE_LABELS[result.stage]) + '</strong></span></div>' +
+      '<small class="valuation-result-params">EPS ' + text(basis.eps_period) + '（' + (basis.eps_kind === "actual" ? "實際值" : "預估值") + '）· PE 理由 ' + text(basis.pe_rationale || "未記錄") +
+      ' · 財報日 ' + text(basis.financial_data_date || "未記錄") + ' · 估值日 ' + text(basis.valuation_date) + ' · 公式版本 ' + text(result.formula_version) + '</small></article>';
+  }
+
   function valuationMarkup() {
-    var valuation = state.valuation || { worksheets: [], results: [], indicators: [], status: "idle", message: "" };
+    var valuation = state.valuation || { worksheets: [], results: [], status: "idle", message: "" };
     var worksheets = Array.isArray(valuation.worksheets) ? valuation.worksheets : [];
     var results = Array.isArray(valuation.results) ? valuation.results : [];
     var instrument = selectedKlineInstrument();
     var symbol = instrument && instrument.symbol;
-    var draft = valuationDraft;
-    var paramFields = "";
-    if (draft.model === "pe_multiple") {
-      paramFields =
-        '<label class="valuation-field"><span>預估 EPS（元）· 使用者假設</span><input type="number" min="0" step="0.01" inputmode="decimal" placeholder="例如 10.00" value="' + escapeHtml(draft.eps) + '" data-action="valuation-ws-input" data-field="eps" data-testid="valuation-ws-eps"></label>' +
-        '<label class="valuation-field"><span>目標本益比 · 使用者假設</span><input type="number" min="0" step="0.1" inputmode="decimal" placeholder="例如 15" value="' + escapeHtml(draft.targetPe) + '" data-action="valuation-ws-input" data-field="targetPe" data-testid="valuation-ws-target-pe"></label>';
-    } else if (draft.model === "dividend_discount_simple") {
-      paramFields =
-        '<label class="valuation-field"><span>預估每股股利（元）· 使用者假設</span><input type="number" min="0" step="0.01" inputmode="decimal" placeholder="例如 5.00" value="' + escapeHtml(draft.dps) + '" data-action="valuation-ws-input" data-field="dps" data-testid="valuation-ws-dps"></label>' +
-        '<label class="valuation-field"><span>股利成長率 g（小數）· 使用者假設</span><input type="number" step="0.01" inputmode="decimal" placeholder="例如 0.03" value="' + escapeHtml(draft.growthRate) + '" data-action="valuation-ws-input" data-field="growthRate" data-testid="valuation-ws-growth-rate"></label>' +
-        '<label class="valuation-field"><span>折現率 r（小數，需大於 g）· 使用者假設</span><input type="number" step="0.01" inputmode="decimal" placeholder="例如 0.08" value="' + escapeHtml(draft.discountRate) + '" data-action="valuation-ws-input" data-field="discountRate" data-testid="valuation-ws-discount-rate"></label>';
-    } else {
-      paramFields =
-        '<label class="valuation-field"><span>預估 EPS（元）· 使用者假設</span><input type="number" min="0" step="0.01" inputmode="decimal" placeholder="例如 10.00" value="' + escapeHtml(draft.eps) + '" data-action="valuation-ws-input" data-field="eps" data-testid="valuation-ws-eps"></label>' +
-        '<label class="valuation-field"><span>預估成長率（%）· 使用者假設</span><input type="number" step="0.1" inputmode="decimal" placeholder="例如 12" value="' + escapeHtml(draft.growthPct) + '" data-action="valuation-ws-input" data-field="growthPct" data-testid="valuation-ws-growth-pct"></label>' +
-        '<label class="valuation-field"><span>PEG 倍數 · 使用者假設</span><input type="number" min="0" step="0.1" inputmode="decimal" placeholder="例如 1.0" value="' + escapeHtml(draft.peg) + '" data-action="valuation-ws-input" data-field="peg" data-testid="valuation-ws-peg"></label>';
-    }
-    var valuationIssues = core.valuationFormIssues(draft, { symbol: symbol });
-    var form = '<div class="valuation-form" data-testid="valuation-form">' +
-      '<label class="valuation-field"><span>工作表名稱</span><input type="text" maxlength="120" placeholder="例如：2330 本益比合理價" value="' + escapeHtml(draft.label) + '" data-action="valuation-ws-input" data-field="label" data-testid="valuation-ws-label"></label>' +
-      '<label class="valuation-field"><span>估值模型</span><select data-action="valuation-ws-input" data-field="model" data-testid="valuation-ws-model">' + alertSelectOptions([["pe_multiple", "本益比法"], ["dividend_discount_simple", "股利折價簡式"], ["growth_adjusted_pe", "成長調整本益比"]], draft.model) + '</select></label>' +
-      paramFields +
-      '<label class="valuation-field"><span>安全邊際（%）· 使用者假設</span><input type="number" min="0" max="99" step="0.1" inputmode="decimal" placeholder="例如 15" value="' + escapeHtml(draft.safetyMargin) + '" data-action="valuation-ws-input" data-field="safetyMargin" data-testid="valuation-ws-safety-margin"></label>' +
-      '<label class="valuation-field valuation-field-wide"><span>假設說明（為什麼這樣假設）</span><input type="text" maxlength="500" placeholder="記錄假設依據；此為個人假設，不是官方或市場共識資料" value="' + escapeHtml(draft.notes) + '" data-action="valuation-ws-input" data-field="notes" data-testid="valuation-ws-notes"></label>' +
-      '<button class="btn btn-outline btn-sm" type="button" data-action="valuation-add" data-testid="valuation-add"' + (valuationIssues.length ? " disabled" : "") + '>新增工作表（' + text(symbol || "未選標的") + '）</button>' +
-      formIssuesMarkup(valuationIssues, "valuation-form-issues") + '</div>';
-    var worksheetRows = worksheets.length ? worksheets.map(function (definition) {
-      return '<article class="valuation-worksheet" data-testid="valuation-worksheet"><div><strong>' + text(definition.label) + '</strong><small>' + text(definition.target && definition.target.security_id) + ' · ' + valuationModelLabel(definition.model && definition.model.type) + ' · ' + valuationModelSummary(definition.model) + ' · 安全邊際 ' + core.formatPercent(definition.safety_margin) + '</small></div><button class="icon-button" type="button" data-action="valuation-delete" data-worksheet-id="' + escapeHtml(definition.worksheet_id) + '" aria-label="刪除合理價工作表">×</button></article>';
-    }).join("") : '<div class="alert-empty" data-testid="valuation-empty">尚未建立合理價工作表。</div>';
-    var resultCards = results.length ? results.map(function (result) {
-      var body = result.status === "ok"
-        ? '<div class="valuation-result-grid"><div><span class="detail-label">合理價 FV</span><strong class="valuation-price" data-testid="valuation-fair-value">' + core.formatNumber(result.fair_value) + '</strong></div>' +
-          '<div><span class="detail-label">買入區上限</span><strong class="valuation-price">' + core.formatNumber(result.buy_zone_ceiling) + '</strong></div>' +
-          '<div><span class="detail-label">現價（' + text(result.price_as_of || "—") + ' 收盤）</span><strong class="valuation-price">' + core.formatNumber(result.current_price) + '</strong></div></div>' +
-          '<div class="valuation-result-badges">' + valuationComparisonBadges(result) + '</div>'
-        : '<p class="valuation-note" data-testid="valuation-insufficient">已納入資料不足，無法對照現價；不會對外抓取補齊。</p>';
-      return '<article class="valuation-result" data-testid="valuation-result-card"><header><strong>' + text(result.label) + '</strong><span class="status status-draft">草稿 · 使用者假設</span></header>' +
-        '<small class="valuation-result-params">' + text(valuationModelSummary(result.model)) + ' · 安全邊際 ' + core.formatPercent(result.safety_margin) + ' · 公式版本 ' + text(result.formula_version) + ' · 資料狀態 ' + text(result.data_status) + '</small>' + body + '</article>';
-    }).join("") : "";
-    var statusLine = valuation.status === "error"
+    var issues = core.valuationFormIssues(valuationDraft, { symbol: symbol });
+
+    var worksheetCards = worksheets.length ? worksheets.map(function (definition) {
+      var scenarios = definition.scenarios || {};
+      var base = scenarios.base || {};
+      return '<article class="valuation-worksheet" data-testid="valuation-worksheet"><div><strong>' + text(definition.label) +
+        '</strong><small>' + text(definition.target && definition.target.security_id) + ' · Base ' + core.formatNumber(base.eps) + ' × ' + core.formatNumber(base.pe) +
+        ' · ' + text((definition.basis || {}).eps_period) + '</small></div>' +
+        '<button class="icon-button" type="button" data-action="valuation-delete" data-worksheet-id="' + escapeHtml(definition.worksheet_id) + '" aria-label="刪除估值工作表">×</button></article>';
+    }).join("") : '<div class="alert-empty" data-testid="valuation-empty">尚未建立估值工作表。</div>';
+
+    var statusMarkup = valuation.status === "error"
       ? '<p class="alert-status error" data-testid="valuation-status">' + text(valuation.message || "估值計算失敗") + '</p>'
-      : "";
-    return '<section class="valuation-panel" data-testid="valuation-panel"><header class="subsection-heading"><div><h2>合理價工作表與價量分析</h2><span class="muted">使用者假設 · 本機確定性計算 · 研究對照，非投資建議</span></div><span class="status status-draft">tqe-fair-value/v1</span></header>' +
-      form + statusLine +
-      '<div class="valuation-worksheet-list" data-testid="valuation-worksheet-list">' + worksheetRows + '</div>' +
-      '<div class="alert-toolbar"><button class="btn btn-primary btn-sm" type="button" data-action="valuation-evaluate" data-testid="valuation-evaluate"' + ((worksheets.length || symbol) && !valuationEvaluateInFlight ? "" : " disabled") + '>' + (valuationEvaluateInFlight ? "計算中…" : "計算合理價與指標") + '</button></div>' +
-      '<div class="valuation-indicator-row" data-testid="valuation-indicators">' +
-      valuationIndicatorTile("zscore", "Z-score", "raw 收盤 · 母體標準差 · 期間顯式") +
-      valuationIndicatorTile("price_percentile", "歷史百分位", "最近收盤在 N 期窗口中的百分位") +
-      valuationIndicatorTile("ma_deviation", "均線乖離", "收盤 / SMA(N) − 1") + '</div>' +
-      '<div class="valuation-result-list" data-testid="valuation-result-list">' + resultCards + '</div>' +
-      '<p class="valuation-note">所有估值輸入都是使用者假設（draft），不是官方資料、市場共識或法人預估；計算只使用本機已納入的 EOD 價量資料。工作表只保存在本機（tqe-fair-value-worksheets/v1）。此區塊為研究對照，不構成投資建議，也不提供任何下單或模擬下單功能。官方基本面欄位（EPS、ROE、月營收）仍等待來源准入，不會自動帶入。</p></section>';
+      : '<p class="alert-status" data-testid="valuation-status">' + text(valuation.message || "使用者假設 · 本機確定性計算") + '</p>';
+
+    return '<section class="valuation-panel" data-testid="valuation-panel">' +
+      '<header class="subsection-heading"><div><h2>Bear／Base／Bull 估值工作表</h2><span class="muted">合理價值 = 預估 EPS × 合理本益比；買進區間 = Base 合理價值 × 自訂比例</span></div><span class="status status-draft">' + text(core.VALUATION_WORKSHEET_SCHEMA) + '</span></header>' +
+      '<div class="valuation-form" data-testid="valuation-form">' +
+      '<label class="valuation-field"><span>工作表名稱</span><input type="text" maxlength="120" placeholder="例如：2330 三情境合理價" value="' + escapeHtml(valuationDraft.label) + '" data-action="valuation-ws-input" data-field="label" data-testid="valuation-ws-label"></label>' +
+      '<div class="valuation-scenario-row">' + valuationScenarioField("bear", "Bear 保守") + valuationScenarioField("base", "Base 最合理") + valuationScenarioField("bull", "Bull 樂觀") + '</div>' +
+      '<div class="valuation-ratio-row" data-testid="valuation-ratios"><h4>買進區間比例（相對 Base 合理價值）</h4>' +
+      valuationRatioField("ratioWatch", "觀察區", "valuation-ratio-watch") +
+      valuationRatioField("ratioFirst", "第一階段", "valuation-ratio-first") +
+      valuationRatioField("ratioSecond", "第二階段", "valuation-ratio-second") +
+      valuationRatioField("ratioSweet", "甜蜜區", "valuation-ratio-sweet") +
+      valuationRatioField("ratioExtreme", "極端錯價", "valuation-ratio-extreme") + '</div>' +
+      valuationBasisMarkup() +
+      '<div class="valuation-actions"><button class="btn btn-primary" type="button" data-action="valuation-add" data-testid="valuation-add"' + (issues.length ? " disabled" : "") + '>加入估值工作表</button>' +
+      formIssuesMarkup(issues, "valuation-form-issues") + '</div></div>' +
+      '<div class="valuation-worksheet-list" data-testid="valuation-worksheet-list">' + worksheetCards + '</div>' +
+      '<div class="alert-toolbar"><button class="btn btn-primary btn-sm" type="button" data-action="valuation-evaluate" data-testid="valuation-evaluate"' + ((worksheets.length && symbol) && !valuationEvaluateInFlight ? "" : " disabled") + '>' + (valuationEvaluateInFlight ? "計算中…" : "計算合理價值與買進區間") + '</button></div>' +
+      statusMarkup +
+      '<div class="valuation-result-list" data-testid="valuation-result-list">' + results.map(valuationResultCard).join("") + '</div>' +
+      '<p class="valuation-note">所有 EPS 與本益比都是使用者假設（draft），不是官方資料、市場共識或法人預估。到價只提示，不給買賣建議；最後決策保留人工。官方基本面欄位仍等待來源准入，不會自動帶入，也不會因股價下跌自動下修 EPS。</p></section>';
   }
 
   function renderKlineChart() {

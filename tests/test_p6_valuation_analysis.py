@@ -17,7 +17,10 @@ from tw_quant_engine.valuation import (  # noqa: E402
     WORKSHEET_STORE_SCHEMA,
     ValuationValidationError,
     closes_from_bars,
-    compute_fair_value,
+    DEFAULT_BUY_ZONE_RATIOS,
+    compute_buy_zone,
+    compute_scenario_values,
+    stage_for_price,
     compute_indicator,
     evaluate_worksheet,
     evaluate_worksheets,
@@ -41,7 +44,7 @@ class P6ValuationValidationTests(unittest.TestCase):
     def test_valid_worksheets_pass_validation(self) -> None:
         for definition in self.fixture["worksheets"]:
             validated = validate_worksheet(definition, self.admitted)
-            self.assertEqual(validated["schema"], "tqe-fair-value-worksheet/v1")
+            self.assertEqual(validated["schema"], "tqr-scenario-valuation-worksheet/v1")
             self.assertEqual(validated["worksheet_id"], definition["worksheet_id"])
 
     def test_invalid_worksheets_are_rejected_fail_closed(self) -> None:
@@ -49,21 +52,17 @@ class P6ValuationValidationTests(unittest.TestCase):
         self.assertEqual(
             cases,
             {
-                "bad_schema",
-                "unknown_model_type",
-                "missing_model_field",
-                "discount_not_greater_than_growth",
-                "growth_not_above_minus_one",
+                "missing_scenario",
+                "buy_zone_ratios_not_decreasing",
+                "unknown_eps_kind",
+                "missing_eps_period",
                 "non_positive_eps",
-                "safety_margin_out_of_range",
-                "target_outside_universe",
-                "peg_growth_product_non_positive",
-                "external_fetch_field",
+                "unknown_worksheet_field",
             },
         )
         for item in self.fixture["invalid_worksheets"]:
             with self.assertRaises(ValuationValidationError, msg=item["case"]):
-                validate_worksheet(item["definition"], self.admitted)
+                validate_worksheet(item["worksheet"], self.admitted)
 
     def test_store_roundtrip(self) -> None:
         definitions = [validate_worksheet(item, self.admitted) for item in self.fixture["worksheets"]]
@@ -79,7 +78,7 @@ class P6ValuationValidationTests(unittest.TestCase):
         definitions = [validate_worksheet(item, self.admitted) for item in self.fixture["worksheets"]]
         store = serialize_worksheet_store(definitions)
         for tampered in (
-            dict(store, schema="tqe-fair-value-worksheets/v0"),
+            dict(store, schema="tqr-scenario-valuation-worksheets/v0"),
             dict(store, version=2),
             dict(store, worksheets=store["worksheets"] + store["worksheets"]),
             {"schema": WORKSHEET_STORE_SCHEMA, "version": 1, "worksheets": "not-a-list"},
@@ -108,44 +107,49 @@ class P6ValuationModelTests(unittest.TestCase):
         cls.admitted = cls.fixture["admitted_security_ids"]
         cls.worksheets = [validate_worksheet(item, cls.admitted) for item in cls.fixture["worksheets"]]
 
-    def test_three_model_formulas_exact(self) -> None:
-        expected = self.fixture["expected"]["fair_values"]
-        for worksheet in self.worksheets:
-            self.assertAlmostEqual(
-                compute_fair_value(worksheet["model"]),
-                expected[worksheet["worksheet_id"]],
-                places=9,
-                msg=worksheet["worksheet_id"],
-            )
+    def test_scenario_values_and_buy_zone_exact(self) -> None:
+        worksheet = next(item for item in self.worksheets if item["worksheet_id"] == "tqr-2330-base")
+        values = compute_scenario_values(worksheet["scenarios"])
+        self.assertEqual(values, self.fixture["expected"]["scenario_values"])
+        zone = compute_buy_zone(values["base"], worksheet["buy_zone_ratios"])
+        self.assertEqual(zone, self.fixture["expected"]["buy_zone"])
+
+    def test_stage_boundaries_are_inclusive_at_the_ratio(self) -> None:
+        ratios = DEFAULT_BUY_ZONE_RATIOS
+        self.assertEqual(stage_for_price(85.0, 100.0, ratios), "first")
+        self.assertEqual(stage_for_price(85.01, 100.0, ratios), "near")
+        self.assertEqual(stage_for_price(65.0, 100.0, ratios), "extreme")
+        self.assertEqual(stage_for_price(100.0, 100.0, ratios), "watch")
 
     def test_evaluation_derived_outputs_and_comparison(self) -> None:
-        worksheet = next(item for item in self.worksheets if item["worksheet_id"] == "p6-pe-2330")
+        worksheet = next(item for item in self.worksheets if item["worksheet_id"] == "tqr-2330-base")
         result = evaluate_worksheet(worksheet, self.fixture["market_data"]["2330"])
         self.assertEqual(result["status"], "ok")
-        self.assertAlmostEqual(result["fair_value"], 150.0)
-        self.assertAlmostEqual(result["buy_zone_ceiling"], 120.0)
+        self.assertAlmostEqual(result["base_value"], 150.0)
+        self.assertEqual(result["scenario_values"], self.fixture["expected"]["scenario_values"])
+        self.assertEqual(result["buy_zone"], self.fixture["expected"]["buy_zone"])
         self.assertEqual(result["current_price"], 100.0)
         self.assertEqual(result["price_as_of"], "2026-07-21")
         self.assertEqual(result["price_basis"], "close")
-        self.assertEqual(result["formula_version"], "tqe-fair-value/v1")
+        self.assertEqual(result["formula_version"], "tqr-scenario-valuation/v1")
         self.assertEqual(result["assumption_source"], "user_supplied_assumption")
         self.assertEqual(result["data_status"], "draft")
         self.assertIs(result["research_only"], True)
+        self.assertEqual(result["stage"], "sweet")
+        self.assertEqual(result["basis"]["eps_period"], "2026Q1")
         comparison = result["comparison"]
-        expected = self.fixture["expected"]["pe_2330_comparison"]
-        self.assertEqual(comparison["vs_fair_value"], expected["vs_fair_value"])
-        self.assertEqual(comparison["vs_buy_zone_ceiling"], expected["vs_buy_zone_ceiling"])
-        self.assertAlmostEqual(comparison["gap_to_fair_value_pct"], expected["gap_to_fair_value_pct"])
-        self.assertAlmostEqual(comparison["gap_to_buy_zone_ceiling_pct"], expected["gap_to_buy_zone_ceiling_pct"])
+        self.assertEqual(comparison["vs_base_value"], "below")
+        self.assertAlmostEqual(comparison["discount_pct"], (100.0 - 150.0) / 150.0)
         self.assertIs(comparison["research_comparison_only"], True)
 
     def test_missing_data_fails_closed_to_insufficient_data(self) -> None:
-        worksheet = next(item for item in self.worksheets if item["worksheet_id"] == "p6-ddm-2317")
+        worksheet = next(item for item in self.worksheets if item["worksheet_id"] == "tqr-2317-base")
         result = evaluate_worksheet(worksheet, self.fixture["market_data"]["2317"])
         self.assertEqual(result["status"], "insufficient_data")
         self.assertIsNone(result["current_price"])
         self.assertIsNone(result["comparison"])
-        self.assertAlmostEqual(result["fair_value"], 103.0)
+        self.assertIsNone(result["stage"])
+        self.assertAlmostEqual(result["base_value"], 66.0)
         result_none = evaluate_worksheet(worksheet, None)
         self.assertEqual(result_none["status"], "insufficient_data")
 
@@ -153,8 +157,8 @@ class P6ValuationModelTests(unittest.TestCase):
         first = evaluate_worksheets(self.worksheets, self.fixture["market_data"])
         second = evaluate_worksheets(self.worksheets, self.fixture["market_data"])
         self.assertEqual(first, second)
-        self.assertEqual(first["schema"], "tqe-fair-value-evaluation/v1")
-        self.assertEqual(len(first["results"]), 3)
+        self.assertEqual(first["schema"], "tqr-scenario-valuation-evaluation/v1")
+        self.assertEqual(len(first["results"]), 2)
 
 
 class P6ValuationIndicatorTests(unittest.TestCase):
@@ -212,13 +216,20 @@ class P6SidecarValuationRouteTests(unittest.TestCase):
         cls.thread.start()
         cls.base = f"http://127.0.0.1:{cls.server.server_address[1]}"
         cls.worksheet = {
-            "schema": "tqe-fair-value-worksheet/v1",
-            "worksheet_id": "p6-sidecar-2330",
-            "label": "2330 本益比合理價",
+            "schema": "tqr-scenario-valuation-worksheet/v1",
+            "worksheet_id": "tqr-sidecar-2330",
+            "label": "2330 三情境合理價",
             "target": {"security_id": "2330"},
-            "model": {"type": "pe_multiple", "eps": 10, "target_pe": 15},
-            "safety_margin": 0.2,
-            "assumption_notes": "",
+            "scenarios": {"bear": {"eps": 8, "pe": 12}, "base": {"eps": 10, "pe": 15}, "bull": {"eps": 12, "pe": 18}},
+            "buy_zone_ratios": {"watch": 0.90, "first": 0.85, "second": 0.80, "sweet": 0.75, "extreme": 0.65},
+            "basis": {
+                "eps_period": "2026Q1",
+                "eps_kind": "estimate",
+                "pe_rationale": "近五年本益比區間中位",
+                "financial_data_date": "2026-05-15",
+                "valuation_date": "2026-07-22",
+                "change_reason": "",
+            },
             "created_at": "2026-07-22T00:00:00Z",
         }
 
@@ -246,10 +257,10 @@ class P6SidecarValuationRouteTests(unittest.TestCase):
         self.assertEqual(payload["mode"], "valuation_analysis_only")
         data = payload["data"]
         result = data["evaluation"]["results"][0]
-        self.assertEqual(result["worksheet_id"], "p6-sidecar-2330")
+        self.assertEqual(result["worksheet_id"], "tqr-sidecar-2330")
         self.assertEqual(result["status"], "ok")
-        self.assertAlmostEqual(result["fair_value"], 150.0)
-        self.assertAlmostEqual(result["buy_zone_ceiling"], 120.0)
+        self.assertAlmostEqual(result["base_value"], 150.0)
+        self.assertAlmostEqual(result["buy_zone"]["first"], 127.5)
         latest_bar = self.catalog.models[("TWSE:2330", "1D")]["bars"][-1]
         self.assertEqual(result["current_price"], float(latest_bar["close"]))
         self.assertEqual(result["price_as_of"], latest_bar["trading_date"])

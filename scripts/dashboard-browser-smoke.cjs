@@ -11,9 +11,9 @@ const PREVIEW_DIR = path.join(ROOT, "outputs", "dashboard-preview");
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
   home: "ab3546148471254d72516ff191215be9c87ecd786bb6484160e767e7cccda10c",
-  company: "6cdd07a4aeb4277361929f4bc535ca24c2a63bd6941ca3216abde05e8d579104",
+  company: "ebb133c3dba5d2962963ce0c05cd8288f94fbed093f588d5c20acf438173ad37",
   watchlist: "a1ea7618c089fc255efadcc4667332e2af3ee5cadb099a77a8019934c94d3814",
-  valuation: "df8b5c893e9d6615c0a9699f7fa7704ed25b1e054b2e610a989a10eeb41c9c66",
+  valuation: "a6aabd57ef723156baea4e2be2a7298c85b3b846e92dc933c32d9c16b09c902e",
 };
 
 function freePort() {
@@ -291,15 +291,28 @@ async function main() {
     assert.equal(await page.locator(".page-title").innerText(), "Valuation");
     await page.locator('[data-testid="valuation-panel"]').waitFor();
     assert.equal(await page.locator('[data-testid="valuation-empty"]').count(), 1);
-    await page.locator('[data-testid="valuation-ws-label"]').fill("2330 本益比合理價");
-    await page.locator('[data-testid="valuation-ws-eps"]').fill("40");
-    await page.locator('[data-testid="valuation-ws-target-pe"]').fill("20");
-    await page.locator('[data-testid="valuation-ws-safety-margin"]').fill("15");
+    await page.locator('[data-testid="valuation-ws-label"]').fill("2330 三情境合理價");
+    await page.locator('[data-testid="valuation-ws-bear-eps"]').fill("30");
+    await page.locator('[data-testid="valuation-ws-bear-pe"]').fill("15");
+    await page.locator('[data-testid="valuation-ws-base-eps"]').fill("40");
+    await page.locator('[data-testid="valuation-ws-base-pe"]').fill("20");
+    await page.locator('[data-testid="valuation-ws-bull-eps"]').fill("50");
+    await page.locator('[data-testid="valuation-ws-bull-pe"]').fill("25");
+    // The basis fields are required: a valuation with no recorded EPS period
+    // must not be addable.
+    assert.equal(await page.locator('[data-testid="valuation-add"]').isDisabled(), true);
+    await page.locator('[data-testid="valuation-basis-period"]').fill("2026Q1");
+    await page.locator('[data-testid="valuation-basis-rationale"]').fill("近五年本益比區間中位");
+    assert.equal(await page.locator('[data-testid="valuation-add"]').isDisabled(), false);
     await page.locator('[data-testid="valuation-add"]').click();
     assert.equal(await page.locator('[data-testid="valuation-worksheet"]').count(), 1);
     await page.locator('[data-testid="valuation-evaluate"]').click();
     await page.locator('[data-testid="valuation-result-card"]').first().waitFor();
-    assert.equal(await page.locator('[data-testid="valuation-fair-value"]').first().innerText(), "800");
+    assert.equal(await page.locator('[data-testid="valuation-base-value"]').first().innerText(), "800");
+    // Buy ladder = Base x 85% / 75%, computed by the engine, not the browser.
+    assert.equal(await page.locator('[data-testid="valuation-zone-first"]').first().innerText(), "680");
+    assert.equal(await page.locator('[data-testid="valuation-zone-sweet"]').first().innerText(), "600");
+    assert.equal(await page.locator('[data-testid="valuation-stage"]').first().innerText(), "觀察");
     await settle(page);
     screenshots.valuation = screenshotHash(await page.screenshot({
       path: path.join(SCREENSHOT_DIR, "valuation.png"),

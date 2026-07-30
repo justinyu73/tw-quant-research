@@ -1,4 +1,4 @@
-"""P6 valuation & analysis: fail-closed worksheet validation, deterministic fair-value models, price/volume indicators.
+"""P6 valuation & analysis: fail-closed worksheet validation, deterministic Bear/Base/Bull fair values, price/volume indicators.
 
 Scope per docs/tqe-p6-valuation-analysis-contract.md:
 - fair value worksheets (tqe-fair-value-worksheet/v1) compute fair value from
@@ -19,16 +19,20 @@ from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping, Sequence
 
 
-WORKSHEET_SCHEMA = "tqe-fair-value-worksheet/v1"
-WORKSHEET_STORE_SCHEMA = "tqe-fair-value-worksheets/v1"
+WORKSHEET_SCHEMA = "tqr-scenario-valuation-worksheet/v1"
+WORKSHEET_STORE_SCHEMA = "tqr-scenario-valuation-worksheets/v1"
 WORKSHEET_STORE_VERSION = 1
-EVALUATION_SCHEMA = "tqe-fair-value-evaluation/v1"
+EVALUATION_SCHEMA = "tqr-scenario-valuation-evaluation/v1"
 INDICATOR_RESULT_SCHEMA = "tqe-price-volume-indicator/v1"
-FORMULA_VERSION = "tqe-fair-value/v1"
+FORMULA_VERSION = "tqr-scenario-valuation/v1"
 MAX_WORKSHEETS = 50
 MAX_INDICATOR_PERIOD = 250
 
-MODEL_TYPES = ("pe_multiple", "dividend_discount_simple", "growth_adjusted_pe")
+SCENARIOS = ("bear", "base", "bull")
+BUY_ZONE_KEYS = ("watch", "first", "second", "sweet", "extreme")
+DEFAULT_BUY_ZONE_RATIOS = {"watch": 0.90, "first": 0.85, "second": 0.80, "sweet": 0.75, "extreme": 0.65}
+EPS_KINDS = ("actual", "estimate")
+STAGES = ("watch", "near", "first", "second", "sweet", "extreme")
 INDICATOR_TYPES = ("zscore", "price_percentile", "ma_deviation")
 PRICE_BASIS = "close"
 STD_CONVENTION = "population"
@@ -37,13 +41,12 @@ DATA_STATUS = "draft"
 
 _WORKSHEET_ID_PATTERN = re.compile(r"^[A-Za-z0-9:_.-]+$")
 _WORKSHEET_KEYS = frozenset(
-    {"schema", "worksheet_id", "label", "target", "model", "safety_margin", "assumption_notes", "created_at"}
+    {"schema", "worksheet_id", "label", "target", "scenarios", "buy_zone_ratios", "basis", "created_at"}
 )
-_MODEL_KEYS = {
-    "pe_multiple": frozenset({"type", "eps", "target_pe"}),
-    "dividend_discount_simple": frozenset({"type", "dps", "growth_rate", "discount_rate"}),
-    "growth_adjusted_pe": frozenset({"type", "eps", "growth_pct", "peg"}),
-}
+_SCENARIO_KEYS = frozenset({"eps", "pe"})
+_BASIS_KEYS = frozenset(
+    {"eps_period", "eps_kind", "pe_rationale", "financial_data_date", "valuation_date", "change_reason"}
+)
 
 
 class ValuationValidationError(ValueError):
@@ -93,67 +96,86 @@ def _validate_target(target: Any, admitted_security_ids: Iterable[str]) -> dict[
     return {"security_id": security_id}
 
 
-def _validate_model(model: Any) -> dict[str, Any]:
-    if not isinstance(model, Mapping):
-        raise ValuationValidationError("model must be an object")
-    kind = model.get("type")
-    if kind not in _MODEL_KEYS:
-        raise ValuationValidationError(f"unknown model type {kind!r}")
-    if set(model) != _MODEL_KEYS[kind]:
-        raise ValuationValidationError(f"{kind} model has unknown or missing fields")
-    if kind == "pe_multiple":
-        return {
-            "type": kind,
-            "eps": _positive(model["eps"], "model.eps"),
-            "target_pe": _positive(model["target_pe"], "model.target_pe"),
+def _validate_scenarios(scenarios: Any) -> dict[str, Any]:
+    """Bear/Base/Bull are all required: one point estimate hides the range."""
+    if not isinstance(scenarios, Mapping):
+        raise ValuationValidationError("scenarios must be an object")
+    if set(scenarios) != set(SCENARIOS):
+        raise ValuationValidationError("scenarios must contain exactly bear, base and bull")
+    out: dict[str, Any] = {}
+    for name in SCENARIOS:
+        entry = scenarios[name]
+        if not isinstance(entry, Mapping) or set(entry) != _SCENARIO_KEYS:
+            raise ValuationValidationError(f"scenarios.{name} must contain exactly eps and pe")
+        out[name] = {
+            "eps": _positive(entry["eps"], f"scenarios.{name}.eps"),
+            "pe": _positive(entry["pe"], f"scenarios.{name}.pe"),
         }
-    if kind == "dividend_discount_simple":
-        dps = _positive(model["dps"], "model.dps")
-        growth = _number(model["growth_rate"], "model.growth_rate")
-        discount = _positive(model["discount_rate"], "model.discount_rate")
-        if growth <= -1:
-            raise ValuationValidationError("model.growth_rate must be greater than -1")
-        if discount <= growth:
-            raise ValuationValidationError("model.discount_rate must be greater than model.growth_rate")
-        return {"type": kind, "dps": dps, "growth_rate": growth, "discount_rate": discount}
-    eps = _positive(model["eps"], "model.eps")
-    growth_pct = _number(model["growth_pct"], "model.growth_pct")
-    peg = _number(model["peg"], "model.peg")
-    if growth_pct * peg <= 0:
-        raise ValuationValidationError("model.growth_pct x model.peg must be positive")
-    return {"type": kind, "eps": eps, "growth_pct": growth_pct, "peg": peg}
+    return out
+
+
+def _validate_buy_zone_ratios(ratios: Any) -> dict[str, float]:
+    if ratios is None:
+        return dict(DEFAULT_BUY_ZONE_RATIOS)
+    if not isinstance(ratios, Mapping) or set(ratios) != set(BUY_ZONE_KEYS):
+        raise ValuationValidationError("buy_zone_ratios must contain exactly " + ", ".join(BUY_ZONE_KEYS))
+    out: dict[str, float] = {}
+    for key in BUY_ZONE_KEYS:
+        value = _number(ratios[key], f"buy_zone_ratios.{key}")
+        if not 0 < value <= 1:
+            raise ValuationValidationError(f"buy_zone_ratios.{key} must be in (0, 1]")
+        out[key] = value
+    ordered = [out[key] for key in BUY_ZONE_KEYS]
+    if ordered != sorted(ordered, reverse=True):
+        raise ValuationValidationError("buy_zone_ratios must decrease from watch to extreme")
+    return out
+
+
+def _validate_basis(basis: Any) -> dict[str, Any]:
+    """Every valuation records what it was based on, so a price move can never
+    silently become the reason a fair value changed."""
+    if not isinstance(basis, Mapping) or set(basis) != _BASIS_KEYS:
+        raise ValuationValidationError("basis must contain exactly " + ", ".join(sorted(_BASIS_KEYS)))
+    eps_kind = basis["eps_kind"]
+    if eps_kind not in EPS_KINDS:
+        raise ValuationValidationError("basis.eps_kind must be actual or estimate")
+    out: dict[str, Any] = {"eps_kind": eps_kind}
+    for field in ("eps_period", "pe_rationale", "financial_data_date", "valuation_date", "change_reason"):
+        value = basis[field]
+        if not isinstance(value, str) or len(value) > 200:
+            raise ValuationValidationError(f"basis.{field} must be a string of at most 200 chars")
+        out[field] = value.strip()
+    if not out["eps_period"]:
+        raise ValuationValidationError("basis.eps_period is required")
+    if not out["valuation_date"]:
+        raise ValuationValidationError("basis.valuation_date is required")
+    return out
 
 
 def validate_worksheet(definition: Any, admitted_security_ids: Iterable[str]) -> dict[str, Any]:
-    """Fail-closed validation of one tqe-fair-value-worksheet/v1 definition."""
+    """Fail-closed validation of one tqr-scenario-valuation-worksheet/v1 definition."""
     if not isinstance(definition, Mapping):
         raise ValuationValidationError("worksheet must be an object")
     unknown = set(definition) - _WORKSHEET_KEYS
     if unknown:
         raise ValuationValidationError(f"worksheet has unknown fields: {sorted(unknown)}")
     if definition.get("schema") != WORKSHEET_SCHEMA:
-        raise ValuationValidationError("worksheet schema must be tqe-fair-value-worksheet/v1")
+        raise ValuationValidationError(f"worksheet schema must be {WORKSHEET_SCHEMA}")
     worksheet_id = definition.get("worksheet_id")
     if not isinstance(worksheet_id, str) or not worksheet_id or len(worksheet_id) > 64 or not _WORKSHEET_ID_PATTERN.match(worksheet_id):
         raise ValuationValidationError("worksheet_id must be 1-64 chars of [A-Za-z0-9:_.-]")
     label = definition.get("label")
     if not isinstance(label, str) or not label.strip() or len(label) > 120:
         raise ValuationValidationError("label must be a non-empty string of at most 120 chars")
-    safety_margin = _number(definition.get("safety_margin"), "safety_margin")
-    if safety_margin < 0 or safety_margin >= 1:
-        raise ValuationValidationError("safety_margin must be a fraction in [0, 1)")
-    notes = definition.get("assumption_notes")
-    if not isinstance(notes, str) or len(notes) > 500:
-        raise ValuationValidationError("assumption_notes must be a string of at most 500 chars")
     created_at = _timestamp(definition.get("created_at"), "created_at")
     return {
         "schema": WORKSHEET_SCHEMA,
         "worksheet_id": worksheet_id,
         "label": label.strip(),
         "target": _validate_target(definition.get("target"), admitted_security_ids),
-        "model": _validate_model(definition.get("model")),
-        "safety_margin": safety_margin,
-        "assumption_notes": notes,
+        "scenarios": _validate_scenarios(definition.get("scenarios")),
+        "buy_zone_ratios": _validate_buy_zone_ratios(definition.get("buy_zone_ratios")),
+        "basis": _validate_basis(definition.get("basis")),
         "created_at": _isoformat(created_at),
     }
 
@@ -184,25 +206,37 @@ def parse_worksheet_store(payload: Any, admitted_security_ids: Iterable[str]) ->
     return worksheets
 
 
-def compute_fair_value(model: Mapping[str, Any]) -> float:
-    """Exact fair value per model (formula version tqe-fair-value/v1)."""
-    kind = model["type"]
-    if kind == "pe_multiple":
-        return model["eps"] * model["target_pe"]
-    if kind == "dividend_discount_simple":
-        return model["dps"] * (1 + model["growth_rate"]) / (model["discount_rate"] - model["growth_rate"])
-    if kind == "growth_adjusted_pe":
-        return model["eps"] * (model["growth_pct"] * model["peg"])
-    raise ValuationValidationError(f"unknown model type {kind!r}")
+def compute_scenario_values(scenarios: Mapping[str, Any]) -> dict[str, float]:
+    """Fair value per scenario = EPS x PE. No other model is offered."""
+    return {name: scenarios[name]["eps"] * scenarios[name]["pe"] for name in SCENARIOS}
 
 
-def _comparison(current_price: float, fair_value: float, buy_zone_ceiling: float) -> dict[str, Any]:
-    vs_fair = "above" if current_price > fair_value else "below" if current_price < fair_value else "at"
+def compute_buy_zone(base_value: float, ratios: Mapping[str, float]) -> dict[str, float]:
+    """Buy ladder is always a ratio of the Base fair value, never of a price."""
+    return {key: base_value * ratios[key] for key in BUY_ZONE_KEYS}
+
+
+def stage_for_price(price: float, base_value: float, ratios: Mapping[str, float]) -> str:
+    zone = compute_buy_zone(base_value, ratios)
+    if price <= zone["extreme"]:
+        return "extreme"
+    if price <= zone["sweet"]:
+        return "sweet"
+    if price <= zone["second"]:
+        return "second"
+    if price <= zone["first"]:
+        return "first"
+    if price <= zone["watch"]:
+        return "near"
+    return "watch"
+
+
+def _comparison(current_price: float, base_value: float, zone: Mapping[str, float]) -> dict[str, Any]:
     return {
-        "vs_fair_value": vs_fair,
-        "vs_buy_zone_ceiling": "below" if current_price < buy_zone_ceiling else "above_or_at",
-        "gap_to_fair_value_pct": (current_price - fair_value) / fair_value,
-        "gap_to_buy_zone_ceiling_pct": (current_price - buy_zone_ceiling) / buy_zone_ceiling,
+        "vs_base_value": "above" if current_price > base_value else "below" if current_price < base_value else "at",
+        "discount_pct": (current_price - base_value) / base_value,
+        "gap_to_first_pct": (current_price - zone["first"]) / zone["first"],
+        "gap_to_sweet_pct": (current_price - zone["sweet"]) / zone["sweet"],
         "research_comparison_only": True,
     }
 
@@ -210,20 +244,24 @@ def _comparison(current_price: float, fair_value: float, buy_zone_ceiling: float
 def evaluate_worksheet(worksheet: Mapping[str, Any], bars: Sequence[Mapping[str, Any]] | None) -> dict[str, Any]:
     """Deterministic derived outputs for one validated worksheet.
 
-    ``bars`` is the admitted EOD series (raw close basis). Missing or empty
-    data fails closed to an insufficient_data state; nothing is fetched or
+    ``bars`` is the admitted EOD series (raw close basis). Missing or empty data
+    fails closed to an insufficient_data state; nothing is fetched or
     extrapolated. The comparison is a research note, never a recommendation.
     """
-    fair_value = compute_fair_value(worksheet["model"])
-    buy_zone_ceiling = fair_value * (1 - worksheet["safety_margin"])
+    values = compute_scenario_values(worksheet["scenarios"])
+    base_value = values["base"]
+    ratios = worksheet["buy_zone_ratios"]
+    zone = compute_buy_zone(base_value, ratios)
     base = {
         "worksheet_id": worksheet["worksheet_id"],
         "label": worksheet["label"],
         "security_id": worksheet["target"]["security_id"],
-        "fair_value": fair_value,
-        "buy_zone_ceiling": buy_zone_ceiling,
-        "model": copy.deepcopy(dict(worksheet["model"])),
-        "safety_margin": worksheet["safety_margin"],
+        "scenario_values": values,
+        "base_value": base_value,
+        "buy_zone": zone,
+        "buy_zone_ratios": dict(ratios),
+        "scenarios": copy.deepcopy(dict(worksheet["scenarios"])),
+        "basis": copy.deepcopy(dict(worksheet["basis"])),
         "formula_version": FORMULA_VERSION,
         "assumption_source": ASSUMPTION_SOURCE,
         "data_status": DATA_STATUS,
@@ -231,7 +269,7 @@ def evaluate_worksheet(worksheet: Mapping[str, Any], bars: Sequence[Mapping[str,
     }
     admitted = [bar for bar in (bars or []) if isinstance(bar, Mapping) and isinstance(bar.get("close"), (int, float)) and not isinstance(bar.get("close"), bool)]
     if not admitted:
-        base.update({"status": "insufficient_data", "current_price": None, "price_as_of": None, "comparison": None})
+        base.update({"status": "insufficient_data", "current_price": None, "price_as_of": None, "stage": None, "comparison": None})
         return base
     latest = admitted[-1]
     current_price = float(latest["close"])
@@ -241,7 +279,8 @@ def evaluate_worksheet(worksheet: Mapping[str, Any], bars: Sequence[Mapping[str,
             "current_price": current_price,
             "price_as_of": latest.get("trading_date"),
             "price_basis": PRICE_BASIS,
-            "comparison": _comparison(current_price, fair_value, buy_zone_ceiling),
+            "stage": stage_for_price(current_price, base_value, ratios),
+            "comparison": _comparison(current_price, base_value, zone),
         }
     )
     return base
@@ -348,7 +387,9 @@ __all__ = [
     "INDICATOR_TYPES",
     "MAX_INDICATOR_PERIOD",
     "MAX_WORKSHEETS",
-    "MODEL_TYPES",
+    "SCENARIOS",
+    "BUY_ZONE_KEYS",
+    "DEFAULT_BUY_ZONE_RATIOS",
     "PRICE_BASIS",
     "STD_CONVENTION",
     "WORKSHEET_SCHEMA",
@@ -356,7 +397,9 @@ __all__ = [
     "WORKSHEET_STORE_VERSION",
     "ValuationValidationError",
     "closes_from_bars",
-    "compute_fair_value",
+    "compute_scenario_values",
+    "compute_buy_zone",
+    "stage_for_price",
     "compute_indicator",
     "evaluate_worksheet",
     "evaluate_worksheets",
