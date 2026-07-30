@@ -11,11 +11,11 @@ const PREVIEW_DIR = path.join(ROOT, "outputs", "dashboard-preview");
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
   home: "ab3546148471254d72516ff191215be9c87ecd786bb6484160e767e7cccda10c",
-  company: "c970d0d4b6fccc00e0972e5ab58eaf8cf992716facf5e31331ca4c8195edf0ff",
+  company: "401b3866d3aded7039877edaa401c34bdda76e15fac60a748a3569ce05d5acf1",
   watchlist: "b74507e759fdc49f1266135af344f126f98edf373ea053094df4791b54e5e002",
   buyplan: "238a83ecdc5329f75de4e4ad140cb3c6721584aea051dfabaeeb61129f70bf80",
-  review: "7fae6ea60bb29e2a66a2dc7350bce950ac75494a9d28f9953d9409d6974afa17",
-  valuation: "0963077ae7ed5b25ef0f8091c2f9871f8113cca4d79477193864d890bc826559",
+  review: "76df1ada2b07f10a73a031571a902f0d220f2f0f5a386f1de6b26f1f097dcae7",
+  valuation: "5db657d0268482f36008bd878f467dc3e2551e2e3ec73232b35fac3964eb6a95",
 };
 
 function freePort() {
@@ -158,6 +158,9 @@ async function main() {
     args: ["--no-sandbox"],
   });
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+  // Valuation date and thesis last-checked default to today, so an unpinned
+  // clock would drift the pixel baselines every calendar day.
+  await page.clock.setFixedTime(new Date("2026-07-22T04:00:00Z"));
   page.on("pageerror", (error) => browserErrors.push(`pageerror: ${error.message}`));
   page.on("console", (message) => {
     if (message.type() === "error") browserErrors.push(`console: ${message.text()}`);
