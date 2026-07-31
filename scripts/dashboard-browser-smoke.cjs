@@ -12,11 +12,11 @@ const PREVIEW_DIR = path.join(ROOT, "outputs", "dashboard-preview");
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
   home: "07c16dbb6b1411fd529f410541c83b4d1069476262758722125f79eae4edcbbb",
-  company: "2b168952ee9387f72b3e2576b6bf7b88fbee7ff2d90e125ef5a5e18380b0d612",
-  watchlist: "e1bda5142f0983e5f40d161cdf14fe33aaf6269b00fe8b3a6f775c785f053e65",
+  company: "5802050e62c15d11a4bd82e674897997adef79eb335fa23d3021e687707a8291",
+  watchlist: "09d0c02d6f94a1cf45c49a8da468b93ec8cea67fe1c1ace9fb7957a6839f1804",
   buyplan: "5efc6f4a62054c4f3bdf933a31541cf070f7d624687639f3755300e569141a54",
   review: "cdc1dfeb3b714540946638615b2b0c48703439fcdd4d74f02b63d5a2e26461e8",
-  valuation: "bc01ab9e860c2a95ca7e937d34f4d40dc9403d1e1b6aa3ecf6f3543d0ec3982d",
+  valuation: "77005bb848f3da2559480e1508b1a3cab5d0405af2fc3f6829cbda7e8ed70439",
 };
 
 function freePort() {
@@ -258,6 +258,10 @@ async function main() {
     // reach Watchlist columns, Watchlist filters, and the Home counters —
     // rendering them is not enough, they have to be writable and to propagate.
     await page.locator('[data-testid="company-status"]').waitFor();
+    // Not tracked yet: the page must say the judgement will not surface anywhere,
+    // instead of silently recording into a view the human never sees.
+    assert.equal(await page.locator('[data-testid="company-tracking-missing"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="company-track-add"]').count(), 1);
     await page.locator('[data-testid="company-industry"]').selectOption("Memory");
     await page.locator('[data-testid="company-fundamental-state"]').selectOption("轉弱");
     await page.locator('[data-testid="company-thesis-state"]').selectOption("待確認");
@@ -293,7 +297,7 @@ async function main() {
     assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 1);
     assert.deepEqual(
       await page.locator('[data-testid="watchlist-table"] thead th').allInnerTexts(),
-      ["代號", "公司／產業", "現價", "合理價值", "折價", "第一買進價", "甜蜜價", "基本面", "投資假設", "下一事件", "買進階段", ""],
+      ["代號", "公司／產業", "現價", "合理價值", "折／溢價", "第一買進價", "甜蜜價", "基本面", "投資假設", "下一事件", "買進階段", ""],
     );
     assert.equal(await page.locator('[data-testid="watchlist-filters"]').count(), 1);
     assert.equal(await page.locator('[data-testid="watchlist-sort"]').inputValue(), "discount");
@@ -380,6 +384,9 @@ async function main() {
     assert.equal(await page.locator('[data-testid="valuation-zone-first"]').first().innerText(), "680");
     assert.equal(await page.locator('[data-testid="valuation-zone-sweet"]').first().innerText(), "600");
     assert.equal(await page.locator('[data-testid="valuation-stage"]').first().innerText(), "觀察");
+    // 2,440 against a base of 800 is a premium, on this page too.
+    const valGap = await page.locator('[data-testid="valuation-discount"]').first().innerText();
+    assert.match(valGap, /^溢價 /, `valuation premium rendered as: ${valGap}`);
     await settle(page);
     screenshots.valuation = screenshotHash(await page.screenshot({
       path: path.join(SCREENSHOT_DIR, "valuation.png"),
@@ -392,12 +399,16 @@ async function main() {
     await page.locator('[data-action="section"][data-section="watchlist"]').first().click();
     await page.locator('[data-testid="watchlist-table"]').waitFor();
     assert.equal(await page.locator('[data-testid="watchlist-base-value"]').first().innerText(), "800");
-    assert.notEqual(await page.locator('[data-testid="watchlist-discount"]').first().innerText(), "—");
     assert.equal(await page.locator('[data-testid="watchlist-stage"]').first().innerText(), "觀察");
+    // 2,440 against a base of 800 is a premium. It must never read as a discount.
+    const wlGap = await page.locator('[data-testid="watchlist-discount"]').first().innerText();
+    assert.match(wlGap, /^溢價 /, `premium rendered as: ${wlGap}`);
+    assert.doesNotMatch(wlGap, /折價/);
 
     await page.locator('[data-action="section"][data-section="home"]').first().click();
     await page.locator('[data-testid="opportunity-list"]').waitFor();
     assert.equal(await page.locator('[data-testid="opportunity-row"]').count(), 1);
+    assert.match(await page.locator('[data-testid="opportunity-discount"]').first().innerText(), /^溢價 /);
     assert.equal(await page.locator('[data-testid="buyplan-status"] li').count(), 1);
 
     // Buy Plan and Review are declared but not yet built; they must say so
