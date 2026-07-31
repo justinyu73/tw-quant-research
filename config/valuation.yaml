@@ -1,8 +1,22 @@
-schema: tw-quant-engine-valuation/v1
+schema: tqr-scenario-valuation/v1
 fair_value:
-  formula: "forward_eps * fair_pe"
-  conservative_formula: "forward_eps * conservative_pe"
-  margin_of_safety_formula: "fair_value * 0.85"
+  formula: "scenario_eps * scenario_pe"
+  scenarios: [bear, base, bull]
+  base_is_authoritative: true
+buy_zone_ratios:
+  watch: 0.90
+  first: 0.85
+  second: 0.80
+  sweet: 0.75
+  extreme: 0.65
+buy_zone_note: "ratios are relative to the base fair value and are user-editable per company"
+required_basis_fields:
+  - eps_period
+  - eps_kind
+  - pe_rationale
+  - financial_data_date
+  - valuation_date
+  - change_reason
 required_data_controls:
   - split_adjustment
   - dividend_adjustment

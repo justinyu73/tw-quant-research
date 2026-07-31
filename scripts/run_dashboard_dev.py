@@ -150,13 +150,12 @@ def collect_report(*, serve_loopback: bool = True) -> dict[str, object]:
             "schema": summary["schema"] == "tw-quant-engine-read-only-product-view/v1",
             "read_only": summary["read_only"] is True and view["read_only"] is True,
             "product_rows": summary["product_count"] == len(view["products"]) == 3,
-            "feature_rows": summary["feature_count"] == len(view["features"]) == 1,
             "digest_present": isinstance(summary["view_digest"], str) and summary["view_digest"].startswith("sha256:"),
         }
         route_checks = {}
         from tw_quant_engine.product_view import read_only_request
 
-        for route in ("/", "/health", "/products", "/features", "/backtest", "/evidence"):
+        for route in ("/", "/health", "/products", "/evidence"):
             route_checks[route] = read_only_request(view, "GET", route)["status"] == 200
         route_checks["reject_write"] = read_only_request(view, "POST", "/products")["status"] == 405
         route_checks["reject_unknown"] = read_only_request(view, "GET", "/unknown")["status"] == 404

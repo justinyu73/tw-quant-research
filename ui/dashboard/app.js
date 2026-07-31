@@ -18,9 +18,7 @@
   var NOTES_LOCAL_STORAGE_KEY = "tw-quant-engine-research-notes.v1";
   var ALERTS_LOCAL_STORAGE_KEY = "tqe-in-app-alerts.v1";
   var ALERTS_SESSION_STORAGE_KEY = "tqe-in-app-alerts.session";
-  var VALUATION_LOCAL_STORAGE_KEY = "tqe-fair-value-worksheets.v1";
-  var FINANCIAL_REVIEW_LOCAL_STORAGE_KEY = "tw-quant-engine-financial-review.prototype-v1";
-  var BACKTEST_SETTINGS_LOCAL_STORAGE_KEY = "tw-quant-engine-backtest-settings.prototype-v1";
+  var VALUATION_LOCAL_STORAGE_KEY = "tqr-scenario-valuation-worksheets.v1";
   var watchlistModelRequests = {};
   var klineInstrumentsAttempts = 0;
   var KLINE_INSTRUMENTS_MAX_ATTEMPTS = 40;
@@ -37,12 +35,6 @@
   var chartDrawings = [];
   var chartDrawingModelKey = null;
   var chartTemplateName = "default";
-  var screenConditions = [];
-  var formulaRows = [defaultFormulaRow("rule-1")];
-  var financialReviewDraft = defaultFinancialReviewDraft();
-  var financialReviewSaved = false;
-  var backtestSettingsDraft = defaultBacktestSettingsDraft();
-  var backtestSettingsSaved = false;
   var dataUpdateInFlight = false;
   var alertsLoadStarted = false;
   var alertsPersistenceAvailable = null;
@@ -124,21 +116,132 @@
   var valuationLoadStarted = false;
   var valuationEvaluateInFlight = false;
   var valuationDraft = defaultValuationDraft();
+  var BUY_PLAN_LOCAL_STORAGE_KEY = "tqr-buy-plans.v1";
+  var buyPlanDraft = defaultBuyPlanDraft();
+  var buyPlansLoaded = false;
+  var fundamentalsCache = {};
+  var fundamentalsRequests = {};
+  var COMPANY_RESEARCH_LOCAL_STORAGE_KEY = "tqr-company-research.v1";
+  var THESIS_LOCAL_STORAGE_KEY = "tqr-theses.v1";
+  var REVIEW_LOCAL_STORAGE_KEY = "tqr-reviews.v1";
+  var researchStoresLoaded = false;
+  var reviewDraft = defaultReviewDraft();
+
+  function defaultReviewDraft() {
+    return { revenue: "", eps: "", margin: "", outlook: "", thesis: "", outcome: "", review_date: todayIso(), note: "" };
+  }
+
+  function persistCompanyResearch() {
+    try {
+      window.localStorage.setItem(COMPANY_RESEARCH_LOCAL_STORAGE_KEY, JSON.stringify(core.companyResearchPayload(state)));
+    } catch (error) {
+      // Browser preview without storage keeps the in-memory record.
+    }
+  }
+
+  function loadResearchStores() {
+    if (researchStoresLoaded) return;
+    researchStoresLoaded = true;
+    try {
+      var companyRecords = window.localStorage.getItem(COMPANY_RESEARCH_LOCAL_STORAGE_KEY);
+      if (companyRecords) state = core.reduce(state, { type: "LOAD_COMPANY_RESEARCH", payload: JSON.parse(companyRecords) });
+      var theses = window.localStorage.getItem(THESIS_LOCAL_STORAGE_KEY);
+      if (theses) state = core.reduce(state, { type: "LOAD_THESES", payload: JSON.parse(theses) });
+      var reviews = window.localStorage.getItem(REVIEW_LOCAL_STORAGE_KEY);
+      if (reviews) state = core.reduce(state, { type: "LOAD_REVIEWS", payload: JSON.parse(reviews) });
+    } catch (error) {
+      // Corrupt stores leave thesis/review empty rather than inventing content.
+    }
+  }
+
+  function persistResearchStores() {
+    try {
+      window.localStorage.setItem(THESIS_LOCAL_STORAGE_KEY, JSON.stringify(core.thesisStorePayload(state)));
+      window.localStorage.setItem(REVIEW_LOCAL_STORAGE_KEY, JSON.stringify(core.reviewStorePayload(state)));
+    } catch (error) {
+      // Browser preview without storage keeps the in-memory records.
+    }
+  }
+
+  function saveReviewFromDraft() {
+    var instrumentId = state.selectedKlineInstrumentId;
+    if (!instrumentId || core.reviewFormIssues(reviewDraft).length) return;
+    state = core.reduce(state, { type: "ADD_REVIEW", instrumentId: instrumentId, review: Object.assign({}, reviewDraft) });
+    reviewDraft = defaultReviewDraft();
+    persistResearchStores();
+    render();
+  }
+
+  function defaultBuyPlanDraft() {
+    return { totalBudget: "", allocFirst: "20", allocSecond: "25", allocSweet: "30", allocReserve: "25", maxPositionPct: "" };
+  }
+
+  function buyPlanDraftFrom(plan) {
+    return {
+      totalBudget: plan.total_budget ? String(plan.total_budget) : "",
+      allocFirst: String(plan.allocations.first),
+      allocSecond: String(plan.allocations.second),
+      allocSweet: String(plan.allocations.sweet),
+      allocReserve: String(plan.allocations.reserve),
+      maxPositionPct: plan.max_position_pct ? String(plan.max_position_pct) : ""
+    };
+  }
+
+  function loadBuyPlans() {
+    if (buyPlansLoaded) return;
+    buyPlansLoaded = true;
+    try {
+      var raw = window.localStorage.getItem(BUY_PLAN_LOCAL_STORAGE_KEY);
+      if (raw) state = core.reduce(state, { type: "LOAD_BUY_PLANS", payload: JSON.parse(raw) });
+    } catch (error) {
+      // A corrupt or unavailable store leaves the plans empty rather than
+      // guessing values the human never entered.
+    }
+  }
+
+  function persistBuyPlans() {
+    try {
+      window.localStorage.setItem(BUY_PLAN_LOCAL_STORAGE_KEY, JSON.stringify(core.buyPlanStorePayload(state)));
+    } catch (error) {
+      // Browser preview without storage still keeps the in-memory plan.
+    }
+  }
+
+  function saveBuyPlanFromDraft() {
+    var instrumentId = state.selectedKlineInstrumentId;
+    if (!instrumentId || core.buyPlanFormIssues(buyPlanDraft).length) return;
+    state = core.reduce(state, {
+      type: "SET_BUY_PLAN",
+      instrumentId: instrumentId,
+      plan: {
+        total_budget: Number(buyPlanDraft.totalBudget),
+        allocations: {
+          first: Number(buyPlanDraft.allocFirst),
+          second: Number(buyPlanDraft.allocSecond),
+          sweet: Number(buyPlanDraft.allocSweet),
+          reserve: Number(buyPlanDraft.allocReserve)
+        },
+        max_position_pct: buyPlanDraft.maxPositionPct === "" ? 0 : Number(buyPlanDraft.maxPositionPct)
+      }
+    });
+    persistBuyPlans();
+    render();
+  }
 
   function defaultValuationDraft() {
     return {
       label: "",
-      model: "pe_multiple",
-      eps: "",
-      targetPe: "",
-      dps: "",
-      growthRate: "",
-      discountRate: "",
-      growthPct: "",
-      peg: "",
-      safetyMargin: "15",
-      notes: ""
+      bearEps: "", bearPe: "",
+      baseEps: "", basePe: "",
+      bullEps: "", bullPe: "",
+      ratioWatch: "90", ratioFirst: "85", ratioSecond: "80", ratioSweet: "75", ratioExtreme: "65",
+      epsPeriod: "", epsKind: "estimate", peRationale: "",
+      financialDataDate: "", valuationDate: todayIso(), changeReason: ""
     };
+  }
+
+  function todayIso() {
+    return new Date().toISOString().slice(0, 10);
   }
 
   function defaultAlertDraft() {
@@ -239,37 +342,8 @@
     nodes.forEach(function (node) { node.outerHTML = markup; });
   }
 
-  function defaultFormulaRow(id) {
-    return {
-      id: id,
-      enabled: true,
-      category: "基本面",
-      field: "毛利率 QoQ",
-      operator: ">=",
-      value_type: "固定數值",
-      value: "0%",
-      period: "最近一季"
-    };
-  }
 
-  function defaultFinancialReviewDraft() {
-    return {
-      industry: "Other",
-      watch_status: "基本面待確認",
-      score: "",
-      note: ""
-    };
-  }
 
-  function defaultBacktestSettingsDraft() {
-    return {
-      universe: "目前自選",
-      signal_time: "收盤後",
-      fill_time: "次日開盤",
-      rebalance: "每月",
-      max_positions: "10"
-    };
-  }
 
   function loadPrototypeDraft(key, defaults) {
     try {
@@ -297,20 +371,12 @@
   }
 
   function loadPrototypeDrafts() {
-    financialReviewDraft = loadPrototypeDraft(FINANCIAL_REVIEW_LOCAL_STORAGE_KEY, defaultFinancialReviewDraft());
-    backtestSettingsDraft = loadPrototypeDraft(BACKTEST_SETTINGS_LOCAL_STORAGE_KEY, defaultBacktestSettingsDraft());
   }
 
   function navMarkup() {
-    var groups = [
-      { label: "行情", ids: ["overview", "market", "products", "features"] },
-      { label: "研究計畫", ids: ["research", "fundamentals", "backtest"] },
-      { label: "記錄", ids: ["stories", "evidence"] },
-      { label: "系統", ids: ["settings"] }
-    ];
-    var symbols = { overview: "⌂", market: "⌁", products: "▦", features: "▤", research: "◈", fundamentals: "▥", backtest: "↗", stories: "✦", evidence: "≡", settings: "⚙" };
-    return groups.map(function (group) {
-      return '<div class="nav-section"><div class="nav-label">' + text(group.label) + '</div><div class="nav-group">' + group.ids.map(function (id) {
+    var symbols = { home: "\u2302", watchlist: "\u25a6", company: "\u25a5", valuation: "\u25c8", buyplan: "\u2317", review: "\u2713" };
+    return '<div class="nav-section"><div class="nav-label">\u50f9\u503c\u7814\u7a76</div><div class="nav-group">' +
+      core.PRIMARY_SECTION_IDS.map(function (id) {
         var item = core.SECTIONS.find(function (section) { return section.id === id; });
         var active = item && item.id === state.activeSection;
         return '<button class="nav-link' + (active ? " active" : "") +
@@ -321,7 +387,6 @@
           (active ? '<span class="nav-active-mark" aria-hidden="true"></span>' : "") +
           "</button>";
       }).join("") + '</div></div>';
-    }).join("");
   }
 
   function pageHeader(title, pretitle) {
@@ -389,45 +454,40 @@
     ];
     return card("故事追蹤", "XQ 式研究欄位與人工筆記", '<div class="story-list" data-testid="story-tracker">' + stories.map(function (item) {
       return '<article class="story-item"><span class="story-kind">' + text(item[0]) + '</span><div><strong>' + text(item[1]) + '</strong><small>' + text(item[2]) + '</small></div>' + statusBadge(item[3]) + '</article>';
-    }).join("") + '</div><div class="story-footer"><span>' + links.length + ' 個可追溯證據連結</span><button class="btn btn-outline btn-sm" type="button" data-action="section" data-section="stories">開啟追蹤</button></div>', "");
+    }).join("") + '</div><div class="story-footer"><span>' + links.length + ' 個可追溯證據連結</span><button class="btn btn-outline btn-sm" type="button" data-action="section" data-section="company">開啟追蹤</button></div>', "");
   }
 
-  function researchModulesMarkup() {
-    return '<div class="research-module-grid"><button class="research-module" type="button" data-action="section" data-section="market"><span class="module-icon module-chart">⌁</span><span><strong>技術面</strong><small>K 線、成交量、指標、標記</small></span><span class="module-arrow">→</span></button>' +
-      '<button class="research-module" type="button" data-action="section" data-section="fundamentals"><span class="module-icon module-finance">▤</span><span><strong>財務追蹤</strong><small>統計、人工覆核與資料可用性</small></span><span class="module-arrow">→</span></button>' +
-      '<button class="research-module" type="button" data-action="section" data-section="research"><span class="module-icon module-screen">◈</span><span><strong>因子與公式</strong><small>條件、篩選與人工審查</small></span><span class="module-arrow">→</span></button>' +
-      '<button class="research-module" type="button" data-action="section" data-section="stories"><span class="module-icon module-story">✦</span><span><strong>故事與證據</strong><small>事件、假說、支持與反證</small></span><span class="module-arrow">→</span></button></div>';
+
+
+  function companyStatusMarkup() {
+    var instrumentId = state.selectedKlineInstrumentId;
+    var instrument = selectedKlineInstrument();
+    if (!instrumentId || !instrument) {
+      return '<div class="empty-state" data-testid="company-status-empty"><strong>尚未選擇公司。</strong><span>選定標的後才能記錄研究狀態。</span></div>';
+    }
+    var record = core.companyRecord(state, instrumentId);
+    function select(field, label, options, testid) {
+      return '<label><span>' + text(label) + '</span><select data-action="company-record" data-field="' + field + '" data-testid="' + testid + '">' +
+        options.map(function (option) {
+          return '<option value="' + escapeHtml(option) + '"' + (record[field] === option ? " selected" : "") + '>' + text(option || "未評分") + '</option>';
+        }).join("") + '</select></label>';
+    }
+    return '<section class="company-status" data-testid="company-status">' +
+      '<div class="company-status-grid">' +
+      select("industry", "產業分類", core.INDUSTRY_OPTIONS, "company-industry") +
+      select("fundamental_state", "基本面狀態", core.FUNDAMENTAL_STATES, "company-fundamental-state") +
+      select("thesis_state", "投資假設", core.THESIS_STATES, "company-thesis-state") +
+      select("position_state", "投資狀態", core.POSITION_STATES, "company-position-state") +
+      select("score", "人工基本面評分", ["", "1", "2", "3", "4", "5"], "company-score") +
+      '<label><span>下一個事件</span><input type="text" maxlength="120" placeholder="例如 8 月營收公布" value="' + escapeHtml(record.next_event) + '" data-action="company-record" data-field="next_event" data-testid="company-next-event"></label>' +
+      '<label class="company-status-held"><span>是否已持有</span><select data-action="company-record" data-field="held" data-testid="company-held">' +
+      '<option value="false"' + (record.held ? "" : " selected") + '>未持有</option>' +
+      '<option value="true"' + (record.held ? " selected" : "") + '>已持有</option></select></label>' +
+      '<label class="company-status-note"><span>人工備註</span><textarea rows="3" maxlength="500" placeholder="支持、反證、一次性收益與下次財報檢查點" data-action="company-record" data-field="note" data-testid="company-note">' + escapeHtml(record.note) + '</textarea></label>' +
+      '</div>' +
+      '<p class="valuation-note" data-testid="company-status-updated">這些是你自己的判斷，直接寫入本機研究記錄並驅動 Watchlist 欄位、篩選器與 Home 統計；不會改寫官方資料。最後更新：' + text(record.updated_at || "尚未更新") + '</p></section>';
   }
 
-  function cockpitMarkup() {
-    var summary = core.summary(view);
-    return pageHeader("市場首頁", "我的自選 · 個股行情 · 研究工具") +
-      '<section class="system-command-bar" data-testid="system-command-bar"><div><span class="eyebrow">TQR MARKET SYSTEM</span><strong>我的市場</strong><span>本機 EOD · 截止 ' + text(view.as_of || "—") + '</span></div><div class="system-command-actions"><button class="btn btn-primary" type="button" data-action="section" data-section="market">開啟行情</button><button class="btn btn-outline" type="button" data-action="section" data-section="research">設定研究規則</button><button class="btn btn-outline" type="button" data-action="section" data-section="stories">新增筆記</button></div></section>' +
-      '<div class="system-metric-strip" data-testid="cockpit-stats"><article><span>自選</span><strong>' + text((state.watchlist && state.watchlist.items || []).length) + '</strong><small>我的行情</small></article><article><span>可用資料</span><strong>' + text(summary.admitted) + '</strong><small>已納入資料列</small></article><article><span>筆記</span><strong>' + text((state.notes || []).length) + '</strong><small>本機保存</small></article><article><span>資料狀態</span><strong>唯讀</strong><small>' + text((view.as_of || "—").slice(0, 10)) + '</small></article></div>' +
-      dataUpdateMarkup() + '<div class="terminal-home-grid"><section class="terminal-home-main">' + card("我的行情", "XQ 式自選報價與快速切換", watchlistMarkup(), "") + card("研究工具列", "TradingView 圖表 · XQ 選股 · FinLab 報告 · MultiCharts 指標", researchModulesMarkup(), "") + '</section><aside class="terminal-home-side">' + card("目前標的", "價格、K 線與自選連動", stockQuoteMarkup(), "") + card("研究捷徑", "從一個標的開始", '<div class="analysis-check-list"><button type="button" class="analysis-check" data-action="section" data-section="market"><span>01</span><strong>看 K 線與技術線</strong><small>價格、成交量、指標</small></button><button type="button" class="analysis-check" data-action="section" data-section="stories"><span>02</span><strong>記錄研究筆記</strong><small>支持、反證、待確認</small></button><button type="button" class="analysis-check" data-action="section" data-section="fundamentals"><span>03</span><strong>核對財報</strong><small>期間、來源、可用性</small></button></div>', "") + '</aside></div>';
-  }
-
-  function financialTrackerMarkup() {
-    var quote = selectedQuoteSnapshot();
-    var instrument = quote.instrument || {};
-    var instrumentLabel = (instrument.symbol || state.selectedKlineInstrumentId || "尚未選取") + " " + (instrument.display_name || "");
-    var reviewStatus = financialReviewSaved ? "已儲存至本機 prototype 草稿" : "尚未儲存；不會寫入官方資料";
-    return '<section class="financial-tracker" data-testid="financial-tracker"><header class="financial-tracker-header"><div><span class="eyebrow">PERSONAL FUNDAMENTAL TRACKER</span><h2>財務追蹤統計表</h2><p>目前標的：' + text(instrumentLabel) + '。數值欄位只顯示已接入、可追溯的資料；其餘維持未接入。</p></div><span class="status status-' + (financialReviewSaved ? "saved" : "draft") + '" data-testid="financial-review-status">' + text(reviewStatus) + '</span></header><div class="table-responsive"><table class="table financial-tracker-table"><thead><tr><th>營運成長</th><th>獲利品質</th><th>財務品質</th><th>估值</th><th>資料狀態</th></tr></thead><tbody><tr><td><strong>月營收 YoY</strong><small>未接入</small></td><td><strong>毛利率／ROE</strong><small>未接入</small></td><td><strong>自由現金流／負債比</strong><small>未接入</small></td><td><strong>PIT TTM PE／PB</strong><small>未接入</small></td><td>' + statusBadge("unavailable") + '<small>等待免費官方來源與 PIT 契約</small></td></tr></tbody></table></div><div class="financial-review-form" data-testid="financial-review-form"><label><span>產業主線</span><select data-action="financial-review-input" data-field="industry" data-testid="financial-review-industry">' + selectOptionMarkup(["Power Infrastructure", "Server Interconnect", "Passive Components", "Memory", "Edge AI", "Other"], financialReviewDraft.industry) + '</select></label><label><span>觀察狀態</span><select data-action="financial-review-input" data-field="watch_status" data-testid="financial-review-status-select">' + selectOptionMarkup(["核心持續追蹤", "等待合理估值", "等待止跌", "基本面待確認", "暫停觀察", "排除"], financialReviewDraft.watch_status) + '</select></label><label><span>人工基本面評分</span><select data-action="financial-review-input" data-field="score" data-testid="financial-review-score">' + selectOptionMarkup(["", "1", "2", "3", "4", "5"], financialReviewDraft.score) + '</select></label><label class="financial-review-note"><span>人工備註</span><textarea rows="3" maxlength="500" placeholder="支持、反證、一次性收益與下次財報檢查點" data-action="financial-review-input" data-field="note" data-testid="financial-review-note">' + escapeHtml(financialReviewDraft.note) + '</textarea></label><div class="financial-review-actions"><span>這是本機研究草稿，不會改寫官方資料或觸發計算。</span><button class="btn btn-primary" type="button" data-action="financial-review-save" data-testid="financial-review-save">儲存追蹤草稿</button></div></div></section>';
-  }
-
-  function fundamentalsMarkup() {
-    var rows = Array.isArray(view.products) ? view.products.filter(function (row) { return row && row.record_type === "fundamental_observation"; }) : [];
-    var body = rows.length ? rows.map(function (row) {
-      var metric = row.fundamental || {};
-      return '<tr><td class="cell-strong">' + text((row.instrument || {}).market + ":" + (row.instrument || {}).security_id) + '</td><td>' + text(metric.metric) + '</td><td class="cell-mono">' + core.formatNumber(metric.monthly_revenue) + '</td><td>' + text(metric.unit) + '</td><td>' + statusBadge(core.qualityLabel(row)) + '</td><td class="mono">' + text((row.provenance || {}).source_id) + '</td></tr>';
-    }).join("") : '<tr><td colspan="6">目前沒有已接入的財報觀測資料；不以價格推估。</td></tr>';
-    return pageHeader("財務追蹤", "財報統計 · 人工覆核 · 來源與期間") +
-      '<div class="fundamental-banner"><strong>財報資料只接受有期間、公告時間與來源的觀測。</strong><span>目前月營收案例未通過品質門檻，維持未納入；這是品質訊號，不是可用數值。</span></div>' +
-      '<div class="fundamental-metric-grid"><article class="fundamental-metric"><span>EPS</span><strong>—</strong><small>尚未接入免費官方來源</small></article><article class="fundamental-metric"><span>ROE</span><strong>—</strong><small>等待季報 PIT 資料</small></article><article class="fundamental-metric"><span>營收 YoY</span><strong>—</strong><small>衝突資料不推估</small></article><article class="fundamental-metric"><span>現金流</span><strong>—</strong><small>等待期間化資料</small></article></div>' +
-      card("個股財務追蹤", "統計欄位與人工覆核分開保存", financialTrackerMarkup(), "") +
-      card("基本面觀測表", "每一列都要能回到 source / period / available_at", '<div class="table-responsive"><table class="table fundamental-table"><thead><tr><th>標的</th><th>指標</th><th>數值</th><th>單位</th><th>品質</th><th>來源</th></tr></thead><tbody>' + body + '</tbody></table></div>', "") +
-      card("人工檢查規則", "每次資料更新後由人為覆核", '<div class="review-prompt-grid"><div><strong>支持故事</strong><span>哪些數據支持目前產業假說？</span></div><div><strong>反證與異常</strong><span>一次性收益、財報更正與來源衝突都需列出。</span></div><div><strong>下次檢查</strong><span>記錄下個財報／月營收公告後的覆核時間。</span></div></div>', "");
-  }
 
   function notesMarkup() {
     var notes = Array.isArray(state.notes) ? state.notes : [];
@@ -439,10 +499,6 @@
     return '<section class="note-composer" data-testid="note-composer"><header class="subsection-heading"><div><h2>新增研究筆記</h2><span class="muted">目前標的：' + text(selected.symbol || state.selectedKlineInstrumentId || "未選取") + ' · ' + text(noteStatus()) + '</span></div><span class="status status-saved" data-testid="note-count">已記錄 ' + notes.length + ' 筆 · 可記錄</span></header><form data-note-form="true"><div class="note-form-grid"><label><span>標題</span><input type="text" maxlength="80" placeholder="例如：AI 伺服器需求仍在加速" value="' + escapeHtml(draft.title) + '" data-action="note-input" data-field="title" data-testid="note-title"></label><label><span>標籤</span><input type="text" maxlength="80" placeholder="例如：營收／產業／待確認" value="' + escapeHtml(draft.tags) + '" data-action="note-input" data-field="tags" data-testid="note-tags"></label></div><label class="note-body-field"><span>觀察內容</span><textarea rows="5" maxlength="2000" placeholder="記錄支持、反證、來源與下一個檢查點……" data-action="note-input" data-field="body" data-testid="note-body">' + escapeHtml(draft.body) + '</textarea></label><div class="note-composer-footer"><span>不自動生成結論；只保存你輸入的研究脈絡。</span><button class="btn btn-primary" type="button" data-action="note-submit" data-testid="note-submit">保存筆記</button></div></form><div class="note-list" data-testid="note-list">' + noteCards + '</div></section>';
   }
 
-  function storiesMarkup() {
-    return pageHeader("研究筆記", "個人觀察 · 故事假說 · 可回看的記錄") +
-      '<div class="story-board"><section class="story-board-main">' + card("我的研究記錄", "像 XQ 的自訂追蹤欄位，也保留 FinLab 的研究脈絡", notesMarkup(), "") + card("事件時間線", "公告／財報／除權息／產業變化", '<div class="timeline"><div><span class="timeline-dot"></span><div><strong>等待免費官方事件來源</strong><small>尚未抓取；不以新聞摘要代替原始證據。</small></div></div><div><span class="timeline-dot muted-dot"></span><div><strong>人為新增下一個檢查點</strong><small>保存日期、來源、觀察與結論。</small></div></div></div>', "") + '</section><aside class="story-board-rail">' + card("筆記欄位", "個人研究工具", '<div class="story-field-list"><div><span>標的</span><strong>目前行情標的</strong></div><div><span>支持</span><strong>財報與公開公告</strong></div><div><span>反證</span><strong>數據衰退或來源衝突</strong></div><div><span>狀態</span><strong>本機草稿 · 人工審查</strong></div></div>', "") + card("資料規則", "免費資料本地保存", '<p class="research-boundary">行情、財報與筆記分開保存；筆記不會改寫官方資料，也不會被當成回測輸入。每一筆記錄都保留建立時間與目前標的。</p>', "") + '</aside></div>';
-  }
 
   function alertSelectOptions(pairs, selected) {
     return pairs.map(function (pair) {
@@ -536,16 +592,7 @@
       '<div class="settings-grid" data-testid="settings-view">' + updateCardMarkup() + themeCardMarkup() + '</div>';
   }
 
-  function marketTerminalMarkup() {
-    return pageHeader("行情分析", "TradingView / MultiCharts 型個人市場終端") +
-      quoteHeaderMarkup() +
-      '<nav class="terminal-tabs" aria-label="標的分析分頁"><button class="terminal-tab active" type="button" data-action="section" data-section="market">行情</button><button class="terminal-tab" type="button" data-action="section" data-section="features">技術指標</button><button class="terminal-tab" type="button" data-action="section" data-section="fundamentals">財報</button><button class="terminal-tab" type="button" data-action="section" data-section="stories">研究筆記</button></nav>' +
-      '<div class="market-terminal-layout"><main class="market-terminal-chart">' + klineMarkup() + '</main><aside class="market-terminal-side">' + compactWatchlistMarkup() + alertsMarkup() + card("快速記錄", "把目前畫面留下來", '<div class="quick-record"><p>看完價格、成交量與技術線後，直接留下你的觀察。</p><button class="btn btn-primary" type="button" data-action="section" data-section="stories">新增研究筆記</button></div>', "") + '</aside></div>';
-  }
 
-  function analysisRailMarkup() {
-    return '<aside class="stock-analysis-rail">' + card("標的摘要", "行情與自選清單連動", stockQuoteMarkup(), "") + card("研究檢查", "圖表、財報與證據連動", '<div class="analysis-check-list"><button type="button" class="analysis-check" data-action="section" data-section="fundamentals"><span>01</span><strong>看財報</strong><small>期間與來源</small></button><button type="button" class="analysis-check" data-action="section" data-section="stories"><span>02</span><strong>寫故事</strong><small>支持與反證</small></button><button type="button" class="analysis-check" data-action="section" data-section="evidence"><span>03</span><strong>看證據</strong><small>摘要雜湊與品質</small></button></div>', "") + storyTrackerMarkup() + '</aside>';
-  }
 
   function selectedKlineInstrument() {
     return core.klineInstruments(state.view).find(function (instrument) {
@@ -932,36 +979,40 @@
     var instrument = selectedKlineInstrument();
     var symbol = instrument && instrument.symbol;
     if (!symbol || !String(valuationDraft.label || "").trim()) return null;
-    var model = null;
-    if (valuationDraft.model === "pe_multiple") {
-      var eps = Number(valuationDraft.eps);
-      var targetPe = Number(valuationDraft.targetPe);
-      if (!(eps > 0) || !(targetPe > 0)) return null;
-      model = { type: "pe_multiple", eps: eps, target_pe: targetPe };
-    } else if (valuationDraft.model === "dividend_discount_simple") {
-      var dps = Number(valuationDraft.dps);
-      var growth = Number(valuationDraft.growthRate);
-      var discount = Number(valuationDraft.discountRate);
-      if (!(dps > 0) || !Number.isFinite(growth) || !(discount > 0) || growth <= -1 || discount <= growth) return null;
-      model = { type: "dividend_discount_simple", dps: dps, growth_rate: growth, discount_rate: discount };
-    } else {
-      var growthEps = Number(valuationDraft.eps);
-      var growthPct = Number(valuationDraft.growthPct);
-      var peg = Number(valuationDraft.peg);
-      if (!(growthEps > 0) || !Number.isFinite(growthPct) || !Number.isFinite(peg) || growthPct * peg <= 0) return null;
-      model = { type: "growth_adjusted_pe", eps: growthEps, growth_pct: growthPct, peg: peg };
+    function scenario(prefix) {
+      var eps = Number(valuationDraft[prefix + "Eps"]);
+      var pe = Number(valuationDraft[prefix + "Pe"]);
+      if (!(eps > 0) || !(pe > 0)) return null;
+      return { eps: eps, pe: pe };
     }
-    var safetyPercent = Number(valuationDraft.safetyMargin);
-    var safetyMargin = Number.isFinite(safetyPercent) ? safetyPercent / 100 : 0;
-    if (!(safetyMargin >= 0 && safetyMargin < 1)) return null;
+    var bear = scenario("bear");
+    var base = scenario("base");
+    var bull = scenario("bull");
+    if (!bear || !base || !bull) return null;
+    function ratio(field) {
+      var value = Number(valuationDraft[field]) / 100;
+      return value > 0 && value <= 1 ? value : null;
+    }
+    var ratios = {
+      watch: ratio("ratioWatch"), first: ratio("ratioFirst"), second: ratio("ratioSecond"),
+      sweet: ratio("ratioSweet"), extreme: ratio("ratioExtreme")
+    };
+    if (Object.keys(ratios).some(function (key) { return ratios[key] === null; })) return null;
     return {
-      schema: "tqe-fair-value-worksheet/v1",
-      worksheet_id: "ws-" + Date.now(),
+      schema: core.VALUATION_WORKSHEET_SCHEMA,
+      worksheet_id: "tqr-" + symbol + "-" + Date.now(),
       label: String(valuationDraft.label).trim().slice(0, 120),
       target: { security_id: symbol },
-      model: model,
-      safety_margin: safetyMargin,
-      assumption_notes: String(valuationDraft.notes || "").slice(0, 500),
+      scenarios: { bear: bear, base: base, bull: bull },
+      buy_zone_ratios: ratios,
+      basis: {
+        eps_period: String(valuationDraft.epsPeriod || "").trim().slice(0, 200),
+        eps_kind: valuationDraft.epsKind === "actual" ? "actual" : "estimate",
+        pe_rationale: String(valuationDraft.peRationale || "").trim().slice(0, 200),
+        financial_data_date: String(valuationDraft.financialDataDate || "").trim().slice(0, 200),
+        valuation_date: String(valuationDraft.valuationDate || "").trim().slice(0, 200),
+        change_reason: String(valuationDraft.changeReason || "").trim().slice(0, 200)
+      },
       created_at: new Date().toISOString()
     };
   }
@@ -1375,7 +1426,7 @@
     var selectedId = instrument.instrument_id || state.selectedKlineInstrumentId;
     var isWatched = (state.watchlist && state.watchlist.items || []).indexOf(selectedId) >= 0;
     var tone = quote.change === null ? "" : quote.change >= 0 ? "positive" : "negative";
-    return '<section class="terminal-quote-bar" data-testid="quote-bar"><div class="terminal-quote-identity"><span class="terminal-market-tag">' + text(instrument.market || "TWSE") + '</span><div><h2>' + text(instrument.symbol || selectedId || "2330") + ' <small>' + text(instrument.display_name || "台積電") + '</small></h2><span class="mono">' + text(selectedId) + ' · ' + text((instrument.currency || "TWD")) + '</span></div></div><div class="terminal-quote-price"><strong>' + core.formatNumber(latest.close) + '</strong><span class="' + tone + '">' + (quote.change === null ? "—" : (quote.change >= 0 ? "+" : "") + core.formatNumber(quote.change) + " (" + core.formatPercent(quote.changePct) + ")") + '</span></div><dl class="terminal-ohlc"><div><dt>開</dt><dd>' + core.formatNumber(latest.open) + '</dd></div><div><dt>高</dt><dd>' + core.formatNumber(latest.high) + '</dd></div><div><dt>低</dt><dd>' + core.formatNumber(latest.low) + '</dd></div><div><dt>量</dt><dd>' + core.formatNumber(latest.volume) + '</dd></div></dl><div class="terminal-quote-actions"><button class="btn ' + (isWatched ? "btn-outline" : "btn-primary") + '" type="button" data-action="watchlist-toggle" data-testid="quote-watchlist-toggle">' + (isWatched ? "已在自選" : "加入自選") + '</button><button class="btn btn-outline" type="button" data-action="section" data-section="stories">記研究筆記</button></div></section>';
+    return '<section class="terminal-quote-bar" data-testid="quote-bar"><div class="terminal-quote-identity"><span class="terminal-market-tag">' + text(instrument.market || "TWSE") + '</span><div><h2>' + text(instrument.symbol || selectedId || "2330") + ' <small>' + text(instrument.display_name || "台積電") + '</small></h2><span class="mono">' + text(selectedId) + ' · ' + text((instrument.currency || "TWD")) + '</span></div></div><div class="terminal-quote-price"><strong>' + core.formatNumber(latest.close) + '</strong><span class="' + tone + '">' + (quote.change === null ? "—" : (quote.change >= 0 ? "+" : "") + core.formatNumber(quote.change) + " (" + core.formatPercent(quote.changePct) + ")") + '</span></div><dl class="terminal-ohlc"><div><dt>開</dt><dd>' + core.formatNumber(latest.open) + '</dd></div><div><dt>高</dt><dd>' + core.formatNumber(latest.high) + '</dd></div><div><dt>低</dt><dd>' + core.formatNumber(latest.low) + '</dd></div><div><dt>量</dt><dd>' + core.formatNumber(latest.volume) + '</dd></div></dl><div class="terminal-quote-actions"><button class="btn ' + (isWatched ? "btn-outline" : "btn-primary") + '" type="button" data-action="watchlist-toggle" data-testid="quote-watchlist-toggle">' + (isWatched ? "已在自選" : "加入自選") + '</button><button class="btn btn-outline" type="button" data-action="section" data-section="company">記研究筆記</button></div></section>';
   }
 
   function compactWatchlistMarkup() {
@@ -1394,7 +1445,7 @@
       var previous = bars.length > 1 ? bars[bars.length - 2] : null;
       var delta = latest && previous ? latest.close - previous.close : null;
       return '<div class="terminal-watchlist-row-wrap"><button class="terminal-watchlist-row' + (instrumentId === state.selectedKlineInstrumentId ? ' active' : '') + '" type="button" data-action="kline-search-pick" data-instrument-id="' + escapeHtml(instrumentId) + '"><span><strong>' + text(instrument.symbol || instrumentId) + '</strong><small>' + text(instrument.display_name) + '</small></span><span class="terminal-watchlist-price"><strong>' + core.formatNumber(latest && latest.close) + '</strong><small class="' + (delta === null ? "" : delta >= 0 ? "positive" : "negative") + '">' + (delta === null ? "—" : (delta >= 0 ? "+" : "") + core.formatNumber(delta)) + '</small></button><button class="terminal-watchlist-remove" type="button" data-action="watchlist-remove" data-instrument-id="' + escapeHtml(instrumentId) + '" aria-label="移除 ' + escapeHtml(instrument.symbol || instrumentId) + '">×</button></div>';
-    }).join("") : '<div class="terminal-watchlist-empty"><strong>還沒有自選標的</strong><span>搜尋 2330，加入後就能在右側快速切換。</span></div>') + '</div><footer class="terminal-watchlist-footer"><span>' + text(noteStatus()) + '</span><button class="btn btn-outline btn-sm" type="button" data-action="section" data-section="products">管理自選</button></footer></section>';
+    }).join("") : '<div class="terminal-watchlist-empty"><strong>還沒有自選標的</strong><span>搜尋 2330，加入後就能在右側快速切換。</span></div>') + '</div><footer class="terminal-watchlist-footer"><span>' + text(noteStatus()) + '</span><button class="btn btn-outline btn-sm" type="button" data-action="section" data-section="watchlist">管理自選</button></footer></section>';
   }
 
   function dataUpdateMarkup() {
@@ -1414,25 +1465,65 @@
     return '<section class="data-update-panel" data-testid="data-update-panel"><div class="data-update-heading"><div><span class="eyebrow">官方免費來源 → 本機保存</span><h2>更新台股資料</h2><p>更新範圍：' + text(targetLabel) + '</p></div><span class="data-update-status status-' + escapeHtml(update.status) + '" data-testid="data-update-status">' + text(statusText) + '</span></div><div class="data-update-controls"><label><span>更新範圍</span><select data-action="data-update-scope" data-testid="data-update-scope"><option value="watchlist"' + (isWatchlist ? ' selected' : '') + '>全部自選（' + targetIds.length + ' 檔）</option><option value="selected"' + (isWatchlist ? '' : ' selected') + '>目前個股</option></select></label><label><span>歷史範圍</span><select data-action="data-update-years" data-testid="data-update-years"><option value="1"' + (update.years === 1 ? ' selected' : '') + '>近 1 年</option><option value="2"' + (update.years === 2 ? ' selected' : '') + '>近 2 年</option><option value="3"' + (update.years === 3 ? ' selected' : '') + '>近 3 年</option></select></label><button class="btn btn-primary" type="button" data-action="data-update" data-testid="data-update-button"' + (enabled ? '' : ' disabled') + '>' + (dataUpdateInFlight ? '更新中…' : (isWatchlist ? '下載並更新自選資料' : '下載並更新目前個股')) + '</button></div><small class="data-update-note">目前提供 TWSE 上市個股；只處理目前範圍，不下載全市場。資料保存於本機 raw 與 K 線快照，不是即時行情；瀏覽器預覽僅展示介面。</small>' + dataUpdateResultMarkup(update.results) + '</section>';
   }
 
-  function watchlistRows() {
-    var items = core.watchlistItemsForActiveGroup(state);
-    if (!items.length) {
-      return '<div class="empty-state" data-testid="watchlist-empty"><strong>尚未建立自選清單</strong><span>從商品選擇器加入股票、ETF 或 TAIFEX TX；草稿需按「儲存自選清單」才會寫入本機 JSON。</span></div>';
+  function pct(value) {
+    return value === null || value === undefined ? "—" : core.formatPercent(value);
+  }
+
+  function num(value) {
+    return value === null || value === undefined ? "—" : core.formatNumber(value);
+  }
+
+  function watchlistFilterMarkup() {
+    var f = state.watchlistFilters || {};
+    function sel(field, label, options, current) {
+      return '<label><span>' + text(label) + '</span><select data-action="watchlist-filter" data-field="' + field + '" data-testid="watchlist-filter-' + field + '">' +
+        '<option value="">全部</option>' +
+        options.map(function (option) {
+          var value = typeof option === "string" ? option : option[0];
+          var name = typeof option === "string" ? option : option[1];
+          return '<option value="' + escapeHtml(value) + '"' + (current === value ? " selected" : "") + '>' + text(name) + '</option>';
+        }).join("") + '</select></label>';
     }
-    return '<div class="table-responsive"><table class="table watchlist-table" data-testid="watchlist-table"><thead><tr>' +
-      '<th>代號</th><th>名稱</th><th>市場</th><th>收盤</th><th>漲跌</th><th>漲幅</th><th>成交量</th><th>PE</th><th>EPS</th><th>月營收年增</th><th>最新財報期</th><th></th>' +
-      '</tr></thead><tbody>' + items.map(function (instrumentId) {
-        var instrument = instrumentForId(instrumentId) || { instrument_id: instrumentId, symbol: instrumentId, display_name: "商品未在目前 catalog", market: "—" };
-        var model = core.klineModel(state.view, instrumentId, "1D");
-        var bars = model && Array.isArray(model.bars) ? model.bars : [];
-        var latest = bars.length ? bars[bars.length - 1] : null;
-        return '<tr><td class="cell-mono cell-strong">' + text(instrument.symbol || instrumentId) + '</td>' +
-          '<td><span class="cell-strong">' + text(instrument.display_name) + '</span><small>' + text(instrumentId) + '</small></td>' +
-          '<td>' + text(instrument.market) + '</td><td class="cell-mono">' + core.formatNumber(latest && latest.close) + '</td>' +
-          '<td>—</td><td>—</td><td class="cell-mono">' + core.formatNumber(latest && latest.volume) + '</td>' +
-          '<td>—</td><td>—</td><td>—</td><td>—</td>' +
-          '<td class="table-action"><button class="btn btn-outline btn-sm" type="button" data-action="watchlist-remove" data-instrument-id="' + escapeHtml(instrumentId) + '">移除</button></td></tr>';
-      }).join("") + '</tbody></table></div>';
+    var stageOptions = ["extreme", "sweet", "second", "first", "near", "watch"].map(function (id) {
+      return [id, core.STAGE_LABELS[id]];
+    });
+    return '<div class="watchlist-filter-bar" data-testid="watchlist-filters">' +
+      sel("industry", "產業", core.INDUSTRY_OPTIONS, f.industry) +
+      sel("fundamental_state", "基本面", core.FUNDAMENTAL_STATES, f.fundamental_state) +
+      sel("thesis_state", "投資假設", core.THESIS_STATES, f.thesis_state) +
+      sel("stage", "買進階段", stageOptions, f.stage) +
+      sel("held", "持有", [["held", "已持有"], ["not_held", "未持有"]], f.held) +
+      '<label><span>排序</span><select data-action="watchlist-sort" data-testid="watchlist-sort">' +
+      [["discount", "折價幅度最大"], ["distance", "距離第一買進價最近"], ["updated", "最近更新日期"]].map(function (option) {
+        return '<option value="' + option[0] + '"' + (state.watchlistSort === option[0] ? " selected" : "") + '>' + text(option[1]) + '</option>';
+      }).join("") + '</select></label></div>';
+  }
+
+  function watchlistRows() {
+    var all = core.watchlistViewRows(state);
+    if (!all.length) {
+      return '<div class="empty-state" data-testid="watchlist-empty"><strong>尚未建立追蹤清單</strong><span>從商品選擇器加入股票；草稿需按「儲存自選清單」才會寫入本機 JSON。</span></div>';
+    }
+    var rows = core.sortWatchlistRows(core.filterWatchlistRows(all, state.watchlistFilters), state.watchlistSort);
+    var body = rows.length ? rows.map(function (row) {
+      return '<tr data-testid="watchlist-row" data-instrument-id="' + escapeHtml(row.instrument_id) + '">' +
+        '<td class="cell-mono cell-strong">' + text(row.symbol) + '</td>' +
+        '<td><span class="cell-strong">' + text(row.name) + '</span><small>' + text(row.industry) + '</small></td>' +
+        '<td class="cell-mono">' + num(row.price) + '</td>' +
+        '<td class="cell-mono" data-testid="watchlist-base-value">' + num(row.base_value) + '</td>' +
+        '<td class="cell-mono ' + (row.discount !== null && row.discount < 0 ? "tone-down" : "") + '" data-testid="watchlist-discount">' + pct(row.discount) + '</td>' +
+        '<td class="cell-mono">' + num(row.first_price) + '</td>' +
+        '<td class="cell-mono">' + num(row.sweet_price) + '</td>' +
+        '<td>' + text(row.fundamental_state) + '</td>' +
+        '<td>' + text(row.thesis_state) + '</td>' +
+        '<td>' + text(row.next_event || "—") + '</td>' +
+        '<td data-testid="watchlist-stage">' + text(row.stage_label) + '</td>' +
+        '<td class="table-action"><button class="btn btn-outline btn-sm" type="button" data-action="watchlist-remove" data-instrument-id="' + escapeHtml(row.instrument_id) + '">移除</button></td></tr>';
+    }).join("") : '<tr><td colspan="12">目前篩選條件下沒有標的。</td></tr>';
+    return watchlistFilterMarkup() + '<div class="table-responsive"><table class="table watchlist-table" data-testid="watchlist-table"><thead><tr>' +
+      '<th>代號</th><th>公司／產業</th><th>現價</th><th>合理價值</th><th>折價</th><th>第一買進價</th><th>甜蜜價</th><th>基本面</th><th>投資假設</th><th>下一事件</th><th>買進階段</th><th></th>' +
+      '</tr></thead><tbody>' + body + '</tbody></table></div>' +
+      '<p class="watchlist-note">合理價值來自你在 Valuation 建立的 Base 工作表；未建立估值的標的，合理價值、折價與買進價一律顯示「—」，不以價格反推。</p>';
   }
 
   function watchlistMarkup() {
@@ -1457,30 +1548,10 @@
       '<section class="watchlist-toolbar-actions" aria-label="自選清單操作"><button class="btn btn-outline" type="button" data-action="watchlist-clear" data-testid="watchlist-clear"' + (items.length ? '' : ' disabled') + '>清除草稿</button>' +
       '<button class="btn btn-primary" type="button" data-action="watchlist-save" data-testid="watchlist-save"' + (canSave ? '' : ' disabled') + '>儲存自選清單</button></section>' +
       '<span class="watchlist-state" data-testid="watchlist-state">' + text(watchlistStatus()) + '</span></div></div>' +
-      watchlistRows() + '<p class="watchlist-note">桌面開發版使用本機 JSON；瀏覽器預覽使用同一資料格式的瀏覽器本機儲存備援。群組目前是本機工作階段資料；PE、EPS、月營收年增與最新財報期目前顯示「—」，代表基本面快照尚未接入；不以 K 線資料推估。成交量取自來源資料欄位。</p>', "");
+      watchlistRows() + '<p class="watchlist-note">桌面開發版使用本機 JSON；瀏覽器預覽使用同一資料格式的瀏覽器本機儲存備援。群組是本機工作階段資料。</p>', "");
   }
 
-  function researchInstrumentId(row) {
-    var instrument = row && row.instrument || {};
-    if (!instrument.market || !instrument.security_id) return "";
-    return instrument.market + ":" + instrument.security_id;
-  }
 
-  function screenConditionBuilderMarkup() {
-    var groups = [
-      { id: "price", label: "價量", items: [["close_above_ma20", "股價站上月線", "收盤價 > MA20"], ["volume_above_ma20", "成交量放大", "成交量 > 20 日均量"], ["new_high_20", "創 20 日新高", "收盤價 = 20 日最高"]] },
-      { id: "technical", label: "技術", items: [["rsi_strong", "RSI 動能偏強", "RSI(14) > 50"], ["macd_cross", "MACD 黃金交叉", "MACD > Signal"], ["trend_up", "均線多頭排列", "MA5 > MA20"]] },
-      { id: "fundamental", label: "財務", items: [["revenue_growth", "營收年增", "月營收 YoY > 10%"], ["roe_positive", "ROE 為正", "ROE > 0%"], ["eps_growth", "EPS 成長", "本期 EPS > 去年同期"]] },
-      { id: "chip", label: "籌碼", items: [["foreign_buy", "外資連續買超", "外資買賣超 > 0"], ["trust_buy", "投信買超", "投信買賣超 > 0"], ["margin_down", "融資減少", "融資餘額低於前期"]] }
-    ];
-    var selected = screenConditions.map(function (id) { return groups.reduce(function (found, group) { return found || group.items.find(function (item) { return item[0] === id; }); }, null); }).filter(Boolean);
-    return '<section class="screen-builder" data-testid="screen-builder"><header class="screen-builder-header"><div><span class="eyebrow">XQ STYLE SCREENER</span><h2>條件選股</h2><p>先選條件，再套用目前可用的本地資料快照；未接入欄位會明確標示。</p></div><span class="screen-condition-count">已選 ' + selected.length + '</span></header><div class="screen-condition-groups">' + groups.map(function (group) {
-      return '<section class="screen-condition-group"><h3>' + text(group.label) + '</h3><div>' + group.items.map(function (item) {
-        var active = screenConditions.indexOf(item[0]) >= 0;
-        return '<button class="screen-condition' + (active ? ' active' : '') + '" type="button" data-action="screen-condition" data-condition-id="' + item[0] + '" aria-pressed="' + (active ? 'true' : 'false') + '"><strong>' + text(item[1]) + '</strong><small>' + text(item[2]) + '</small></button>';
-      }).join('') + '</div></section>';
-    }).join('') + '</div><div class="screen-selected">' + (selected.length ? selected.map(function (item) { return '<span class="screen-chip">' + text(item[1]) + '<button type="button" data-action="screen-condition" data-condition-id="' + item[0] + '" aria-label="移除條件">×</button></span>'; }).join('') : '<span>尚未選擇條件；可以先用市場與資料品質快速篩選。</span>') + '</div></section>';
-  }
 
   function selectOptionMarkup(values, selected) {
     return values.map(function (value) {
@@ -1488,33 +1559,7 @@
     }).join('');
   }
 
-  function formulaBuilderMarkup() {
-    var categories = ["價格", "報酬", "均線", "動能", "波動", "成交量", "基本面", "估值", "市場", "Regime", "人工欄位"];
-    var fields = ["毛利率 QoQ", "PE 5年百分位", "Z-score", "市場 Regime", "人工基本面評分"];
-    var operators = [">", ">=", "<", "<=", "=", "!=", "Between", "Cross Above", "Cross Below", "Is True", "Is False", "Is Null"];
-    var valueTypes = ["固定數值", "另一個欄位", "歷史平均", "歷史中位數", "歷史百分位", "產業平均", "大盤數值", "前一期數值"];
-    var periods = ["最近一季", "最近一月", "20日", "60日", "120日", "自訂"];
-    return '<section class="formula-builder" data-testid="formula-builder"><header class="formula-builder-header"><div><span class="eyebrow">TRADINGVIEW STYLE SETTINGS</span><h2>公式與條件草稿</h2><p>每列是人為設定，不會自動執行、下單或把未接入資料補成數值。</p></div><button class="btn btn-outline" type="button" data-action="formula-add" data-testid="formula-add">新增條件</button></header><div class="formula-rule-list">' + formulaRows.map(function (rule, index) {
-      return '<article class="formula-rule" data-testid="formula-rule" data-rule-id="' + escapeHtml(rule.id) + '"><div class="formula-rule-number">' + String(index + 1).padStart(2, "0") + '</div><label class="formula-switch"><span>啟用</span><input type="checkbox" data-action="formula-input" data-rule-id="' + escapeHtml(rule.id) + '" data-field="enabled"' + (rule.enabled ? ' checked' : '') + '></label><label><span>資料分類</span><select data-action="formula-input" data-rule-id="' + escapeHtml(rule.id) + '" data-field="category">' + selectOptionMarkup(categories, rule.category) + '</select></label><label><span>欄位</span><select data-action="formula-input" data-rule-id="' + escapeHtml(rule.id) + '" data-field="field">' + selectOptionMarkup(fields, rule.field) + '</select></label><label><span>運算子</span><select data-action="formula-input" data-rule-id="' + escapeHtml(rule.id) + '" data-field="operator">' + selectOptionMarkup(operators, rule.operator) + '</select></label><label><span>比較值</span><select data-action="formula-input" data-rule-id="' + escapeHtml(rule.id) + '" data-field="value_type">' + selectOptionMarkup(valueTypes, rule.value_type) + '</select></label><label><span>輸入值</span><input type="text" data-action="formula-input" data-rule-id="' + escapeHtml(rule.id) + '" data-field="value" value="' + escapeHtml(rule.value) + '"></label><label><span>期間</span><select data-action="formula-input" data-rule-id="' + escapeHtml(rule.id) + '" data-field="period">' + selectOptionMarkup(periods, rule.period) + '</select></label><button class="icon-button formula-remove" type="button" data-action="formula-remove" data-rule-id="' + escapeHtml(rule.id) + '" aria-label="移除第 ' + (index + 1) + ' 個條件"' + (formulaRows.length === 1 ? ' disabled' : '') + '>×</button></article>';
-    }).join('') + '</div><footer class="formula-builder-footer"><span>邏輯群組：AND / OR / NOT 與巢狀群組已納入規格，計算引擎仍需 PIT 資料與人為啟動。</span><span class="status status-draft">設定草稿</span></footer></section>';
-  }
 
-  function researchMarkup() {
-    var spec = state.screenSpec || {};
-    var groupItems = core.watchlistItemsForActiveGroup(state);
-    var rows = state.screenSpecStatus === "applied" ? core.screenProducts(view, spec) : [];
-    var specJson = JSON.stringify(spec, null, 2);
-    var strategyJson = JSON.stringify(state.strategySpec, null, 2);
-    var resultBody = rows.length ? '<div class="table-responsive"><table class="table" data-testid="research-results"><thead><tr><th>商品</th><th>日期</th><th>收盤</th><th>品質</th><th></th></tr></thead><tbody>' + rows.map(function (row) {
-      var instrumentId = researchInstrumentId(row);
-      var alreadyAdded = instrumentId && groupItems.indexOf(instrumentId) >= 0;
-      return '<tr><td><span class="cell-strong">' + text(core.productLabel(row)) + '</span><small>' + text(recordTypeLabel(row.record_type)) + '</small></td><td>' + text(row.bar && row.bar.trading_date) + '</td><td class="cell-mono">' + core.formatNumber(row.bar && row.bar.close_raw) + '</td><td>' + statusBadge(core.qualityLabel(row)) + '</td><td class="table-action"><button class="btn btn-outline btn-sm" type="button" data-action="research-add-group" data-instrument-id="' + escapeHtml(instrumentId) + '"' + (alreadyAdded ? ' disabled' : '') + '>' + (alreadyAdded ? '已在群組' : '加入群組') + '</button></td></tr>';
-    }).join("") + '</tbody></table></div>' : '<div class="empty-state" data-testid="research-results-empty"><strong>' + (state.screenSpecStatus === "applied" ? "沒有符合的已納入商品。" : "尚未套用篩選規格。") + '</strong><span>篩選只讀取目前已核准的市場資料快照；不補佔位值，也不從 K 線推估。</span></div>';
-    return pageHeader("因子與公式", "條件設定 · 人工篩選 · 結果加入觀察池") + formulaBuilderMarkup() + screenConditionBuilderMarkup() +
-      '<div class="row col-8-4"><div>' + card("連動篩選器", "目前資料快照的篩選結果", '<div class="research-toolbar"><label><span>品質</span><select data-action="screen-input" data-field="quality" data-testid="research-quality"><option value="admitted"' + (spec.quality === "admitted" ? ' selected' : '') + '>已納入</option><option value="unadmitted"' + (spec.quality === "unadmitted" ? ' selected' : '') + '>未納入</option><option value="invalid"' + (spec.quality === "invalid" ? ' selected' : '') + '>無效</option><option value=""' + (!spec.quality ? ' selected' : '') + '>全部</option></select></label><label><span>市場</span><input type="text" placeholder="TWSE / TPEx / US" value="' + escapeHtml(spec.market) + '" data-action="screen-input" data-field="market" data-testid="research-market"></label><label><span>最多筆數</span><input type="number" min="1" max="100" value="' + text(spec.max_rows) + '" data-action="screen-input" data-field="max_rows" data-testid="research-max-rows"></label><button class="btn btn-primary" type="button" data-action="screen-apply" data-testid="research-apply">套用篩選</button><span class="research-status" data-testid="research-status">' + (state.screenSpecStatus === "applied" ? '目前顯示 ' + rows.length + ' 筆已納入資料' : '篩選草稿；尚未套用') + '</span></div>' + resultBody, "") + '</div>' +
-      '<div>' + card("篩選規格", "可檢查的選股條件", '<pre class="spec-block" data-testid="screen-spec">' + escapeHtml(specJson) + '</pre>' + card("策略規格", "僅供研究交接", '<pre class="spec-block" data-testid="strategy-spec">' + escapeHtml(strategyJson) + '</pre>', ""), "") + '</div></div>' +
-      card("研究邊界", "選股不等於執行", '<p class="research-boundary">結果可以加入目前工作階段群組，並可供人工審查；策略規格的進出場條件尚未納入，沒有回測提交、即時警示、券商連線或自動下單。</p>', "");
-  }
 
   function latestIndicatorValue(model, indicatorName, valuesKey) {
     var indicator = model && model.indicators && model.indicators[indicatorName];
@@ -1607,32 +1652,11 @@
       technicalSnapshotMarkup(model) +
       '<section class="kline-quality" data-testid="kline-quality"><header class="subsection-heading"><h2>資料品質與來源</h2><span class="muted">不在瀏覽器重新推導</span></header>' + qualityBody +
       coverageBody +
-      '<div class="kline-provenance"><span>來源：' + text(model && model.source) + '</span><span>資料快照：' + text(model && model.snapshot_digest) + '</span><span>時區：' + text(model && model.timezone) + '</span></div></section>' + valuationMarkup(), "");
+      '<div class="kline-provenance"><span>來源：' + text(model && model.source) + '</span><span>資料快照：' + text(model && model.snapshot_digest) + '</span><span>時區：' + text(model && model.timezone) + '</span></div></section>', "");
   }
 
-  function valuationModelLabel(type) {
-    if (type === "pe_multiple") return "本益比法";
-    if (type === "dividend_discount_simple") return "股利折價簡式";
-    if (type === "growth_adjusted_pe") return "成長調整本益比";
-    return type || "未知模型";
-  }
 
-  function valuationModelSummary(model) {
-    if (!model) return "";
-    if (model.type === "pe_multiple") return "FV = EPS " + core.formatNumber(model.eps) + " × 目標 PE " + core.formatNumber(model.target_pe);
-    if (model.type === "dividend_discount_simple") return "FV = 股利 " + core.formatNumber(model.dps) + " × (1+" + core.formatNumber(model.growth_rate) + ") ÷ (" + core.formatNumber(model.discount_rate) + "−" + core.formatNumber(model.growth_rate) + ")";
-    if (model.type === "growth_adjusted_pe") return "FV = EPS " + core.formatNumber(model.eps) + " × (成長 " + core.formatNumber(model.growth_pct) + "% × PEG " + core.formatNumber(model.peg) + ")";
-    return "";
-  }
 
-  function valuationComparisonBadges(result) {
-    var comparison = result && result.comparison;
-    if (!comparison) return '<span class="status status-unavailable">資料不足</span>';
-    var vsFair = comparison.vs_fair_value === "above" ? "高於合理價" : comparison.vs_fair_value === "below" ? "低於合理價" : "等於合理價";
-    var vsZone = comparison.vs_buy_zone_ceiling === "below" ? "低於買入區上限" : "高於或等於買入區上限";
-    return '<span class="status status-draft" data-testid="valuation-vs-fair">' + text(vsFair) + '（' + core.formatPercent(comparison.gap_to_fair_value_pct) + '）</span>' +
-      '<span class="status status-draft" data-testid="valuation-vs-zone">' + text(vsZone) + '（' + core.formatPercent(comparison.gap_to_buy_zone_ceiling_pct) + '）</span>';
-  }
 
   function valuationIndicatorTile(type, label, note) {
     var indicators = state.valuation && Array.isArray(state.valuation.indicators) ? state.valuation.indicators : [];
@@ -1646,64 +1670,100 @@
       '<small>' + text(note) + '</small></div>';
   }
 
+  function valuationScenarioField(prefix, label) {
+    return '<div class="valuation-scenario" data-testid="valuation-scenario-' + prefix + '"><h4>' + text(label) + '</h4>' +
+      '<label><span>EPS</span><input type="number" step="0.01" inputmode="decimal" value="' + escapeHtml(valuationDraft[prefix + "Eps"]) + '" data-action="valuation-ws-input" data-field="' + prefix + 'Eps" data-testid="valuation-ws-' + prefix + '-eps"></label>' +
+      '<label><span>合理本益比</span><input type="number" step="0.1" inputmode="decimal" value="' + escapeHtml(valuationDraft[prefix + "Pe"]) + '" data-action="valuation-ws-input" data-field="' + prefix + 'Pe" data-testid="valuation-ws-' + prefix + '-pe"></label>' +
+      '</div>';
+  }
+
+  function valuationRatioField(field, label, testid) {
+    return '<label><span>' + text(label) + '（%）</span><input type="number" min="1" max="100" step="0.5" inputmode="decimal" value="' + escapeHtml(valuationDraft[field]) + '" data-action="valuation-ws-input" data-field="' + field + '" data-testid="' + testid + '"></label>';
+  }
+
+  function valuationBasisMarkup() {
+    return '<div class="valuation-basis" data-testid="valuation-basis"><h4>估值依據</h4>' +
+      '<label><span>使用哪一期 EPS</span><input type="text" maxlength="200" placeholder="例如 2026Q1" value="' + escapeHtml(valuationDraft.epsPeriod) + '" data-action="valuation-ws-input" data-field="epsPeriod" data-testid="valuation-basis-period"></label>' +
+      '<label><span>EPS 類型</span><select data-action="valuation-ws-input" data-field="epsKind" data-testid="valuation-basis-kind">' +
+      '<option value="actual"' + (valuationDraft.epsKind === "actual" ? " selected" : "") + '>實際值</option>' +
+      '<option value="estimate"' + (valuationDraft.epsKind !== "actual" ? " selected" : "") + '>預估值</option></select></label>' +
+      '<label><span>PE 選擇理由</span><input type="text" maxlength="200" placeholder="例如 近五年區間中位" value="' + escapeHtml(valuationDraft.peRationale) + '" data-action="valuation-ws-input" data-field="peRationale" data-testid="valuation-basis-rationale"></label>' +
+      '<label><span>財報資料日期</span><input type="date" value="' + escapeHtml(valuationDraft.financialDataDate) + '" data-action="valuation-ws-input" data-field="financialDataDate" data-testid="valuation-basis-financial-date"></label>' +
+      '<label><span>估值日期</span><input type="date" value="' + escapeHtml(valuationDraft.valuationDate) + '" data-action="valuation-ws-input" data-field="valuationDate" data-testid="valuation-basis-date"></label>' +
+      '<label><span>估值修改原因</span><input type="text" maxlength="200" placeholder="例如 季報公布後上調 EPS" value="' + escapeHtml(valuationDraft.changeReason) + '" data-action="valuation-ws-input" data-field="changeReason" data-testid="valuation-basis-reason"></label>' +
+      '</div>';
+  }
+
+  function valuationResultCard(result) {
+    if (result.status !== "ok") {
+      return '<article class="valuation-result" data-testid="valuation-result-card"><header><strong>' + text(result.label) + '</strong><span class="status status-draft">資料不足</span></header>' +
+        '<p class="valuation-insufficient" data-testid="valuation-insufficient">此標的目前沒有已納入的收盤資料，不做任何推估。</p></article>';
+    }
+    var values = result.scenario_values || {};
+    var zone = result.buy_zone || {};
+    var comparison = result.comparison || {};
+    var basis = result.basis || {};
+    return '<article class="valuation-result" data-testid="valuation-result-card">' +
+      '<header><strong>' + text(result.label) + '</strong><span class="status status-draft">' + text(result.security_id) + '</span></header>' +
+      '<div class="valuation-scenario-grid">' +
+      '<div><span class="detail-label">Bear</span><strong>' + core.formatNumber(values.bear) + '</strong></div>' +
+      '<div><span class="detail-label">Base 合理價值</span><strong class="valuation-price" data-testid="valuation-base-value">' + core.formatNumber(values.base) + '</strong></div>' +
+      '<div><span class="detail-label">Bull</span><strong>' + core.formatNumber(values.bull) + '</strong></div>' +
+      '</div>' +
+      '<div class="valuation-zone-grid" data-testid="valuation-zone">' +
+      '<div><span class="detail-label">觀察區</span><strong>' + core.formatNumber(zone.watch) + '</strong></div>' +
+      '<div><span class="detail-label">第一階段</span><strong data-testid="valuation-zone-first">' + core.formatNumber(zone.first) + '</strong></div>' +
+      '<div><span class="detail-label">第二階段</span><strong>' + core.formatNumber(zone.second) + '</strong></div>' +
+      '<div><span class="detail-label">甜蜜價</span><strong data-testid="valuation-zone-sweet">' + core.formatNumber(zone.sweet) + '</strong></div>' +
+      '<div><span class="detail-label">極端錯價</span><strong>' + core.formatNumber(zone.extreme) + '</strong></div>' +
+      '</div>' +
+      '<div class="valuation-compare"><span>現價 <strong>' + core.formatNumber(result.current_price) + '</strong></span>' +
+      '<span>折價 <strong data-testid="valuation-discount">' + core.formatPercent(comparison.discount_pct) + '</strong></span>' +
+      '<span>目前階段 <strong data-testid="valuation-stage">' + text(core.STAGE_LABELS[result.stage]) + '</strong></span></div>' +
+      '<small class="valuation-result-params">EPS ' + text(basis.eps_period) + '（' + (basis.eps_kind === "actual" ? "實際值" : "預估值") + '）· PE 理由 ' + text(basis.pe_rationale || "未記錄") +
+      ' · 財報日 ' + text(basis.financial_data_date || "未記錄") + ' · 估值日 ' + text(basis.valuation_date) + ' · 公式版本 ' + text(result.formula_version) + '</small></article>';
+  }
+
   function valuationMarkup() {
-    var valuation = state.valuation || { worksheets: [], results: [], indicators: [], status: "idle", message: "" };
+    var valuation = state.valuation || { worksheets: [], results: [], status: "idle", message: "" };
     var worksheets = Array.isArray(valuation.worksheets) ? valuation.worksheets : [];
     var results = Array.isArray(valuation.results) ? valuation.results : [];
     var instrument = selectedKlineInstrument();
     var symbol = instrument && instrument.symbol;
-    var draft = valuationDraft;
-    var paramFields = "";
-    if (draft.model === "pe_multiple") {
-      paramFields =
-        '<label class="valuation-field"><span>預估 EPS（元）· 使用者假設</span><input type="number" min="0" step="0.01" inputmode="decimal" placeholder="例如 10.00" value="' + escapeHtml(draft.eps) + '" data-action="valuation-ws-input" data-field="eps" data-testid="valuation-ws-eps"></label>' +
-        '<label class="valuation-field"><span>目標本益比 · 使用者假設</span><input type="number" min="0" step="0.1" inputmode="decimal" placeholder="例如 15" value="' + escapeHtml(draft.targetPe) + '" data-action="valuation-ws-input" data-field="targetPe" data-testid="valuation-ws-target-pe"></label>';
-    } else if (draft.model === "dividend_discount_simple") {
-      paramFields =
-        '<label class="valuation-field"><span>預估每股股利（元）· 使用者假設</span><input type="number" min="0" step="0.01" inputmode="decimal" placeholder="例如 5.00" value="' + escapeHtml(draft.dps) + '" data-action="valuation-ws-input" data-field="dps" data-testid="valuation-ws-dps"></label>' +
-        '<label class="valuation-field"><span>股利成長率 g（小數）· 使用者假設</span><input type="number" step="0.01" inputmode="decimal" placeholder="例如 0.03" value="' + escapeHtml(draft.growthRate) + '" data-action="valuation-ws-input" data-field="growthRate" data-testid="valuation-ws-growth-rate"></label>' +
-        '<label class="valuation-field"><span>折現率 r（小數，需大於 g）· 使用者假設</span><input type="number" step="0.01" inputmode="decimal" placeholder="例如 0.08" value="' + escapeHtml(draft.discountRate) + '" data-action="valuation-ws-input" data-field="discountRate" data-testid="valuation-ws-discount-rate"></label>';
-    } else {
-      paramFields =
-        '<label class="valuation-field"><span>預估 EPS（元）· 使用者假設</span><input type="number" min="0" step="0.01" inputmode="decimal" placeholder="例如 10.00" value="' + escapeHtml(draft.eps) + '" data-action="valuation-ws-input" data-field="eps" data-testid="valuation-ws-eps"></label>' +
-        '<label class="valuation-field"><span>預估成長率（%）· 使用者假設</span><input type="number" step="0.1" inputmode="decimal" placeholder="例如 12" value="' + escapeHtml(draft.growthPct) + '" data-action="valuation-ws-input" data-field="growthPct" data-testid="valuation-ws-growth-pct"></label>' +
-        '<label class="valuation-field"><span>PEG 倍數 · 使用者假設</span><input type="number" min="0" step="0.1" inputmode="decimal" placeholder="例如 1.0" value="' + escapeHtml(draft.peg) + '" data-action="valuation-ws-input" data-field="peg" data-testid="valuation-ws-peg"></label>';
-    }
-    var valuationIssues = core.valuationFormIssues(draft, { symbol: symbol });
-    var form = '<div class="valuation-form" data-testid="valuation-form">' +
-      '<label class="valuation-field"><span>工作表名稱</span><input type="text" maxlength="120" placeholder="例如：2330 本益比合理價" value="' + escapeHtml(draft.label) + '" data-action="valuation-ws-input" data-field="label" data-testid="valuation-ws-label"></label>' +
-      '<label class="valuation-field"><span>估值模型</span><select data-action="valuation-ws-input" data-field="model" data-testid="valuation-ws-model">' + alertSelectOptions([["pe_multiple", "本益比法"], ["dividend_discount_simple", "股利折價簡式"], ["growth_adjusted_pe", "成長調整本益比"]], draft.model) + '</select></label>' +
-      paramFields +
-      '<label class="valuation-field"><span>安全邊際（%）· 使用者假設</span><input type="number" min="0" max="99" step="0.1" inputmode="decimal" placeholder="例如 15" value="' + escapeHtml(draft.safetyMargin) + '" data-action="valuation-ws-input" data-field="safetyMargin" data-testid="valuation-ws-safety-margin"></label>' +
-      '<label class="valuation-field valuation-field-wide"><span>假設說明（為什麼這樣假設）</span><input type="text" maxlength="500" placeholder="記錄假設依據；此為個人假設，不是官方或市場共識資料" value="' + escapeHtml(draft.notes) + '" data-action="valuation-ws-input" data-field="notes" data-testid="valuation-ws-notes"></label>' +
-      '<button class="btn btn-outline btn-sm" type="button" data-action="valuation-add" data-testid="valuation-add"' + (valuationIssues.length ? " disabled" : "") + '>新增工作表（' + text(symbol || "未選標的") + '）</button>' +
-      formIssuesMarkup(valuationIssues, "valuation-form-issues") + '</div>';
-    var worksheetRows = worksheets.length ? worksheets.map(function (definition) {
-      return '<article class="valuation-worksheet" data-testid="valuation-worksheet"><div><strong>' + text(definition.label) + '</strong><small>' + text(definition.target && definition.target.security_id) + ' · ' + valuationModelLabel(definition.model && definition.model.type) + ' · ' + valuationModelSummary(definition.model) + ' · 安全邊際 ' + core.formatPercent(definition.safety_margin) + '</small></div><button class="icon-button" type="button" data-action="valuation-delete" data-worksheet-id="' + escapeHtml(definition.worksheet_id) + '" aria-label="刪除合理價工作表">×</button></article>';
-    }).join("") : '<div class="alert-empty" data-testid="valuation-empty">尚未建立合理價工作表。</div>';
-    var resultCards = results.length ? results.map(function (result) {
-      var body = result.status === "ok"
-        ? '<div class="valuation-result-grid"><div><span class="detail-label">合理價 FV</span><strong class="valuation-price" data-testid="valuation-fair-value">' + core.formatNumber(result.fair_value) + '</strong></div>' +
-          '<div><span class="detail-label">買入區上限</span><strong class="valuation-price">' + core.formatNumber(result.buy_zone_ceiling) + '</strong></div>' +
-          '<div><span class="detail-label">現價（' + text(result.price_as_of || "—") + ' 收盤）</span><strong class="valuation-price">' + core.formatNumber(result.current_price) + '</strong></div></div>' +
-          '<div class="valuation-result-badges">' + valuationComparisonBadges(result) + '</div>'
-        : '<p class="valuation-note" data-testid="valuation-insufficient">已納入資料不足，無法對照現價；不會對外抓取補齊。</p>';
-      return '<article class="valuation-result" data-testid="valuation-result-card"><header><strong>' + text(result.label) + '</strong><span class="status status-draft">草稿 · 使用者假設</span></header>' +
-        '<small class="valuation-result-params">' + text(valuationModelSummary(result.model)) + ' · 安全邊際 ' + core.formatPercent(result.safety_margin) + ' · 公式版本 ' + text(result.formula_version) + ' · 資料狀態 ' + text(result.data_status) + '</small>' + body + '</article>';
-    }).join("") : "";
-    var statusLine = valuation.status === "error"
+    var issues = core.valuationFormIssues(valuationDraft, { symbol: symbol });
+
+    var worksheetCards = worksheets.length ? worksheets.map(function (definition) {
+      var scenarios = definition.scenarios || {};
+      var base = scenarios.base || {};
+      return '<article class="valuation-worksheet" data-testid="valuation-worksheet"><div><strong>' + text(definition.label) +
+        '</strong><small>' + text(definition.target && definition.target.security_id) + ' · Base ' + core.formatNumber(base.eps) + ' × ' + core.formatNumber(base.pe) +
+        ' · ' + text((definition.basis || {}).eps_period) + '</small></div>' +
+        '<button class="icon-button" type="button" data-action="valuation-delete" data-worksheet-id="' + escapeHtml(definition.worksheet_id) + '" aria-label="刪除估值工作表">×</button></article>';
+    }).join("") : '<div class="alert-empty" data-testid="valuation-empty">尚未建立估值工作表。</div>';
+
+    var statusMarkup = valuation.status === "error"
       ? '<p class="alert-status error" data-testid="valuation-status">' + text(valuation.message || "估值計算失敗") + '</p>'
-      : "";
-    return '<section class="valuation-panel" data-testid="valuation-panel"><header class="subsection-heading"><div><h2>合理價工作表與價量分析</h2><span class="muted">使用者假設 · 本機確定性計算 · 研究對照，非投資建議</span></div><span class="status status-draft">tqe-fair-value/v1</span></header>' +
-      form + statusLine +
-      '<div class="valuation-worksheet-list" data-testid="valuation-worksheet-list">' + worksheetRows + '</div>' +
-      '<div class="alert-toolbar"><button class="btn btn-primary btn-sm" type="button" data-action="valuation-evaluate" data-testid="valuation-evaluate"' + ((worksheets.length || symbol) && !valuationEvaluateInFlight ? "" : " disabled") + '>' + (valuationEvaluateInFlight ? "計算中…" : "計算合理價與指標") + '</button></div>' +
-      '<div class="valuation-indicator-row" data-testid="valuation-indicators">' +
-      valuationIndicatorTile("zscore", "Z-score", "raw 收盤 · 母體標準差 · 期間顯式") +
-      valuationIndicatorTile("price_percentile", "歷史百分位", "最近收盤在 N 期窗口中的百分位") +
-      valuationIndicatorTile("ma_deviation", "均線乖離", "收盤 / SMA(N) − 1") + '</div>' +
-      '<div class="valuation-result-list" data-testid="valuation-result-list">' + resultCards + '</div>' +
-      '<p class="valuation-note">所有估值輸入都是使用者假設（draft），不是官方資料、市場共識或法人預估；計算只使用本機已納入的 EOD 價量資料。工作表只保存在本機（tqe-fair-value-worksheets/v1）。此區塊為研究對照，不構成投資建議，也不提供任何下單或模擬下單功能。官方基本面欄位（EPS、ROE、月營收）仍等待來源准入，不會自動帶入。</p></section>';
+      : '<p class="alert-status" data-testid="valuation-status">' + text(valuation.message || "使用者假設 · 本機確定性計算") + '</p>';
+
+    return '<section class="valuation-panel" data-testid="valuation-panel">' +
+      '<header class="subsection-heading"><div><h2>Bear／Base／Bull 估值工作表</h2><span class="muted">合理價值 = 預估 EPS × 合理本益比；買進區間 = Base 合理價值 × 自訂比例</span></div><span class="status status-draft">' + text(core.VALUATION_WORKSHEET_SCHEMA) + '</span></header>' +
+      '<div class="valuation-form" data-testid="valuation-form">' +
+      '<label class="valuation-field"><span>工作表名稱</span><input type="text" maxlength="120" placeholder="例如：2330 三情境合理價" value="' + escapeHtml(valuationDraft.label) + '" data-action="valuation-ws-input" data-field="label" data-testid="valuation-ws-label"></label>' +
+      '<div class="valuation-scenario-row">' + valuationScenarioField("bear", "Bear 保守") + valuationScenarioField("base", "Base 最合理") + valuationScenarioField("bull", "Bull 樂觀") + '</div>' +
+      '<div class="valuation-ratio-row" data-testid="valuation-ratios"><h4>買進區間比例（相對 Base 合理價值）</h4>' +
+      valuationRatioField("ratioWatch", "觀察區", "valuation-ratio-watch") +
+      valuationRatioField("ratioFirst", "第一階段", "valuation-ratio-first") +
+      valuationRatioField("ratioSecond", "第二階段", "valuation-ratio-second") +
+      valuationRatioField("ratioSweet", "甜蜜區", "valuation-ratio-sweet") +
+      valuationRatioField("ratioExtreme", "極端錯價", "valuation-ratio-extreme") + '</div>' +
+      valuationBasisMarkup() +
+      '<div class="valuation-actions"><button class="btn btn-primary" type="button" data-action="valuation-add" data-testid="valuation-add"' + (issues.length ? " disabled" : "") + '>加入估值工作表</button>' +
+      formIssuesMarkup(issues, "valuation-form-issues") + '</div></div>' +
+      '<div class="valuation-worksheet-list" data-testid="valuation-worksheet-list">' + worksheetCards + '</div>' +
+      '<div class="alert-toolbar"><button class="btn btn-primary btn-sm" type="button" data-action="valuation-evaluate" data-testid="valuation-evaluate"' + ((worksheets.length && symbol) && !valuationEvaluateInFlight ? "" : " disabled") + '>' + (valuationEvaluateInFlight ? "計算中…" : "計算合理價值與買進區間") + '</button></div>' +
+      statusMarkup +
+      '<div class="valuation-result-list" data-testid="valuation-result-list">' + results.map(valuationResultCard).join("") + '</div>' +
+      '<p class="valuation-note">所有 EPS 與本益比都是使用者假設（draft），不是官方資料、市場共識或法人預估。到價只提示，不給買賣建議；最後決策保留人工。官方基本面欄位仍等待來源准入，不會自動帶入，也不會因股價下跌自動下修 EPS。</p></section>';
   }
 
   function renderKlineChart() {
@@ -1814,20 +1874,6 @@
     }
   }
 
-  function productRows(products, limit) {
-    var rows = Array.isArray(products) ? products.slice(0, limit || products.length) : [];
-    if (!rows.length) return '<div class="empty-state"><strong>此資料快照沒有商品資料列。</strong><span>資料模型為空；不插入佔位值。</span></div>';
-    return '<div class="table-responsive"><table class="table"><thead><tr><th>商品</th><th>日期</th><th>收盤</th><th>品質</th><th></th></tr></thead><tbody>' +
-      rows.map(function (row, index) {
-        var bar = row.bar || {};
-        var date = bar.trading_date || (row.fundamental || {}).period_end;
-      return '<tr><td><span class="cell-strong">' + text(core.productLabel(row)) +
-          '</span><small>' + text(recordTypeLabel(row.record_type)) + '</small></td><td>' + text(date) +
-          '</td><td class="cell-mono">' + core.formatNumber(bar.close_raw) +
-          '</td><td>' + statusBadge(core.qualityLabel(row)) +
-          '</td><td class="table-action"><button class="btn btn-outline btn-sm" type="button" data-action="product" data-index="' + index + '">詳情</button></td></tr>';
-      }).join("") + "</tbody></table></div>";
-  }
 
   function evidenceMarkup(links) {
     var items = Array.isArray(links) ? links : [];
@@ -1837,56 +1883,9 @@
     }).join("") + "</ul>";
   }
 
-  function featureMarkup() {
-    var rows = Array.isArray(view.features) ? view.features : [];
-    if (!rows.length) return '<div class="empty-state"><strong>此資料快照沒有因子資料列。</strong><span>不從商品資料列推導因子值。</span></div>';
-    return '<div class="table-responsive"><table class="table"><thead><tr><th>商品</th><th>交易日</th><th>因子值</th><th>資料截至</th></tr></thead><tbody>' +
-      rows.map(function (row) {
-        var values = row.features || {};
-        var labels = Object.keys(values).map(function (key) {
-          return '<span class="value-chip">' + text(key) + ': ' + core.formatNumber(values[key].value) + '</span>';
-        }).join("");
-        return '<tr><td class="cell-strong">' + text(row.security_id || row.instrument || "—") +
-          '</td><td>' + text(row.trading_date) + '</td><td><div class="value-chips">' +
-          (labels || "—") + '</div></td><td>' + text(row.as_of) + '</td></tr>';
-      }).join("") + "</tbody></table></div>";
-  }
 
-  function featuresMarkup() {
-    return pageHeader("技術指標", "均線 · 動能 · 趨勢 · 成交量") +
-      '<div class="feature-workbench" data-testid="feature-workbench">' +
-      technicalSnapshotMarkup(core.selectedKline(state)) +
-      '</div>' +
-      card("技術因子快照", "同一份 K 線資料的可追溯計算結果", featureMarkup());
-  }
 
-  function backtestSettingsMarkup() {
-    var savedLabel = backtestSettingsSaved ? "已儲存至本機 prototype 草稿" : "尚未儲存；不會啟動回測";
-    return '<section class="backtest-settings" data-testid="backtest-settings"><header class="backtest-settings-header"><div><span class="eyebrow">RESEARCH VALIDATION SETTINGS</span><h2>驗證設定草稿</h2><p>先固定資料、訊號與成交時間，再由人為決定是否執行可重播研究。</p></div><span class="status status-' + (backtestSettingsSaved ? "saved" : "draft") + '" data-testid="backtest-settings-status">' + text(savedLabel) + '</span></header><div class="backtest-settings-grid"><label><span>股票母體</span><select data-action="backtest-setting-input" data-field="universe" data-testid="backtest-universe">' + selectOptionMarkup(["目前自選", "目前群組", "人工指定清單"], backtestSettingsDraft.universe) + '</select></label><label><span>訊號計算時間</span><select data-action="backtest-setting-input" data-field="signal_time" data-testid="backtest-signal-time">' + selectOptionMarkup(["收盤後"], backtestSettingsDraft.signal_time) + '</select></label><label><span>成交時間</span><select data-action="backtest-setting-input" data-field="fill_time" data-testid="backtest-fill-time">' + selectOptionMarkup(["次日開盤", "次日 VWAP", "次日收盤"], backtestSettingsDraft.fill_time) + '</select></label><label><span>再平衡頻率</span><select data-action="backtest-setting-input" data-field="rebalance" data-testid="backtest-rebalance">' + selectOptionMarkup(["每週", "每月", "每季"], backtestSettingsDraft.rebalance) + '</select></label><label><span>最大持股數</span><input type="number" min="1" max="100" data-action="backtest-setting-input" data-field="max_positions" data-testid="backtest-max-positions" value="' + escapeHtml(backtestSettingsDraft.max_positions) + '"></label></div><div class="backtest-settings-footer"><span>禁止使用今日收盤資料、又以今日收盤成交；所有正式結果仍需 PIT、成本與資料品質檢查。</span><button class="btn btn-primary" type="button" data-action="backtest-settings-save" data-testid="backtest-settings-save">儲存設定草稿</button></div></section>';
-  }
 
-  function backtestMarkup() {
-    var backtest = view.backtest || {};
-    if (backtest.status !== "available" || !backtest.result) {
-      return '<div class="empty-state"><strong>回測狀態為 ' + text(backtest.status || "無資料") + '。</strong><span>在資料截至日確認可用前，不顯示結果。</span></div>';
-    }
-    var result = backtest.result;
-    var metrics = result.metrics || {};
-    var cards = [['cumulative_return', core.formatPercent(metrics.cumulative_return), "teal"],
-      ['annualized_return', core.formatPercent(metrics.annualized_return), "green"],
-      ['max_drawdown', core.formatPercent(metrics.max_drawdown), "red"],
-      ['turnover', core.formatNumber(metrics.turnover), "blue"],
-      ['trade_count', core.formatNumber(metrics.trade_count), "yellow"]];
-    var curve = Array.isArray(result.equity_curve) ? result.equity_curve : [];
-    return '<div class="row col-3 compact-metrics">' + cards.map(function (item) {
-      return '<article class="card metric-card"><span class="stat-icon ' + item[2] + '" aria-hidden="true">•</span><div><div class="stat-label">' +
-        text(item[0]) + '</div><div class="metric-value">' + text(item[1]) + '</div></div></article>';
-    }).join("") + '</div><div class="subsection"><div class="subsection-heading"><h2>資產曲線</h2><span class="muted">來源結果 · 唯讀</span></div>' +
-      (curve.length ? '<div class="table-responsive"><table class="table"><thead><tr><th>日期</th><th>資產</th><th>部位</th></tr></thead><tbody>' + curve.map(function (point) {
-        return '<tr><td>' + text(point.date || point.trading_date) + '</td><td class="cell-mono">' + core.formatNumber(point.equity) +
-          '</td><td>' + text(point.position) + '</td></tr>';
-      }).join("") + '</tbody></table></div>' : '<div class="empty-state">沒有資產曲線資料點。</div>') + '</div>';
-  }
 
   function card(title, subtitle, body, action) {
     return '<section class="card"><header class="card-header"><div><h2 class="card-title">' + text(title) +
@@ -1911,33 +1910,311 @@
       '<footer class="dialog-footer"><span>值來自 S8 資料快照。</span><button class="btn btn-primary" type="button" data-action="close-dialog">關閉</button></footer></section></div>';
   }
 
+  function summaryTile(label, value, hint, testid) {
+    return '<article data-testid="' + testid + '"><span>' + text(label) + '</span><strong>' + text(value) + '</strong><small>' + text(hint) + '</small></article>';
+  }
+
+  function homePageMarkup() {
+    var watched = (state.watchlist && state.watchlist.items || []).length;
+    var stages = core.buyStageSummary(state);
+    return pageHeader("Home", "今天哪些公司接近我的合理買進價格") +
+      '<section class="system-command-bar" data-testid="system-command-bar"><div><span class="eyebrow">VALUE RESEARCH WORKSPACE</span><strong>投資摘要</strong><span>本機 EOD · 截止 ' + text(view.as_of || "—") + '</span></div><div class="system-command-actions"><button class="btn btn-primary" type="button" data-action="section" data-section="watchlist">開啟 Watchlist</button><button class="btn btn-outline" type="button" data-action="section" data-section="valuation">估值工作表</button></div></section>' +
+      '<div class="system-metric-strip" data-testid="investment-summary">' +
+      summaryTile("追蹤標的", watched, "Watchlist 公司數", "summary-tracked") +
+      summaryTile("進入買進區", stages.first, "到達第一階段價", "summary-first-stage") +
+      summaryTile("進入甜蜜區", stages.sweet, "到達甜蜜價", "summary-sweet") +
+      summaryTile("基本面待確認", stages.pending, "需人工覆核", "summary-pending") +
+      summaryTile("假設失效", stages.invalid, "Thesis 已破壞", "summary-invalid") +
+      '</div>' +
+      card("價值機會", "依合理價值折價幅度排序；不使用動能、AI 或情緒分數", opportunityListMarkup(), "") +
+      '<div class="row col-8-4"><div>' + card("基本面更新", "只顯示會改變合理價值的變化", fundamentalChangeMarkup(), "") + '</div>' +
+      '<div>' + card("買進計畫狀態", "每檔目前位於哪一階段", buyPlanStatusMarkup(), "") + '</div></div>';
+  }
+
+  function opportunityListMarkup() {
+    var rows = core.opportunityRows(state);
+    if (!rows.length) {
+      return '<div class="empty-state" data-testid="opportunity-empty"><strong>尚無可排序的價值機會。</strong><span>先在 Valuation 建立 Base 合理價值，這裡才會依折價幅度排序；不以價格推估合理價值。</span></div>';
+    }
+    return '<div class="table-responsive"><table class="table" data-testid="opportunity-list"><thead><tr><th>股票</th><th>現價</th><th>合理價值</th><th>折價</th><th>狀態</th></tr></thead><tbody>' +
+      rows.map(function (row) {
+        return '<tr data-testid="opportunity-row"><td><span class="cell-strong">' + text(row.symbol) + '</span><small>' + text(row.name) + '</small></td>' +
+          '<td class="cell-mono">' + core.formatNumber(row.price) + '</td>' +
+          '<td class="cell-mono">' + core.formatNumber(row.base_value) + '</td>' +
+          '<td class="cell-mono ' + (row.discount < 0 ? "tone-down" : "tone-up") + '">' + core.formatPercent(row.discount) + '</td>' +
+          '<td>' + text(row.stage_label) + '</td></tr>';
+      }).join("") + '</tbody></table></div>';
+  }
+
+  function fundamentalChangeMarkup() {
+    return '<div class="timeline" data-testid="fundamental-changes"><div><span class="timeline-dot muted-dot"></span><div><strong>基本面來源尚未接入</strong><small>月營收、季報、EPS 與三率等待免費官方來源與 PIT 契約；不以每日股價波動充當基本面警報。</small></div></div></div>';
+  }
+
+  function buyPlanStatusMarkup() {
+    var rows = core.buyPlanStatusRows(state);
+    if (!rows.length) {
+      return '<div class="empty-state" data-testid="buyplan-status-empty"><strong>尚未建立買進計畫。</strong><span>在 Buy Plan 設定總預算與分段價格後，這裡會顯示目前階段。</span></div>';
+    }
+    return '<ul class="buyplan-status-list" data-testid="buyplan-status">' + rows.map(function (row) {
+      return '<li><strong>' + text(row.symbol) + '</strong><span>' + text(row.stage_label) + '</span></li>';
+    }).join("") + '</ul>';
+  }
+
+  function watchlistPageMarkup() {
+    return pageHeader("Watchlist", "追蹤清單 · 合理價值 · 折價幅度 · 買進階段") +
+      '<div class="data-source-banner"><strong>免費資料本地保存</strong><span>目前顯示已核准的本機資料；未接入付費訂閱、即時行情或券商。</span></div>' +
+      dataUpdateMarkup() + watchlistMarkup();
+  }
+
+  function companyPageMarkup() {
+    return pageHeader("Company", "公司研究工作區 · Thesis · 財報 · 趨勢 · 價格參考") +
+      quoteHeaderMarkup() +
+      card("Thesis 投資假設", "為什麼研究這家公司；什麼情況代表假設失效", thesisMarkup(), "") +
+      card("研究筆記", "支持、反證與下一個檢查點", notesMarkup(), "") +
+      card("Fundamental Snapshot", "已擷取期別的核心財報欄位", fundamentalSnapshotMarkup(), "") +
+      card("研究狀態", "產業、基本面、投資假設與下一個事件；驅動 Watchlist 與 Home", companyStatusMarkup(), "") +
+      card("Trend Table", "最近 8 季與最近 12 個月", trendTableMarkup(), "") +
+      card("Price Reference", "歷史價格位置 · 前高前低 · 回檔幅度；不參與價值判斷", klineMarkup(), "");
+  }
+
+  function fundamentalsFor(securityId) {
+    return fundamentalsCache[securityId] || null;
+  }
+
+  function ensureFundamentals() {
+    var instrument = selectedKlineInstrument();
+    var symbol = instrument && instrument.symbol;
+    if (!symbol || fundamentalsCache[symbol] !== undefined || fundamentalsRequests[symbol]) return;
+    fundamentalsRequests[symbol] = true;
+    sidecarFetch("/fundamentals?security_id=" + encodeURIComponent(symbol))
+      .then(function (payload) {
+        fundamentalsCache[symbol] = payload && payload.schema === "tw-quant-engine-sidecar-fundamentals/v1" ? payload : null;
+        render();
+      })
+      .catch(function () {
+        // No local series yet, or the sidecar is unavailable. The panel keeps
+        // its explicit unavailable state rather than inventing a number.
+        fundamentalsCache[symbol] = null;
+        render();
+      });
+  }
+
+  function pctCell(value) {
+    return value === null || value === undefined ? "—" : core.formatPercent(value);
+  }
+
+  function fundamentalSnapshotMarkup() {
+    var instrument = selectedKlineInstrument();
+    var symbol = instrument && instrument.symbol;
+    var data = symbol ? fundamentalsFor(symbol) : null;
+    var revenue = data && data.monthly_revenue.observations[0];
+    var income = data && data.income_statement.observations[0];
+    var balance = data && data.balance_sheet && data.balance_sheet.observations[0];
+    if (!revenue && !income && !balance) {
+      return '<div class="empty-state" data-testid="fundamental-snapshot-empty"><strong>此標的尚無已擷取的基本面期別。</strong><span>執行 <code>scripts/capture_twse_fundamentals.py</code> 擷取一期後才會顯示；不以價格推估，也不補 0。</span></div>';
+    }
+    function tile(label, value, hint, testid) {
+      return '<article class="fundamental-metric" data-testid="' + testid + '"><span>' + text(label) + '</span><strong>' + text(value) + '</strong><small>' + text(hint) + '</small></article>';
+    }
+    var revenueValues = revenue ? revenue.values : {};
+    var incomeValues = income ? income.values : {};
+    var balanceValues = balance ? balance.values : {};
+    return '<div class="fundamental-metric-grid" data-testid="fundamental-snapshot">' +
+      tile("月營收 YoY", revenue ? pctCell(revenueValues.revenue_yoy) : "—", revenue ? revenue.period : "未擷取", "fundamental-revenue-yoy") +
+      tile("月營收 MoM", revenue ? pctCell(revenueValues.revenue_mom) : "—", revenue ? revenue.period : "未擷取", "fundamental-revenue-mom") +
+      tile("EPS", income && incomeValues.eps !== null ? core.formatNumber(incomeValues.eps) : "—", income ? income.period : "未擷取", "fundamental-eps") +
+      tile("毛利率", income ? pctCell(incomeValues.gross_margin) : "—", income ? income.period : "未擷取", "fundamental-gross-margin") +
+      tile("營益率", income ? pctCell(incomeValues.operating_margin) : "—", income ? income.period : "未擷取", "fundamental-operating-margin") +
+      tile("淨利率", income ? pctCell(incomeValues.net_margin) : "—", income ? income.period : "未擷取", "fundamental-net-margin") +
+      tile("負債比", balance ? pctCell(balanceValues.debt_ratio) : "—", balance ? balance.period : "未擷取", "fundamental-debt-ratio") +
+      tile("流動比", balance && balanceValues.current_ratio !== null ? core.formatNumber(balanceValues.current_ratio) : "—", balance ? balance.period : "未擷取", "fundamental-current-ratio") +
+      tile("每股淨值", balance && balanceValues.bvps !== null ? core.formatNumber(balanceValues.bvps) : "—", balance ? balance.period : "未擷取", "fundamental-bvps") +
+      '</div>' +
+      '<p class="valuation-note" data-testid="fundamental-provenance">來源 ' + text(data.attribution) + '｜available_at 採交易所整批出表日（保守上界），非公司公告時間；published_at 未接入。</p>';
+  }
+
+  function trendTableMarkup() {
+    var instrument = selectedKlineInstrument();
+    var symbol = instrument && instrument.symbol;
+    var data = symbol ? fundamentalsFor(symbol) : null;
+    if (!data) {
+      return '<div class="empty-state" data-testid="trend-table-empty"><strong>季度與月營收趨勢尚未擷取。</strong><span>免費官方來源每次只發布一期，序列以 forward accumulation 累積；缺資料不補 0、不內插、不延用前期。</span></div>';
+    }
+    var quarters = data.income_statement.observations;
+    var months = data.monthly_revenue.observations;
+    var quarterRows = quarters.length ? quarters.map(function (item) {
+      var v = item.values;
+      return '<tr data-testid="trend-quarter-row"><td>' + text(item.period) + '</td>' +
+        '<td class="cell-mono">' + core.formatNumber(v.revenue) + '</td>' +
+        '<td class="cell-mono">' + pctCell(v.gross_margin) + '</td>' +
+        '<td class="cell-mono">' + pctCell(v.operating_margin) + '</td>' +
+        '<td class="cell-mono">' + pctCell(v.net_margin) + '</td>' +
+        '<td class="cell-mono">' + (v.eps === null ? "—" : core.formatNumber(v.eps)) + '</td></tr>';
+    }).join("") : '<tr><td colspan="6">尚無已擷取的季別。</td></tr>';
+    var monthRows = months.length ? months.map(function (item) {
+      var v = item.values;
+      return '<tr data-testid="trend-month-row"><td>' + text(item.period) + '</td>' +
+        '<td class="cell-mono">' + core.formatNumber(v.monthly_revenue) + '</td>' +
+        '<td class="cell-mono">' + pctCell(v.revenue_mom) + '</td>' +
+        '<td class="cell-mono">' + pctCell(v.revenue_yoy) + '</td>' +
+        '<td class="cell-mono">' + pctCell(v.cumulative_yoy) + '</td></tr>';
+    }).join("") : '<tr><td colspan="5">尚無已擷取的月份。</td></tr>';
+    var balances = data.balance_sheet ? data.balance_sheet.observations : [];
+    var balanceRows = balances.length ? balances.map(function (item) {
+      var v = item.values;
+      return '<tr data-testid="trend-balance-row"><td>' + text(item.period) + '</td>' +
+        '<td class="cell-mono">' + pctCell(v.debt_ratio) + '</td>' +
+        '<td class="cell-mono">' + (v.current_ratio === null ? "—" : core.formatNumber(v.current_ratio)) + '</td>' +
+        '<td class="cell-mono">' + (v.bvps === null ? "—" : core.formatNumber(v.bvps)) + '</td></tr>';
+    }).join("") : '<tr><td colspan="4">尚無已擷取的財務品質期別。</td></tr>';
+    return '<div class="trend-coverage" data-testid="trend-coverage">' +
+      '<span>季報深度 <strong data-testid="trend-coverage-quarters">' + text(data.income_statement.coverage.label) + '</strong></span>' +
+      '<span>月營收深度 <strong data-testid="trend-coverage-months">' + text(data.monthly_revenue.coverage.label) + '</strong></span>' +
+      '<span>財務品質深度 <strong data-testid="trend-coverage-balance">' + text(data.balance_sheet ? data.balance_sheet.coverage.label : "0 / 8") + '</strong></span>' +
+      '<span class="muted">forward accumulation：每次擷取只會多一期</span></div>' +
+      '<div class="table-responsive"><table class="table" data-testid="trend-quarters"><thead><tr><th>季度</th><th>營收</th><th>毛利率</th><th>營益率</th><th>淨利率</th><th>EPS</th></tr></thead><tbody>' + quarterRows + '</tbody></table></div>' +
+      '<div class="table-responsive"><table class="table" data-testid="trend-months"><thead><tr><th>月份</th><th>營收</th><th>月增</th><th>年增</th><th>累計年增</th></tr></thead><tbody>' + monthRows + '</tbody></table></div>' +
+      '<div class="table-responsive"><table class="table" data-testid="trend-balance"><thead><tr><th>季度</th><th>負債比</th><th>流動比</th><th>每股淨值</th></tr></thead><tbody>' + balanceRows + '</tbody></table></div>';
+  }
+
+  function valuationPageMarkup() {
+    return pageHeader("Valuation", "Bear／Base／Bull · 合理本益比 · 買進區間") + valuationMarkup();
+  }
+
+  function buyPlanAllocField(key, label, testid) {
+    var field = "alloc" + key.charAt(0).toUpperCase() + key.slice(1);
+    return '<label><span>' + text(label) + '（%）</span><input type="number" min="0" max="100" step="1" inputmode="decimal" value="' + escapeHtml(buyPlanDraft[field]) + '" data-action="buyplan-input" data-field="' + field + '" data-testid="' + testid + '"></label>';
+  }
+
+  function buyPlanPageMarkup() {
+    var instrument = selectedKlineInstrument();
+    var instrumentId = state.selectedKlineInstrumentId;
+    var symbol = instrument && instrument.symbol;
+    if (!instrumentId || !symbol) {
+      return pageHeader("Buy Plan", "總預算 · 分段價格 · 分段比例 · 到價提示") +
+        card("分段買進計畫", "先選一家公司", '<div class="empty-state" data-testid="buyplan-no-instrument"><strong>尚未選擇公司。</strong><span>在 Watchlist 或 Company 選定標的後，才能為它建立分段買進計畫。</span></div>', "");
+    }
+    var issues = core.buyPlanFormIssues(buyPlanDraft);
+    var tranches = core.buyPlanTranches(state, instrumentId);
+    var hasZone = tranches.some(function (item) { return item.price !== null; });
+    var rows = tranches.map(function (item) {
+      var reachedLabel = item.reached === null ? "—" : item.reached ? "已到價" : "未到價";
+      return '<tr data-testid="buyplan-tranche" data-tranche="' + item.key + '"><td>' + text(item.label) + '</td>' +
+        '<td class="cell-mono">' + (item.price === null ? "—" : core.formatNumber(item.price)) + '</td>' +
+        '<td class="cell-mono">' + text(item.allocation_pct) + '%</td>' +
+        '<td class="cell-mono">' + (item.amount === null ? "—" : core.formatNumber(item.amount)) + '</td>' +
+        '<td data-testid="buyplan-reached">' + text(reachedLabel) + '</td></tr>';
+    }).join("");
+
+    var reached = tranches.filter(function (item) { return item.reached === true; });
+    var prompt = reached.length
+      ? '<div class="buyplan-prompt" data-testid="buyplan-prompt"><strong>價格已進入' + text(reached[reached.length - 1].label) + '區間。</strong><span>請確認投資假設是否仍成立，再由你自己決定是否買進。系統不代為判斷。</span></div>'
+      : '<div class="buyplan-prompt muted" data-testid="buyplan-prompt-idle"><strong>尚未進入任何分段區間。</strong><span>到價時這裡只會提示你回頭檢查 Thesis。</span></div>';
+
+    return pageHeader("Buy Plan", "總預算 · 分段價格 · 分段比例 · 到價提示") +
+      card("分段買進計畫", text(symbol) + " · 價格由 Valuation 的買進區間帶入", 
+        '<div class="buyplan-form" data-testid="buyplan-form">' +
+        '<label><span>總預算</span><input type="number" min="0" step="1000" inputmode="decimal" value="' + escapeHtml(buyPlanDraft.totalBudget) + '" data-action="buyplan-input" data-field="totalBudget" data-testid="buyplan-budget"></label>' +
+        buyPlanAllocField("first", "第一階段", "buyplan-alloc-first") +
+        buyPlanAllocField("second", "第二階段", "buyplan-alloc-second") +
+        buyPlanAllocField("sweet", "甜蜜區", "buyplan-alloc-sweet") +
+        buyPlanAllocField("reserve", "保留資金", "buyplan-alloc-reserve") +
+        '<label><span>投資組合上限（%）</span><input type="number" min="0" max="100" step="1" inputmode="decimal" value="' + escapeHtml(buyPlanDraft.maxPositionPct) + '" data-action="buyplan-input" data-field="maxPositionPct" data-testid="buyplan-max-position"></label>' +
+        '<div class="buyplan-actions"><button class="btn btn-primary" type="button" data-action="buyplan-save" data-testid="buyplan-save"' + (issues.length ? " disabled" : "") + '>儲存買進計畫</button>' +
+        formIssuesMarkup(issues, "buyplan-issues") + '</div></div>', "") +
+      card("分段狀態", hasZone ? "價格對照 Valuation 的買進區間" : "尚未建立估值", 
+        (hasZone ? "" : '<div class="empty-state" data-testid="buyplan-no-valuation"><strong>此標的尚未建立 Base 合理價值。</strong><span>分段價格一律由估值推導，不從市價或歷史高點回推。</span></div>') +
+        '<div class="table-responsive"><table class="table" data-testid="buyplan-table"><thead><tr><th>階段</th><th>價格</th><th>比例</th><th>金額</th><th>到價</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+        prompt +
+        '<p class="valuation-note">到價只提示你回頭檢查投資假設。這裡不提供、也不會出現「建議買進」「強力買進」或任何信心分數；沒有下單、模擬下單或券商連線。</p>', "");
+  }
+
+  function thesisMarkup() {
+    var instrumentId = state.selectedKlineInstrumentId;
+    if (!instrumentId) {
+      return '<div class="empty-state" data-testid="thesis-no-instrument"><strong>尚未選擇公司。</strong><span>選定標的後即可記錄投資假設。</span></div>';
+    }
+    var thesis = core.thesisFor(state, instrumentId);
+    var fields = core.THESIS_FIELDS.map(function (pair) {
+      return '<label class="thesis-field"><span>' + text(pair[1]) + '</span>' +
+        '<textarea rows="3" maxlength="2000" data-action="thesis-input" data-field="' + pair[0] + '" data-testid="thesis-' + pair[0] + '">' + escapeHtml(thesis[pair[0]]) + '</textarea></label>';
+    }).join("");
+    return '<section class="thesis-form" data-testid="thesis-form">' + fields +
+      '<div class="thesis-footer"><span data-testid="thesis-last-checked">最後檢查日期：' + text(thesis.last_checked || "尚未檢查") + '</span>' +
+      '<button class="btn btn-primary" type="button" data-action="thesis-check" data-testid="thesis-check">標記今日已檢查</button></div>' +
+      '<p class="valuation-note">Thesis 是你自己的判斷記錄，不會被任何計算覆寫；失效條件請寫成可驗證的事實，例如「連續兩季營收年增轉負」。</p></section>';
+  }
+
+  function reviewPageMarkup() {
+    var instrumentId = state.selectedKlineInstrumentId;
+    var instrument = selectedKlineInstrument();
+    if (!instrumentId || !instrument) {
+      return pageHeader("Review", "月／季審查 · 假設是否仍成立") +
+        card("投資審查", "先選一家公司", '<div class="empty-state" data-testid="review-no-instrument"><strong>尚未選擇公司。</strong><span>在 Watchlist 或 Company 選定標的後才能建立審查記錄。</span></div>', "");
+    }
+    var issues = core.reviewFormIssues(reviewDraft);
+    var questions = core.REVIEW_QUESTIONS.map(function (pair) {
+      return '<label><span>' + text(pair[1]) + '</span><select data-action="review-input" data-field="' + pair[0] + '" data-testid="review-' + pair[0] + '">' +
+        '<option value="">未回答</option>' +
+        core.REVIEW_ANSWERS.map(function (answer) {
+          return '<option value="' + escapeHtml(answer) + '"' + (reviewDraft[pair[0]] === answer ? " selected" : "") + '>' + text(answer) + '</option>';
+        }).join("") + '</select></label>';
+    }).join("");
+    var history = core.reviewsFor(state, instrumentId);
+    var historyMarkup = history.length ? '<div class="table-responsive"><table class="table" data-testid="review-history"><thead><tr><th>審查日</th><th>營收</th><th>EPS</th><th>毛利率</th><th>展望</th><th>假設</th><th>結果</th></tr></thead><tbody>' +
+      history.map(function (entry) {
+        return '<tr data-testid="review-row"><td>' + text(entry.review_date) + '</td>' +
+          core.REVIEW_QUESTIONS.map(function (pair) { return '<td>' + text(entry[pair[0]]) + '</td>'; }).join("") +
+          '<td data-testid="review-outcome">' + text(entry.outcome) + '</td></tr>';
+      }).join("") + '</tbody></table></div>'
+      : '<div class="empty-state" data-testid="review-history-empty"><strong>尚無審查記錄。</strong><span>每月或每季回答上方問題，留下你當時的判斷依據。</span></div>';
+
+    return pageHeader("Review", "月／季審查 · 假設是否仍成立") +
+      card("本次審查", text(instrument.symbol) + " · 避免買進後忘記原本理由",
+        '<div class="review-form" data-testid="review-form">' + questions +
+        '<label><span>審查結果</span><select data-action="review-input" data-field="outcome" data-testid="review-outcome-select">' +
+        '<option value="">未選擇</option>' +
+        core.REVIEW_OUTCOMES.map(function (outcome) {
+          return '<option value="' + escapeHtml(outcome) + '"' + (reviewDraft.outcome === outcome ? " selected" : "") + '>' + text(outcome) + '</option>';
+        }).join("") + '</select></label>' +
+        '<label><span>審查日期</span><input type="date" value="' + escapeHtml(reviewDraft.review_date) + '" data-action="review-input" data-field="review_date" data-testid="review-date"></label>' +
+        '<label class="review-note"><span>備註</span><textarea rows="3" maxlength="1000" data-action="review-input" data-field="note" data-testid="review-note">' + escapeHtml(reviewDraft.note) + '</textarea></label>' +
+        '<div class="review-actions"><button class="btn btn-primary" type="button" data-action="review-save" data-testid="review-save"' + (issues.length ? " disabled" : "") + '>儲存審查</button>' +
+        formIssuesMarkup(issues, "review-issues") + '</div></div>', "") +
+      card("審查歷史", "每一次結論都留下日期與依據", historyMarkup, "");
+  }
+
+  function evidencePageMarkup() {
+    return pageHeader("資料來源", "資料脈絡與可重現性") +
+      card("證據登錄表", "資料快照識別與來源連結", '<div class="lineage-grid"><div><span class="detail-label">資料格式</span><p>' + text(view.schema) +
+        '</p></div><div><span class="detail-label">視圖摘要雜湊</span><p class="mono">' + text(view.view_digest || "未記錄") +
+        '</p></div><div><span class="detail-label">資料截至</span><p>' + text(view.as_of) + '</p></div><div><span class="detail-label">證據連結</span>' + evidenceMarkup(view.evidence_links) + '</div></div>', "");
+  }
+
   function mainMarkup() {
     var section = state.activeSection;
-    if (section === "market") return marketTerminalMarkup();
-    if (section === "products") return pageHeader("我的自選", "自選清單 · 報價欄位 · 快速切換") + '<div class="data-source-banner"><strong>免費資料本地保存</strong><span>目前顯示已核准的本地資料；未接入付費訂閱、即時行情或券商。</span></div>' + watchlistMarkup() + card("資料快照", "目前可供研究的原始／標準化列", productRows(view.products));
-    if (section === "features") return featuresMarkup();
-    if (section === "research") return researchMarkup();
-    if (section === "fundamentals") return fundamentalsMarkup();
-    if (section === "stories") return storiesMarkup();
+    if (section === "watchlist") return watchlistPageMarkup();
+    if (section === "company") return companyPageMarkup();
+    if (section === "valuation") return valuationPageMarkup();
+    if (section === "buyplan") return buyPlanPageMarkup();
+    if (section === "review") return reviewPageMarkup();
     if (section === "settings") return settingsMarkup();
-    if (section === "backtest") return pageHeader("驗證報告", "回測設定 · 研究結果 · 資料品質") + backtestSettingsMarkup() + '<div class="report-command-bar"><div><strong>研究報告快照</strong><span>只讀取已保存的回測結果；不自動執行。</span></div><div class="report-tabs"><button class="report-tab active" type="button">績效</button><button class="report-tab" type="button">風險</button><button class="report-tab" type="button">持倉</button><button class="report-tab" type="button">交易</button></div></div><div class="calculation-boundary"><strong>這裡只保存人為啟動的研究計算結果。</strong><span>不代表即時策略、不會送單，也不會自動升格為投資決策。</span></div>' + card("回測報告快照", "可重播的研究結果，不是交易執行", backtestMarkup());
-    if (section === "evidence") return pageHeader("資料與證據", "資料脈絡與可重現性") + card("證據登錄表", "資料快照識別與來源連結", '<div class="lineage-grid"><div><span class="detail-label">資料格式</span><p>' + text(view.schema) +
-      '</p></div><div><span class="detail-label">視圖摘要雜湊</span><p class="mono">' + text(view.view_digest || "未記錄") +
-      '</p></div><div><span class="detail-label">資料截至</span><p>' + text(view.as_of) + '</p></div><div><span class="detail-label">證據連結</span>' + evidenceMarkup(view.evidence_links) + '</div></div>');
-    return cockpitMarkup();
+    if (section === "evidence") return evidencePageMarkup();
+    return homePageMarkup();
   }
 
   function systemTopbarMarkup() {
     var active = state.activeSection;
-    var links = [{ id: "market", label: "行情" }, { id: "products", label: "自選" }, { id: "research", label: "因子" }, { id: "backtest", label: "驗證" }, { id: "stories", label: "筆記" }];
+    var links = [{ id: "watchlist", label: "自選" }, { id: "company", label: "公司" }, { id: "valuation", label: "估值" }, { id: "buyplan", label: "買進計畫" }, { id: "review", label: "審查" }];
     var instruments = core.klineInstruments(state.view);
-    return '<header class="topbar system-topbar"><div class="system-topbar-left"><div class="breadcrumb"><span>TQR / MARKET</span><span class="sep">/</span><span class="current">' + text(core.SECTIONS.find(function (item) { return item.id === active; }).label) + '</span></div><nav class="system-quick-nav" aria-label="快速工具">' + links.map(function (link) { return '<button class="system-quick-link' + (active === link.id ? ' active' : '') + '" type="button" data-action="section" data-section="' + link.id + '">' + text(link.label) + '</button>'; }).join('') + '</nav></div><div class="system-topbar-right"><div class="system-global-search symbol-search"><label><span>搜尋標的</span><input type="search" autocomplete="off" placeholder="代號 / 名稱" value="' + escapeHtml(klineSearchQuery || '') + '" data-action="global-search" data-testid="global-search" aria-controls="global-search-results"></label>' + symbolSearchResults(instruments, klineSearchQuery, [], state.selectedKlineInstrumentId, "global-search-results", "global-search-pick") + '</div><span class="system-feed-status"><i></i>EOD · 本機</span><span class="read-only-pill">研究唯讀</span><button class="btn btn-outline btn-sm" type="button" data-action="reset">重設視圖</button></div></header>';
+    return '<header class="topbar system-topbar"><div class="system-topbar-left"><div class="breadcrumb"><span>VALUE RESEARCH</span><span class="sep">/</span><span class="current">' + text(core.SECTIONS.find(function (item) { return item.id === active; }).label) + '</span></div><nav class="system-quick-nav" aria-label="快速工具">' + links.map(function (link) { return '<button class="system-quick-link' + (active === link.id ? ' active' : '') + '" type="button" data-action="section" data-section="' + link.id + '">' + text(link.label) + '</button>'; }).join('') + '</nav></div><div class="system-topbar-right"><div class="system-global-search symbol-search"><label><span>搜尋標的</span><input type="search" autocomplete="off" placeholder="代號 / 名稱" value="' + escapeHtml(klineSearchQuery || '') + '" data-action="global-search" data-testid="global-search" aria-controls="global-search-results"></label>' + symbolSearchResults(instruments, klineSearchQuery, [], state.selectedKlineInstrumentId, "global-search-results", "global-search-pick") + '</div><span class="system-feed-status"><i></i>EOD · 本機</span><span class="read-only-pill">研究唯讀</span><button class="btn btn-outline btn-sm" type="button" data-action="reset">重設視圖</button></div></header>';
   }
 
   function render() {
-    root.innerHTML = '<div class="app-shell"><aside class="sidebar"><div class="sidebar-brand"><img class="brand-logo" src="./tqr-logo.svg" alt="TQR"><span class="brand-name">TQR <small>個人台股研究終端</small></span></div><nav class="sidebar-nav" aria-label="主導覽">' + navMarkup() + '</nav><div class="sidebar-footer"><div class="sidebar-note"><span class="read-only-icon">唯</span><p><strong>免費優先 · 本機記錄</strong><span>行情、筆記與資料唯讀；不含即時、下單或自動交易。</span></p></div></div></aside><main class="main">' + systemTopbarMarkup() + '<div class="page-wrapper" id="main-content" tabindex="-1">' + mainMarkup() + '</div><footer class="footer"><span>資料格式 ' + text(view.schema) + '</span><span>本機行情 · 自選 · 筆記</span></footer></main></div>' + detailDialog();
+    root.innerHTML = '<div class="app-shell"><aside class="sidebar"><div class="sidebar-brand"><img class="brand-logo" src="./tqr-logo.svg" alt="Value Research Workspace"><span class="brand-name">Value Research <small>台股價值投資研究工作台</small></span></div><nav class="sidebar-nav" aria-label="主導覽">' + navMarkup() + '</nav><div class="sidebar-footer"><div class="sidebar-note"><span class="read-only-icon">唯</span><p><strong>免費優先 · 本機記錄</strong><span>財報決定價值、估值決定買進價格；市場只提供成交機會。</span></p></div></div></aside><main class="main">' + systemTopbarMarkup() + '<div class="page-wrapper" id="main-content" tabindex="-1">' + mainMarkup() + '</div><footer class="footer"><span>資料格式 ' + text(view.schema) + '</span><span>本機資料 · 人工估值 · 最後決策保留人工</span></footer></main></div>' + detailDialog();
     renderKlineChart();
     ensureKlineRuntime();
+    ensureFundamentals();
   }
 
   root.addEventListener("click", function (event) {
@@ -1968,6 +2245,20 @@
       persistValuation();
     }
     if (action === "valuation-evaluate") evaluateValuation();
+    if (action === "review-save") {
+      saveReviewFromDraft();
+      return;
+    }
+    if (action === "thesis-check") {
+      state = core.reduce(state, { type: "SET_THESIS_FIELD", instrumentId: state.selectedKlineInstrumentId, field: "last_checked", value: todayIso() });
+      persistResearchStores();
+      render();
+      return;
+    }
+    if (action === "buyplan-save") {
+      saveBuyPlanFromDraft();
+      return;
+    }
     if (action === "theme-set") applyTheme(target.getAttribute("data-theme"));
     if (action === "update-check") {
       checkAppUpdate();
@@ -1976,25 +2267,6 @@
     if (action === "update-install") {
       installAppUpdate();
       return;
-    }
-    if (action === "screen-condition") {
-      var conditionId = target.getAttribute("data-condition-id");
-      var conditionIndex = screenConditions.indexOf(conditionId);
-      if (conditionIndex >= 0) screenConditions.splice(conditionIndex, 1);
-      else if (conditionId) screenConditions.push(conditionId);
-    }
-    if (action === "formula-add") {
-      formulaRows.push(defaultFormulaRow("rule-" + Date.now()));
-    }
-    if (action === "formula-remove") {
-      var removeRuleId = target.getAttribute("data-rule-id");
-      if (formulaRows.length > 1) formulaRows = formulaRows.filter(function (rule) { return rule.id !== removeRuleId; });
-    }
-    if (action === "financial-review-save") {
-      financialReviewSaved = savePrototypeDraft(FINANCIAL_REVIEW_LOCAL_STORAGE_KEY, financialReviewDraft);
-    }
-    if (action === "backtest-settings-save") {
-      backtestSettingsSaved = savePrototypeDraft(BACKTEST_SETTINGS_LOCAL_STORAGE_KEY, backtestSettingsDraft);
     }
     if (action === "kline-fit" && chartInstance) {
       chartInstance.timeScale().fitContent();
@@ -2069,10 +2341,6 @@
     if (action === "watchlist-toggle" && state.selectedKlineInstrumentId) {
       state = core.reduce(state, { type: "TOGGLE_WATCHLIST", instrumentId: state.selectedKlineInstrumentId });
     }
-    if (action === "research-add-group") {
-      state = core.reduce(state, { type: "ADD_TO_WATCHLIST_GROUP", instrumentId: target.getAttribute("data-instrument-id") });
-    }
-    if (action === "screen-apply") state = core.reduce(state, { type: "APPLY_SCREEN_SPEC" });
     if (action === "watchlist-remove") {
       state = core.reduce(state, { type: "REMOVE_WATCHLIST", instrumentId: target.getAttribute("data-instrument-id") });
       if (watchlistSearchSelection === target.getAttribute("data-instrument-id")) watchlistSearchSelection = null;
@@ -2096,7 +2364,6 @@
         chartDrawings = [];
         chartDrawingModelKey = null;
         chartTemplateName = "default";
-        screenConditions = [];
       }
     }
     render();
@@ -2125,29 +2392,6 @@
       state = core.reduce(state, { type: "SET_DATA_UPDATE_SCOPE", scope: target.value });
       render();
       return;
-    }
-    if (target.getAttribute("data-action") === "screen-input") {
-      state = core.reduce(state, { type: "SET_SCREEN_SPEC", field: target.getAttribute("data-field"), value: target.value });
-      return;
-    }
-    if (target.getAttribute("data-action") === "formula-input") {
-      formulaRows = formulaRows.map(function (rule) {
-        if (rule.id !== target.getAttribute("data-rule-id")) return rule;
-        var next = Object.assign({}, rule);
-        next[target.getAttribute("data-field")] = target.type === "checkbox" ? String(target.checked) : target.value;
-        if (target.type === "checkbox") next.enabled = target.checked;
-        return next;
-      });
-      return;
-    }
-    if (target.getAttribute("data-action") === "financial-review-input") {
-      financialReviewDraft[target.getAttribute("data-field")] = target.value;
-      financialReviewSaved = false;
-      return;
-    }
-    if (target.getAttribute("data-action") === "backtest-setting-input") {
-      backtestSettingsDraft[target.getAttribute("data-field")] = target.value;
-      backtestSettingsSaved = false;
     }
     if (target.getAttribute("data-action") === "alert-input") {
       alertDraft[target.getAttribute("data-field")] = target.value;
@@ -2190,31 +2434,47 @@
       refreshSearchResults("global-search-results", symbolSearchResults(core.klineInstruments(state.view), klineSearchQuery, [], state.selectedKlineInstrumentId, "global-search-results", "global-search-pick"));
       return;
     }
-    if (target.getAttribute("data-action") === "screen-input") {
-      state = core.reduce(state, { type: "SET_SCREEN_SPEC", field: target.getAttribute("data-field"), value: target.value });
+    if (target.getAttribute("data-action") === "company-record") {
+      var companyField = target.getAttribute("data-field");
+      var companyValue = companyField === "held" ? target.value === "true" : target.value;
+      state = core.reduce(state, {
+        type: "SET_COMPANY_RECORD",
+        instrumentId: state.selectedKlineInstrumentId,
+        field: companyField,
+        value: companyValue,
+        now: todayIso()
+      });
+      persistCompanyResearch();
+      render();
+      return;
+    }
+    if (target.getAttribute("data-action") === "thesis-input") {
+      state = core.reduce(state, { type: "SET_THESIS_FIELD", instrumentId: state.selectedKlineInstrumentId, field: target.getAttribute("data-field"), value: target.value });
+      persistResearchStores();
+      return;
+    }
+    if (target.getAttribute("data-action") === "review-input") {
+      reviewDraft[target.getAttribute("data-field")] = target.value;
+      render();
+      return;
+    }
+    if (target.getAttribute("data-action") === "buyplan-input") {
+      buyPlanDraft[target.getAttribute("data-field")] = target.value;
+      render();
+      return;
+    }
+    if (target.getAttribute("data-action") === "watchlist-filter") {
+      state = core.reduce(state, { type: "SET_WATCHLIST_FILTER", field: target.getAttribute("data-field"), value: target.value });
+      render();
+      return;
+    }
+    if (target.getAttribute("data-action") === "watchlist-sort") {
+      state = core.reduce(state, { type: "SET_WATCHLIST_SORT", value: target.value });
+      render();
       return;
     }
     if (target.getAttribute("data-action") === "note-input") {
       state = core.reduce(state, { type: "SET_NOTE_DRAFT", field: target.getAttribute("data-field"), value: target.value });
-      return;
-    }
-    if (target.getAttribute("data-action") === "formula-input") {
-      formulaRows = formulaRows.map(function (rule) {
-        if (rule.id !== target.getAttribute("data-rule-id")) return rule;
-        var next = Object.assign({}, rule);
-        next[target.getAttribute("data-field")] = target.value;
-        return next;
-      });
-      return;
-    }
-    if (target.getAttribute("data-action") === "financial-review-input") {
-      financialReviewDraft[target.getAttribute("data-field")] = target.value;
-      financialReviewSaved = false;
-      return;
-    }
-    if (target.getAttribute("data-action") === "backtest-setting-input") {
-      backtestSettingsDraft[target.getAttribute("data-field")] = target.value;
-      backtestSettingsSaved = false;
       return;
     }
     if (target.getAttribute("data-action") === "alert-input") {
@@ -2284,6 +2544,8 @@
   });
 
   loadPrototypeDrafts();
+  loadBuyPlans();
+  loadResearchStores();
   ensureNotesRuntime();
   ensureAlertsRuntime();
   ensureValuationRuntime();

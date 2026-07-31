@@ -6,7 +6,7 @@
     "path": "docs/tqr-research-platform-spec.md",
     "status": "active",
     "authority": "docs/tqe-product-boundary.md#research-planning-and-tracking-prototype-v1",
-    "decision": "TQR-IA-002"
+    "decision": "TQR-IA-003"
   },
   "purpose": "Track every unavailable, disabled, and draft-only field group in the TQR research planning and tracking prototype v1, with the rendering behaviour and the admission preconditions required before each group may become a computed or official field. This file does not modify the spec and does not enable any field.",
   "hard_boundary": "No real-time quotes, paid sources, provider credentials, broker connectivity, order placement, unattended screening, or automatic promotion is authorized by these contracts (spec lines 14-18).",
@@ -41,15 +41,27 @@
         "data-quality admission contract (spec line 51)"
       ],
       "spec_sections": [
-        {"section": "Data availability vocabulary", "lines": "49-51"},
-        {"section": "Field dictionary / Fundamentals and valuation", "lines": "90-96"},
-        {"section": "IA map / 財務追蹤", "lines": "29"}
+        {
+          "section": "Data availability vocabulary",
+          "lines": "49-51"
+        },
+        {
+          "section": "Field dictionary / Fundamentals and valuation",
+          "lines": "90-96"
+        },
+        {
+          "section": "IA map / 財務追蹤",
+          "lines": "29"
+        }
       ]
     },
     {
       "contract_id": "tqr-unavailable/forward-eps-pe",
       "category": "forward_eps_pe",
-      "fields": ["forward_eps", "forward_pe"],
+      "fields": [
+        "forward_eps",
+        "forward_pe"
+      ],
       "render_behavior": "unavailable",
       "ui_treatment": "em dash plus an explicit source gap; unavailable for this entire product phase",
       "required_source_type": "none_admitted_in_this_phase",
@@ -58,13 +70,18 @@
         "any future source must satisfy the no-paid-source, no-credential boundary (spec lines 14-16)"
       ],
       "spec_sections": [
-        {"section": "Data availability vocabulary", "lines": "52"}
+        {
+          "section": "Data availability vocabulary",
+          "lines": "52"
+        }
       ]
     },
     {
       "contract_id": "tqr-unavailable/adjusted-close",
       "category": "adjusted_close",
-      "fields": ["adjusted_close"],
+      "fields": [
+        "adjusted_close"
+      ],
       "render_behavior": "disabled",
       "ui_treatment": "Close is the only current price basis; Adjusted Close stays disabled (spec lines 52-54)",
       "required_source_type": "corporate_action_adjusted_ohlcv",
@@ -78,7 +95,10 @@
         "P5.4 applies the defined policy after source admission (tqe-p5-adjusted-ohlcv-volume-policy.json: p5_4_application_required=true)"
       ],
       "spec_sections": [
-        {"section": "Data availability vocabulary", "lines": "52-54"}
+        {
+          "section": "Data availability vocabulary",
+          "lines": "52-54"
+        }
       ]
     },
     {
@@ -96,7 +116,10 @@
         "point-in-time availability and data-quality state recorded per record (spec line 18)"
       ],
       "spec_sections": [
-        {"section": "Field dictionary / Market and price", "lines": "63, 65-68"}
+        {
+          "section": "Field dictionary / Market and price",
+          "lines": "63, 65-68"
+        }
       ]
     },
     {
@@ -117,7 +140,10 @@
         "no paid sources or provider credentials (spec lines 14-16)"
       ],
       "spec_sections": [
-        {"section": "Field dictionary / Market and price", "lines": "63, 65-68"}
+        {
+          "section": "Field dictionary / Market and price",
+          "lines": "63, 65-68"
+        }
       ]
     },
     {
@@ -139,14 +165,22 @@
         "breadth, futures positioning, and VIX inputs additionally depend on their own field contracts in this file"
       ],
       "spec_sections": [
-        {"section": "Regime, signal, tranche, and risk vocabulary", "lines": "132-135"},
-        {"section": "IA map roadmap note", "lines": "34-37"}
+        {
+          "section": "Regime, signal, tranche, and risk vocabulary",
+          "lines": "132-135"
+        },
+        {
+          "section": "IA map roadmap note",
+          "lines": "34-37"
+        }
       ]
     },
     {
       "contract_id": "tqr-draft/zscore-computed-field",
       "category": "zscore_computed_field",
-      "fields": ["zscore"],
+      "fields": [
+        "zscore"
+      ],
       "render_behavior": "draft",
       "ui_treatment": "setting vocabulary exposed; no calculation result claimed (spec lines 85-88)",
       "required_source_type": "admitted_price_policy_contract",
@@ -157,7 +191,10 @@
         "admitted price-policy contract exists (spec lines 87-88)"
       ],
       "spec_sections": [
-        {"section": "Field dictionary / Observation pool and comparison", "lines": "85-88"}
+        {
+          "section": "Field dictionary / Observation pool and comparison",
+          "lines": "85-88"
+        }
       ]
     },
     {
@@ -176,8 +213,14 @@
         "permitted as a local prototype draft already (spec line 77); must never be presented as an official or calculated value"
       ],
       "spec_sections": [
-        {"section": "Field dictionary / Observation pool and comparison", "lines": "72-83"},
-        {"section": "Data availability vocabulary / draft", "lines": "47"}
+        {
+          "section": "Field dictionary / Observation pool and comparison",
+          "lines": "72-83"
+        },
+        {
+          "section": "Data availability vocabulary / draft",
+          "lines": "47"
+        }
       ]
     },
     {
@@ -202,7 +245,10 @@
         "date": "2026-07-22"
       },
       "spec_sections": [
-        {"section": "Field dictionary / Fundamentals and valuation", "lines": "96, 98-100"}
+        {
+          "section": "Field dictionary / Fundamentals and valuation",
+          "lines": "96, 98-100"
+        }
       ]
     },
     {
@@ -224,8 +270,14 @@
         "total score remains a human-run research calculation, never an automatic action (spec lines 127-128)"
       ],
       "spec_sections": [
-        {"section": "Formula and factor draft contract", "lines": "102-128"},
-        {"section": "IA map / 因子與公式", "lines": "28"}
+        {
+          "section": "Formula and factor draft contract",
+          "lines": "102-128"
+        },
+        {
+          "section": "IA map / 因子與公式",
+          "lines": "28"
+        }
       ]
     },
     {
@@ -256,8 +308,14 @@
         "report metrics shown only when they belong to a reproducible saved result (spec lines 157-161)"
       ],
       "spec_sections": [
-        {"section": "Validation settings and report contract", "lines": "143-161"},
-        {"section": "IA map / 驗證報告", "lines": "30"}
+        {
+          "section": "Validation settings and report contract",
+          "lines": "143-161"
+        },
+        {
+          "section": "IA map / 驗證報告",
+          "lines": "30"
+        }
       ]
     },
     {
@@ -280,8 +338,14 @@
         "remains vocabulary/human plan only; any automation would require a separate product-phase authorization (spec lines 34-37, 141)"
       ],
       "spec_sections": [
-        {"section": "Regime, signal, tranche, and risk vocabulary", "lines": "137-141"},
-        {"section": "IA map roadmap note", "lines": "34-37"}
+        {
+          "section": "Regime, signal, tranche, and risk vocabulary",
+          "lines": "137-141"
+        },
+        {
+          "section": "IA map roadmap note",
+          "lines": "34-37"
+        }
       ]
     }
   ],

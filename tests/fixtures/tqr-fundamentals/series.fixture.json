@@ -1,0 +1,234 @@
+{
+  "schema": "tqr-fundamental-series/v1",
+  "version": 1,
+  "observations": [
+    {
+      "schema": "tqr-fundamental-observation/v1",
+      "family": "balance_sheet",
+      "security_id": "1101",
+      "display_name": "台泥",
+      "period": "2026Q1",
+      "values": {
+        "assets": 597615286.0,
+        "liabilities": 292869670.0,
+        "equity": 304745616.0,
+        "current_assets": 184722314.0,
+        "current_liabilities": 82516661.0,
+        "bvps": 31.39,
+        "debt_ratio": 0.4900638870204535,
+        "current_ratio": 2.238606261588796
+      },
+      "provenance": {
+        "source_id": "twse_openapi",
+        "market": "TWSE",
+        "endpoint": "/v1/opendata/t187ap07_L_ci",
+        "license_ref": "https://data.gov.tw/license",
+        "attribution": "資料來源：臺灣證券交易所",
+        "available_at": "2026-07-28",
+        "available_at_basis": "exchange_batch_export_date",
+        "published_at": null,
+        "normalization_version": "tqr-fundamentals/v1"
+      }
+    },
+    {
+      "schema": "tqr-fundamental-observation/v1",
+      "family": "balance_sheet",
+      "security_id": "2330",
+      "display_name": "台積電",
+      "period": "2026Q1",
+      "values": {
+        "assets": 8000000.0,
+        "liabilities": 2000000.0,
+        "equity": 6000000.0,
+        "current_assets": 3000000.0,
+        "current_liabilities": 1000000.0,
+        "bvps": 150.0,
+        "debt_ratio": 0.25,
+        "current_ratio": 3.0
+      },
+      "provenance": {
+        "source_id": "twse_openapi",
+        "market": "TWSE",
+        "endpoint": "/v1/opendata/t187ap07_L_ci",
+        "license_ref": "https://data.gov.tw/license",
+        "attribution": "資料來源：臺灣證券交易所",
+        "available_at": "2026-07-28",
+        "available_at_basis": "exchange_batch_export_date",
+        "published_at": null,
+        "normalization_version": "tqr-fundamentals/v1"
+      }
+    },
+    {
+      "schema": "tqr-fundamental-observation/v1",
+      "family": "income_statement",
+      "security_id": "1101",
+      "display_name": "台泥",
+      "period": "2026Q1",
+      "values": {
+        "revenue": 33168148.0,
+        "gross_profit": 6208390.0,
+        "operating_income": 2792191.0,
+        "net_income": 1204739.0,
+        "eps": 0.1,
+        "gross_margin": 0.18717927814359728,
+        "operating_margin": 0.0841829034289162,
+        "net_margin": 0.03632216667629438
+      },
+      "provenance": {
+        "source_id": "twse_openapi",
+        "market": "TWSE",
+        "endpoint": "/v1/opendata/t187ap06_L_ci",
+        "license_ref": "https://data.gov.tw/license",
+        "attribution": "資料來源：臺灣證券交易所",
+        "available_at": "2026-07-28",
+        "available_at_basis": "exchange_batch_export_date",
+        "published_at": null,
+        "normalization_version": "tqr-fundamentals/v1"
+      }
+    },
+    {
+      "schema": "tqr-fundamental-observation/v1",
+      "family": "income_statement",
+      "security_id": "2330",
+      "display_name": "台積電",
+      "period": "2026Q1",
+      "values": {
+        "revenue": 900000000.0,
+        "gross_profit": 540000000.0,
+        "operating_income": 450000000.0,
+        "net_income": 400000000.0,
+        "eps": 15.42,
+        "gross_margin": 0.6,
+        "operating_margin": 0.5,
+        "net_margin": 0.4444444444444444
+      },
+      "provenance": {
+        "source_id": "twse_openapi",
+        "market": "TWSE",
+        "endpoint": "/v1/opendata/t187ap06_L_ci",
+        "license_ref": "https://data.gov.tw/license",
+        "attribution": "資料來源：臺灣證券交易所",
+        "available_at": "2026-07-28",
+        "available_at_basis": "exchange_batch_export_date",
+        "published_at": null,
+        "normalization_version": "tqr-fundamentals/v1"
+      }
+    },
+    {
+      "schema": "tqr-fundamental-observation/v1",
+      "family": "monthly_revenue",
+      "security_id": "1101",
+      "display_name": "台泥",
+      "industry": "水泥工業",
+      "period": "2026-05",
+      "values": {
+        "monthly_revenue": 12612013.0,
+        "monthly_revenue_previous_month": 11800000.0,
+        "monthly_revenue_last_year": 9500000.0,
+        "cumulative_revenue": 58084626.0,
+        "cumulative_revenue_last_year": 60273039.0,
+        "revenue_mom": 0.06881466101694915,
+        "revenue_yoy": 0.32758031578947366,
+        "cumulative_yoy": -0.036308323527539405
+      },
+      "provenance": {
+        "source_id": "twse_openapi",
+        "market": "TWSE",
+        "endpoint": "/v1/opendata/t187ap05_L",
+        "license_ref": "https://data.gov.tw/license",
+        "attribution": "資料來源：臺灣證券交易所",
+        "available_at": "2026-06-17",
+        "available_at_basis": "exchange_batch_export_date",
+        "published_at": null,
+        "normalization_version": "tqr-fundamentals/v1"
+      }
+    },
+    {
+      "schema": "tqr-fundamental-observation/v1",
+      "family": "monthly_revenue",
+      "security_id": "1101",
+      "display_name": "台泥",
+      "industry": "水泥工業",
+      "period": "2026-06",
+      "values": {
+        "monthly_revenue": 13382706.0,
+        "monthly_revenue_previous_month": 12612013.0,
+        "monthly_revenue_last_year": 10107877.0,
+        "cumulative_revenue": 71467332.0,
+        "cumulative_revenue_last_year": 70380916.0,
+        "revenue_mom": 0.061107850110842736,
+        "revenue_yoy": 0.3239878166305348,
+        "cumulative_yoy": 0.015436229900730477
+      },
+      "provenance": {
+        "source_id": "twse_openapi",
+        "market": "TWSE",
+        "endpoint": "/v1/opendata/t187ap05_L",
+        "license_ref": "https://data.gov.tw/license",
+        "attribution": "資料來源：臺灣證券交易所",
+        "available_at": "2026-07-17",
+        "available_at_basis": "exchange_batch_export_date",
+        "published_at": null,
+        "normalization_version": "tqr-fundamentals/v1"
+      }
+    },
+    {
+      "schema": "tqr-fundamental-observation/v1",
+      "family": "monthly_revenue",
+      "security_id": "2330",
+      "display_name": "台積電",
+      "industry": "水泥工業",
+      "period": "2026-05",
+      "values": {
+        "monthly_revenue": 300000000.0,
+        "monthly_revenue_previous_month": 290000000.0,
+        "monthly_revenue_last_year": 200000000.0,
+        "cumulative_revenue": 1400000000.0,
+        "cumulative_revenue_last_year": 1000000000.0,
+        "revenue_mom": 0.034482758620689655,
+        "revenue_yoy": 0.5,
+        "cumulative_yoy": 0.4
+      },
+      "provenance": {
+        "source_id": "twse_openapi",
+        "market": "TWSE",
+        "endpoint": "/v1/opendata/t187ap05_L",
+        "license_ref": "https://data.gov.tw/license",
+        "attribution": "資料來源：臺灣證券交易所",
+        "available_at": "2026-06-17",
+        "available_at_basis": "exchange_batch_export_date",
+        "published_at": null,
+        "normalization_version": "tqr-fundamentals/v1"
+      }
+    },
+    {
+      "schema": "tqr-fundamental-observation/v1",
+      "family": "monthly_revenue",
+      "security_id": "2330",
+      "display_name": "台積電",
+      "industry": "水泥工業",
+      "period": "2026-06",
+      "values": {
+        "monthly_revenue": 310000000.0,
+        "monthly_revenue_previous_month": 300000000.0,
+        "monthly_revenue_last_year": 210000000.0,
+        "cumulative_revenue": 1710000000.0,
+        "cumulative_revenue_last_year": 1210000000.0,
+        "revenue_mom": 0.03333333333333333,
+        "revenue_yoy": 0.47619047619047616,
+        "cumulative_yoy": 0.4132231404958678
+      },
+      "provenance": {
+        "source_id": "twse_openapi",
+        "market": "TWSE",
+        "endpoint": "/v1/opendata/t187ap05_L",
+        "license_ref": "https://data.gov.tw/license",
+        "attribution": "資料來源：臺灣證券交易所",
+        "available_at": "2026-07-17",
+        "available_at_basis": "exchange_batch_export_date",
+        "published_at": null,
+        "normalization_version": "tqr-fundamentals/v1"
+      }
+    }
+  ]
+}

@@ -14,6 +14,16 @@ from typing import Any, Mapping
 from urllib.parse import parse_qs, urlsplit
 
 from .alerts import ALERT_STORE_SCHEMA, AlertValidationError, evaluate_alerts, parse_alert_store, validate_alert
+from .fundamentals import (
+    ATTRIBUTION,
+    BALANCE_SHEET,
+    INCOME_STATEMENT,
+    LICENSE_REF,
+    MONTHLY_REVENUE,
+    SERIES_SCHEMA,
+    coverage,
+    series_for,
+)
 from .valuation import (
     WORKSHEET_STORE_SCHEMA,
     ValuationValidationError,
@@ -38,6 +48,7 @@ from .data_update import (
 
 
 SIDECAR_INSTRUMENTS_SCHEMA = "tw-quant-engine-sidecar-instruments/v1"
+SIDECAR_FUNDAMENTALS_SCHEMA = "tw-quant-engine-sidecar-fundamentals/v1"
 SIDECAR_INSTRUMENT_READ_MODEL_SCHEMA = "tw-quant-engine-instrument-read-model/v1"
 SIDECAR_KLINE_SCHEMA = "tw-quant-engine-sidecar-kline/v1"
 SIDECAR_ALERTS_SCHEMA = "tw-quant-engine-sidecar-alerts/v1"
@@ -149,6 +160,7 @@ class KlineCatalog:
     instruments: tuple[dict[str, Any], ...]
     models: dict[tuple[str, str], dict[str, Any]]
     digest: str
+    fundamentals: dict[str, Any] | None = None
 
     def instruments_response(self) -> dict[str, Any]:
         return {
@@ -249,6 +261,36 @@ class KlineCatalog:
                 model = self.models.get((str(item["instrument_id"]), "1D"))
                 bars_by_symbol[symbol] = model.get("bars") if isinstance(model, Mapping) else None
         return bars_by_symbol
+
+    def fundamentals_response(self, security_id: str) -> tuple[int, dict[str, Any]]:
+        """Whatever periods have actually been captured for one security.
+
+        Depth is reported honestly (`n / expected`); no period is padded,
+        interpolated, or carried forward. An empty local series is a normal
+        state, not an error.
+        """
+        if not security_id or len(security_id) > 16 or not security_id.isalnum():
+            return 400, {"error": "invalid_security_id"}
+        series = self.fundamentals
+        return 200, {
+            "schema": SIDECAR_FUNDAMENTALS_SCHEMA,
+            "read_only": True,
+            "security_id": security_id,
+            "monthly_revenue": {
+                "observations": series_for(series, security_id, MONTHLY_REVENUE, 12),
+                "coverage": coverage(series, security_id, MONTHLY_REVENUE, 12),
+            },
+            "income_statement": {
+                "observations": series_for(series, security_id, INCOME_STATEMENT, 8),
+                "coverage": coverage(series, security_id, INCOME_STATEMENT, 8),
+            },
+            "balance_sheet": {
+                "observations": series_for(series, security_id, BALANCE_SHEET, 8),
+                "coverage": coverage(series, security_id, BALANCE_SHEET, 8),
+            },
+            "attribution": ATTRIBUTION,
+            "license_ref": LICENSE_REF,
+        }
 
     def valuation_response(self, worksheets_payload: Any, indicators_payload: Any) -> tuple[int, dict[str, Any]]:
         """Evaluate P6 fair value worksheets and price/volume indicators over admitted data.
@@ -361,7 +403,22 @@ def load_catalog(fixture_root: str | Path, data_dir: str | Path | None = None) -
         "instruments": instrument_rows,
         "models": [models[key] for key in sorted(models)],
     }
-    return KlineCatalog(tuple(instrument_rows), models, _digest(digest_payload))
+    return KlineCatalog(tuple(instrument_rows), models, _digest(digest_payload), _load_fundamentals(local_root))
+
+
+def _load_fundamentals(data_dir: Path | None) -> dict[str, Any] | None:
+    """Read the locally accumulated fundamentals series, if the human has ever
+    captured one. Absence is a normal state, not an error."""
+    if data_dir is None:
+        return None
+    path = data_dir / "fundamentals-series.json"
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if payload.get("schema") == SERIES_SCHEMA else None
 
 
 def _json_response(handler: BaseHTTPRequestHandler, status: int, payload: Mapping[str, Any]) -> None:
@@ -390,7 +447,7 @@ def _request_handler(runtime: dict[str, Any]) -> type[BaseHTTPRequestHandler]:
         def do_OPTIONS(self) -> None:  # noqa: N802
             """Complete the WebView CORS preflight for explicit JSON updates."""
             parsed = urlsplit(self.path)
-            if parsed.path not in {"/data/update", "/instruments", "/instrument", "/data/status", "/health", "/kline"}:
+            if parsed.path not in {"/data/update", "/instruments", "/instrument", "/data/status", "/health", "/kline", "/fundamentals"}:
                 _json_response(self, 404, {"error": "unknown_route"})
                 return
             self.send_response(204)
@@ -507,6 +564,14 @@ def _request_handler(runtime: dict[str, Any]) -> type[BaseHTTPRequestHandler]:
                     alert_query["now"][0] if "now" in alert_query else None,
                 )
                 _json_response(self, alert_status, alert_payload)
+                return
+            if parsed.path == "/fundamentals":
+                fundamentals_query = parse_qs(parsed.query, keep_blank_values=True)
+                if set(fundamentals_query) != {"security_id"} or len(fundamentals_query["security_id"]) != 1:
+                    _json_response(self, 400, {"error": "security_id_required"})
+                    return
+                status, payload = runtime["catalog"].fundamentals_response(fundamentals_query["security_id"][0])
+                _json_response(self, status, payload)
                 return
             if parsed.path == "/valuation":
                 if len(parsed.query) > 32768:

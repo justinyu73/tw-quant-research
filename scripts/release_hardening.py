@@ -13,8 +13,6 @@ REQUIRED_EVIDENCE = {
     "S3": "workflow/evidence/s3-public-data.acceptance.json",
     "S4": "workflow/evidence/s4-ingestion-product-alignment.acceptance.json",
     "S5": "workflow/evidence/s5-quality-corporate-actions.acceptance.json",
-    "S6": "workflow/evidence/s6-feature-pipeline.acceptance.json",
-    "S7": "workflow/evidence/s7-backtest.acceptance.json",
     "S8": "workflow/evidence/s8-read-only-product-view.acceptance.json",
 }
 VOLATILE_KEYS = frozenset({"captured_at", "stdout_digest", "stderr_digest", "stderr_digest_normalized"})

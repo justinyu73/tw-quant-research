@@ -13,15 +13,12 @@ const view = {
       bar: { trading_date: "2026-01-05", close_raw: 110 },
     },
   ],
-  features: [],
-  backtest: { status: "empty" },
   quality: { status_counts: { admitted: 1, unadmitted: 0, invalid: 0 } },
 };
 
 let state = core.createInitialState(view);
-assert.equal(state.activeSection, "overview");
+assert.equal(state.activeSection, "home");
 assert.equal(state.dialogOpen, false);
-assert.deepEqual(state.valuationInputs, { eps: "", peLow: "", peHigh: "", safetyMargin: "" });
 assert.deepEqual(state.watchlist, { items: [], status: "idle", dirty: false, message: "" });
 assert.deepEqual(state.dataUpdate, { scope: "watchlist", years: 1, status: "idle", message: "", results: [] });
 state = core.reduce(state, { type: "SET_DATA_UPDATE_SCOPE", scope: "selected" });
@@ -60,8 +57,6 @@ assert.deepEqual(core.watchlistPayload(state), {
 state = core.reduce(state, { type: "WATCHLIST_SAVED" });
 assert.equal(state.watchlist.dirty, false);
 state = core.reduce(state, { type: "SET_VALUATION_INPUT", field: "eps", value: "10.00" });
-assert.equal(state.valuationInputs.eps, "10.00");
-assert.equal(state.valuationInputs.peLow, "");
 assert.deepEqual(state.notes, []);
 state = core.reduce(state, { type: "SET_NOTE_DRAFT", field: "title", value: "2330 研究觀察" });
 state = core.reduce(state, { type: "SET_NOTE_DRAFT", field: "body", value: "等待下一次財報核對" });
@@ -70,8 +65,8 @@ assert.equal(state.notes[0].title, "2330 研究觀察");
 assert.deepEqual(state.noteDraft, { title: "", body: "", tags: "" });
 state = core.reduce(state, { type: "DELETE_NOTE", noteId: "note-1" });
 assert.deepEqual(state.notes, []);
-state = core.reduce(state, { type: "SELECT_SECTION", section: "products" });
-assert.equal(state.activeSection, "products");
+state = core.reduce(state, { type: "SELECT_SECTION", section: "watchlist" });
+assert.equal(state.activeSection, "watchlist");
 state = core.reduce(state, { type: "OPEN_PRODUCT_DETAIL", index: 0 });
 assert.equal(state.dialogOpen, true);
 assert.equal(core.selectedProduct(state).instrument.security_id, "2330");
@@ -80,11 +75,10 @@ assert.equal(state.dialogOpen, false);
 state = core.reduce(state, { type: "OPEN_PRODUCT_DETAIL", index: 99 });
 assert.equal(state.dialogOpen, false);
 state = core.reduce(state, { type: "SELECT_SECTION", section: "orders" });
-assert.equal(state.activeSection, "products");
+assert.equal(state.activeSection, "watchlist");
 state = core.reduce(state, { type: "RESET" });
-assert.equal(state.activeSection, "overview");
+assert.equal(state.activeSection, "home");
 assert.equal(state.view.read_only, true);
-assert.deepEqual(state.valuationInputs, { eps: "", peLow: "", peHigh: "", safetyMargin: "" });
 assert.deepEqual(state.watchlist.items, ["TWSE:2330", "TAIFEX:TX:202608", "TPEx:006201"]);
 
 // P6 in-app alerts: session-local definitions, flat store payload, in-app events only
@@ -129,13 +123,20 @@ assert.equal(state.alerts.definitions.length, 1);
 
 // P6 valuation & analysis: session-local worksheets, flat store payload, research-only results
 const worksheetDef = {
-  schema: "tqe-fair-value-worksheet/v1",
+  schema: "tqr-scenario-valuation-worksheet/v1",
   worksheet_id: "ws-test-1",
-  label: "2330 本益比合理價",
+  label: "2330 三情境合理價",
   target: { security_id: "2330" },
-  model: { type: "pe_multiple", eps: 10, target_pe: 15 },
-  safety_margin: 0.2,
-  assumption_notes: "使用者假設",
+  scenarios: { bear: { eps: 8, pe: 12 }, base: { eps: 10, pe: 15 }, bull: { eps: 12, pe: 18 } },
+  buy_zone_ratios: { watch: 0.9, first: 0.85, second: 0.8, sweet: 0.75, extreme: 0.65 },
+  basis: {
+    eps_period: "2026Q1",
+    eps_kind: "estimate",
+    pe_rationale: "近五年區間中位",
+    financial_data_date: "2026-05-15",
+    valuation_date: "2026-07-22",
+    change_reason: ""
+  },
   created_at: "2026-07-22T00:00:00Z"
 };
 assert.deepEqual(state.valuation, { worksheets: [], results: [], indicators: [], status: "idle", message: "" });
@@ -145,19 +146,21 @@ assert.equal(state.valuation.worksheets.length, 1);
 assert.equal(state.valuation.status, "ready");
 state = core.reduce(state, { type: "ADD_VALUATION_WORKSHEET", worksheet: worksheetDef });
 assert.equal(state.valuation.worksheets.length, 1);
-assert.deepEqual(core.valuationStorePayload(state), { schema: "tqe-fair-value-worksheets/v1", version: 1, worksheets: [worksheetDef] });
-const badWorksheet = Object.assign({}, worksheetDef, { worksheet_id: "ws-bad", model: { type: "dcf_full" } });
+assert.deepEqual(core.valuationStorePayload(state), { schema: "tqr-scenario-valuation-worksheets/v1", version: 1, worksheets: [worksheetDef] });
+const badWorksheet = Object.assign({}, worksheetDef, { worksheet_id: "ws-bad", scenarios: { bear: { eps: 8, pe: 12 }, base: { eps: 0, pe: 15 }, bull: { eps: 12, pe: 18 } } });
 state = core.reduce(state, { type: "ADD_VALUATION_WORKSHEET", worksheet: badWorksheet });
 assert.equal(state.valuation.worksheets.length, 1);
 const valuationResult = {
   worksheet_id: "ws-test-1",
-  label: "2330 本益比合理價",
+  label: "2330 三情境合理價",
   security_id: "2330",
-  fair_value: 150,
-  buy_zone_ceiling: 120,
-  model: worksheetDef.model,
-  safety_margin: 0.2,
-  formula_version: "tqe-fair-value/v1",
+  scenario_values: { bear: 96, base: 150, bull: 216 },
+  base_value: 150,
+  buy_zone: { watch: 135, first: 127.5, second: 120, sweet: 112.5, extreme: 97.5 },
+  buy_zone_ratios: worksheetDef.buy_zone_ratios,
+  scenarios: worksheetDef.scenarios,
+  basis: worksheetDef.basis,
+  formula_version: "tqr-scenario-valuation/v1",
   assumption_source: "user_supplied_assumption",
   data_status: "draft",
   research_only: true,
@@ -165,12 +168,14 @@ const valuationResult = {
   current_price: 100,
   price_as_of: "2026-07-21",
   price_basis: "close",
-  comparison: { vs_fair_value: "below", vs_buy_zone_ceiling: "below", gap_to_fair_value_pct: -1 / 3, gap_to_buy_zone_ceiling_pct: -1 / 6, research_comparison_only: true }
+  stage: "sweet",
+  comparison: { vs_base_value: "below", discount_pct: -1 / 3, gap_to_first_pct: -0.2156862745098039, gap_to_sweet_pct: -1 / 9, research_comparison_only: true }
 };
 const zscoreResult = { schema: "tqe-price-volume-indicator/v1", type: "zscore", period: 20, price_basis: "close", std_convention: "population", research_only: true, status: "ok", value: 1.41, security_id: "2330" };
 state = core.reduce(state, { type: "VALUATION_EVALUATED", results: [valuationResult, { worksheet_id: "ws-foreign", formula_version: "v0" }], indicators: [zscoreResult, { type: "rsi" }] });
 assert.equal(state.valuation.results.length, 1);
-assert.equal(state.valuation.results[0].formula_version, "tqe-fair-value/v1");
+assert.equal(state.valuation.results[0].formula_version, "tqr-scenario-valuation/v1");
+assert.equal(state.valuation.results[0].stage, "sweet");
 assert.equal(state.valuation.results[0].comparison.research_comparison_only, true);
 assert.equal(state.valuation.indicators.length, 1);
 assert.equal(state.valuation.indicators[0].std_convention, "population");
@@ -207,23 +212,24 @@ assert.equal(core.alertFormIssues(Object.assign({}, validAlertDraft, { expiryPol
 assert.equal(core.alertFormIssues(Object.assign({}, validAlertDraft, { expiryPolicy: "until", until: "not-a-date" }), { symbol: "2330" })[0].field, "until");
 assert.deepEqual(core.alertFormIssues(Object.assign({}, validAlertDraft, { expiryPolicy: "until", until: "2026-12-31T00:00" }), { symbol: "2330" }), []);
 
-const peDraft = { label: "2330 本益比", model: "pe_multiple", eps: "10", targetPe: "15", dps: "", growthRate: "", discountRate: "", growthPct: "", peg: "", safetyMargin: "15", notes: "" };
-assert.deepEqual(core.valuationFormIssues(peDraft, { symbol: "2330" }), []);
-assert.deepEqual(core.valuationFormIssues(peDraft, { symbol: "" }).map((item) => item.field), ["target"]);
-assert.equal(core.valuationFormIssues(Object.assign({}, peDraft, { label: "" }), { symbol: "2330" })[0].message, "工作表名稱不可空白（120 字以內）");
-assert.match(core.valuationFormIssues(Object.assign({}, peDraft, { eps: "0" }), { symbol: "2330" })[0].message, /預估 EPS 需為大於 0/);
-assert.match(core.valuationFormIssues(Object.assign({}, peDraft, { targetPe: "-3" }), { symbol: "2330" })[0].message, /目標本益比需為大於 0/);
-const ddmDraft = Object.assign({}, peDraft, { model: "dividend_discount_simple", dps: "5", growthRate: "0.03", discountRate: "0.08" });
-assert.deepEqual(core.valuationFormIssues(ddmDraft, { symbol: "2330" }), []);
-assert.equal(core.valuationFormIssues(Object.assign({}, ddmDraft, { discountRate: "0.02" }), { symbol: "2330" })[0].message, "折現率 r 必須大於股利成長率 g");
-assert.match(core.valuationFormIssues(Object.assign({}, ddmDraft, { growthRate: "-1.2", discountRate: "0.08" }), { symbol: "2330" })[0].message, /股利成長率 g 需大於 -1/);
-assert.match(core.valuationFormIssues(Object.assign({}, ddmDraft, { dps: "0" }), { symbol: "2330" })[0].message, /預估每股股利需為大於 0/);
-const growthDraft = Object.assign({}, peDraft, { model: "growth_adjusted_pe", growthPct: "12", peg: "1.2" });
-assert.deepEqual(core.valuationFormIssues(growthDraft, { symbol: "2330" }), []);
-assert.match(core.valuationFormIssues(Object.assign({}, growthDraft, { growthPct: "-12" }), { symbol: "2330" })[0].message, /乘積需為正數/);
-assert.match(core.valuationFormIssues(Object.assign({}, growthDraft, { peg: "abc" }), { symbol: "2330" })[0].message, /PEG 倍數需為數字/);
-assert.match(core.valuationFormIssues(Object.assign({}, peDraft, { safetyMargin: "100" }), { symbol: "2330" })[0].message, /安全邊際需為 0 以上、小於 100/);
-assert.match(core.valuationFormIssues(Object.assign({}, peDraft, { safetyMargin: "-1" }), { symbol: "2330" })[0].message, /安全邊際需為 0 以上、小於 100/);
+const scenarioDraft = {
+  label: "2330 三情境合理價",
+  bearEps: "8", bearPe: "12", baseEps: "10", basePe: "15", bullEps: "12", bullPe: "18",
+  ratioWatch: "90", ratioFirst: "85", ratioSecond: "80", ratioSweet: "75", ratioExtreme: "65",
+  epsPeriod: "2026Q1", epsKind: "estimate", peRationale: "近五年區間中位",
+  financialDataDate: "2026-05-15", valuationDate: "2026-07-22", changeReason: ""
+};
+assert.deepEqual(core.valuationFormIssues(scenarioDraft, { symbol: "2330" }), []);
+assert.deepEqual(core.valuationFormIssues(scenarioDraft, { symbol: "" }).map((item) => item.field), ["target"]);
+assert.equal(core.valuationFormIssues(Object.assign({}, scenarioDraft, { label: "" }), { symbol: "2330" })[0].message, "工作表名稱不可空白（120 字以內）");
+assert.match(core.valuationFormIssues(Object.assign({}, scenarioDraft, { baseEps: "0" }), { symbol: "2330" })[0].message, /Base EPS 需為大於 0/);
+assert.match(core.valuationFormIssues(Object.assign({}, scenarioDraft, { bullPe: "-3" }), { symbol: "2330" })[0].message, /Bull 合理本益比需為大於 0/);
+// The ladder must stay monotonic: a sweet price above the first-stage price is
+// not a valuation, it is a data-entry error.
+assert.match(core.valuationFormIssues(Object.assign({}, scenarioDraft, { ratioSweet: "95" }), { symbol: "2330" }).map((i) => i.message).join(), /遞減/);
+assert.match(core.valuationFormIssues(Object.assign({}, scenarioDraft, { epsPeriod: "" }), { symbol: "2330" })[0].message, /哪一期 EPS/);
+assert.match(core.valuationFormIssues(Object.assign({}, scenarioDraft, { epsKind: "guess" }), { symbol: "2330" })[0].message, /實際值或預估值/);
+assert.match(core.valuationFormIssues(Object.assign({}, scenarioDraft, { valuationDate: "" }), { symbol: "2330" })[0].message, /估值日期/);
 
 assert.match(core.watchlistGroupNameIssues("")[0].message, /群組名稱不可空白/);
 assert.match(core.watchlistGroupNameIssues("   ")[0].message, /群組名稱不可空白/);
