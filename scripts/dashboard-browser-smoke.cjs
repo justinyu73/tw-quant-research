@@ -14,12 +14,12 @@ const ROOT = path.resolve(__dirname, "..");
 const PREVIEW_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "tqr-preview-"));
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
-  home: "07c16dbb6b1411fd529f410541c83b4d1069476262758722125f79eae4edcbbb",
-  company: "5802050e62c15d11a4bd82e674897997adef79eb335fa23d3021e687707a8291",
-  watchlist: "09d0c02d6f94a1cf45c49a8da468b93ec8cea67fe1c1ace9fb7957a6839f1804",
-  buyplan: "5efc6f4a62054c4f3bdf933a31541cf070f7d624687639f3755300e569141a54",
-  review: "cdc1dfeb3b714540946638615b2b0c48703439fcdd4d74f02b63d5a2e26461e8",
-  valuation: "77005bb848f3da2559480e1508b1a3cab5d0405af2fc3f6829cbda7e8ed70439",
+  home: "5f581dc4ff0523a38c6b4c728ff3b212724d71517cead16403facb52b88768ad",
+  company: "ec1bedc20b748eb42376c32358ab15d0459014faea9f765a68429febb005cd7f",
+  watchlist: "6d090659ecb5d46d35b514adb7f663a8e4a28f622113df52ff879ed0aac00555",
+  buyplan: "3e20479616fb8ec73d5abec92349f9ab90d7b7b2c0b6b1249889f7278574badd",
+  review: "f18283b9010ba8dbbbfa89e26800e6ad935474de3f188b04120f9ddd57e2303a",
+  valuation: "97f433903105bc20618d49fc6e03a5ba6cc0eb92c676fd7bfdcc051a1553a6d7",
 };
 
 function freePort() {
@@ -109,6 +109,11 @@ function screenshotHash(buffer) {
 // Ensure fonts loaded and the canvas/DOM paint has flushed before a pixel capture,
 // so screenshots are deterministic across runs (Lightweight Charts repaints on rAF).
 async function settle(page) {
+  // Assertions on below-the-fold elements leave the page scrolled, and a
+  // fullPage capture then paints the sticky top nav at that scroll offset
+  // instead of the document top: the baseline would encode how far the run
+  // happened to scroll rather than what the page looks like.
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.evaluate(() => document.fonts.ready);
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
@@ -220,7 +225,7 @@ async function main() {
     const globalSearch = page.locator('[data-testid="global-search"]');
     await globalSearch.fill("2330");
     await page.locator('[data-testid="global-search-results"] .symbol-search-result').filter({ hasText: "2330" }).first().click();
-    assert.equal(await page.locator(".page-title").innerText(), "Company");
+    assert.equal(await page.locator(".page-title").innerText(), "公司研究");
     await page.locator('[data-testid="kline-chart"]').waitFor();
     assert.equal(await page.locator('[data-testid="kline-period-label"]').innerText(), "1D");
     assert.equal(await page.locator('[data-testid="kline-chart"] canvas').count() > 0, true);
@@ -284,7 +289,7 @@ async function main() {
 
     // Watchlist: the primary work surface.
     await page.locator('[data-action="section"][data-section="watchlist"]').first().click();
-    assert.equal(await page.locator(".page-title").innerText(), "Watchlist");
+    assert.equal(await page.locator(".page-title").innerText(), "自選清單");
     await page.locator('[data-testid="watchlist-toolbar"]').waitFor();
     assert.equal(await page.locator('[data-testid="watchlist-empty"]').count(), 1);
     assert.equal(await page.locator('[data-testid="data-update-panel"]').count(), 1);
@@ -430,7 +435,7 @@ async function main() {
     // Buy Plan and Review are declared but not yet built; they must say so
     // rather than render a fake surface.
     await page.locator('[data-action="section"][data-section="buyplan"]').first().click();
-    assert.equal(await page.locator(".page-title").innerText(), "Buy Plan");
+    assert.equal(await page.locator(".page-title").innerText(), "買進計畫");
     await page.locator('[data-testid="buyplan-form"]').waitFor();
     // Tranche prices come from the valuation ladder, not from the market price.
     assert.equal(await page.locator('[data-testid="buyplan-tranche"]').count(), 4);
@@ -453,7 +458,7 @@ async function main() {
       animations: "disabled",
     }));
     await page.locator('[data-action="section"][data-section="review"]').first().click();
-    assert.equal(await page.locator(".page-title").innerText(), "Review");
+    assert.equal(await page.locator(".page-title").innerText(), "投資審查");
     await page.locator('[data-testid="review-form"]').waitFor();
     assert.equal(await page.locator('[data-testid="review-history-empty"]').count(), 1);
     // Every question must be answered before a review can be recorded.

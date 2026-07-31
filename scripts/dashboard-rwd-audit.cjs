@@ -39,12 +39,10 @@ const VIEWS = [
   { id: "valuation", label: "估值", ready: '[data-testid="valuation-panel"]' },
   { id: "buyplan", label: "買進計畫" },
   { id: "review", label: "投資審查" },
+  // Not primary navigation; reached from the top strip's utility cluster.
+  { id: "evidence", label: "資料來源" },
+  { id: "settings", label: "設定" },
 ];
-// evidence and settings are deliberately absent: they exist in SECTIONS and
-// render a page, but no control anywhere sets data-section for them, so there
-// is no navigation path to audit. Auditing them only produced 30s timeouts —
-// and a total of 0 failures that looked like a pass. Restore them here once a
-// real entry point exists (TQR-UIUX-001 still claims they are reachable).
 
 function findChromium(playwright) {
   const candidates = [];

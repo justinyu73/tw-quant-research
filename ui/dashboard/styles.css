@@ -861,6 +861,11 @@ input, select, textarea, button { font-family: inherit; }
   .watchlist-group-control, .watchlist-group-new-control { grid-template-columns: minmax(0, 1fr) auto; }
   .system-global-search { width: min(125px, 38vw); }
   .system-topbar-right .btn { display: none; }
+  /* At this width the strip cannot hold brand + six sections + search +
+     utility. The brand is decoration and goes first; navigation is the one
+     thing that must stay usable, so it keeps its scrollable track. */
+  .topnav-brand { display: none; }
+  .topbar { gap: var(--space-3); padding: 0 var(--space-3); }
   .footer { align-items: flex-start; flex-direction: column; gap: 4px; padding: 12px; }
   .terminal-watchlist-group { grid-template-columns: 1fr; }
   .terminal-watchlist-group .btn { width: 100%; }
@@ -1040,3 +1045,10 @@ input, select, textarea, button { font-family: inherit; }
 .system-topbar .btn-outline:hover { border-color: #7fa2ff; color: #fff; background: rgba(41, 98, 255, 0.18); }
 .system-topbar .system-global-search input::placeholder { color: rgba(154, 164, 178, 0.75); }
 
+
+/* Provenance and settings are reachable but are not primary navigation:
+   TQR-UIUX-001 keeps the top strip at exactly six sections. */
+.topnav-utility { display: flex; flex: 0 0 auto; align-items: center; gap: var(--space-1); }
+.topnav-utility-link { min-height: 32px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); color: var(--nav-text); background: transparent; font-size: var(--type-helper); font-weight: 600; white-space: nowrap; }
+.topnav-utility-link:hover { color: #d5dee8; background: rgba(255, 255, 255, 0.07); }
+.topnav-utility-link.active { color: var(--nav-text-active); background: rgba(41, 98, 255, 0.2); }

@@ -1,6 +1,6 @@
 {
   "schema": "tqr-fundamentals-source-contract/v1",
-  "status": "twse_live_proven_tpex_offline_proven_forward_accumulation",
+  "status": "twse_and_tpex_live_proven_forward_accumulation",
   "purpose": "Record what the candidate endpoints measurably return. Admission and enablement decisions live in the doc this points at.",
   "license": {
     "id": "government-data-open-license-v1",
@@ -17,7 +17,7 @@
     "capture": "scripts/capture_fundamentals.py",
     "markets": {
       "TWSE": "live_proven",
-      "TPEx": "offline_proven_live_capture_owed"
+      "TPEx": "live_proven"
     },
     "families": [
       "monthly_revenue",
@@ -32,7 +32,18 @@
     },
     "absent_mapped_column": "FundamentalsMappingError_aborts_capture",
     "observation_key_excludes_market": true,
-    "cross_market_same_key": "reported_as_conflict_and_refused"
+    "cross_market_same_key": "reported_as_conflict_and_refused",
+    "tpex_first_live_capture": {
+      "admitted": {
+        "monthly_revenue": 891,
+        "income_statement": 883,
+        "balance_sheet": 883
+      },
+      "distinct_periods_per_family": 1,
+      "supersedes": 0,
+      "conflicts": 0,
+      "source_rows_and_dropped": "not_retained_by_the_capture_run"
+    }
   },
   "probed_at": "2026-07-30T18:50:02Z",
   "sources": [

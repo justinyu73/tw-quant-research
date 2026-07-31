@@ -2236,6 +2236,14 @@
       symbolSearchResults(instruments, klineSearchQuery, [], state.selectedKlineInstrumentId, "global-search-results", "global-search-pick") + '</div>' +
       '<span class="system-feed-status"><i></i>EOD · 本機</span>' +
       '<span class="read-only-pill">研究唯讀</span>' +
+      '<nav class="topnav-utility" aria-label="工具">' +
+      ['evidence', 'settings'].map(function (id) {
+        var item = core.SECTIONS.find(function (section) { return section.id === id; });
+        var active = state.activeSection === id;
+        return '<button class="topnav-utility-link' + (active ? ' active' : '') +
+          '" type="button" data-action="section" data-section="' + id +
+          '" aria-current="' + (active ? 'page' : 'false') + '">' + text(item && item.label) + '</button>';
+      }).join('') + '</nav>' +
       '<button class="btn btn-outline btn-sm" type="button" data-action="reset">重設視圖</button>' +
       '</div></header>';
   }
