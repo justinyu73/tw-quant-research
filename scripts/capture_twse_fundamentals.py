@@ -23,6 +23,7 @@ if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
 from tw_quant_engine.fundamentals import (  # noqa: E402
+    BALANCE_SHEET,
     FAMILIES,
     INCOME_STATEMENT,
     MONTHLY_REVENUE,
@@ -35,6 +36,7 @@ from tw_quant_engine.fundamentals import (  # noqa: E402
 ENDPOINTS = {
     MONTHLY_REVENUE: "https://openapi.twse.com.tw/v1/opendata/t187ap05_L",
     INCOME_STATEMENT: "https://openapi.twse.com.tw/v1/opendata/t187ap06_L_ci",
+    BALANCE_SHEET: "https://openapi.twse.com.tw/v1/opendata/t187ap07_L_ci",
 }
 USER_AGENT = "tqr-fundamentals-capture"
 TIMEOUT = 60

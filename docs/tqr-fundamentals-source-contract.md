@@ -119,9 +119,10 @@ adding TPEx.
 | Piece | Where |
 | --- | --- |
 | Normalization + forward accumulation | `src/tw_quant_engine/fundamentals.py` |
+| Families implemented | monthly_revenue, income_statement, balance_sheet |
 | Human-run capture | `scripts/capture_twse_fundamentals.py` |
 | Read model route | `GET /fundamentals?security_id=` |
-| Offline tests | `tests/test_tqr_fundamentals.py` (16 cases) |
+| Offline tests | `tests/test_tqr_fundamentals.py` (19 cases) |
 
 Live capture on 2026-07-31 normalized 1,082 monthly-revenue rows (period
 2026-06) and 1,045 income-statement rows (period 2026Q1) with zero drops. A
@@ -136,3 +137,14 @@ convention is correct while remaining independently computed.
 TPEx (`mopsfin_t187ap05_O`, `mopsfin_t187ap06_O_ci`) stays unimplemented. Its
 `SecuritiesCompanyCode` / `Year` / `Season` / `Date` naming needs its own mapping
 entry before admission.
+
+### Balance sheet (added 2026-07-31)
+
+`t187ap07_L_ci` supplies `資產總額`, `負債總額`, `權益總額`, `流動資產`,
+`流動負債`, `每股參考淨值`, from which debt ratio, current ratio, and BVPS are
+derived. Same single-period constraint and same forward accumulation.
+
+A live re-capture observed the income-statement response grow from 1,045 to
+1,046 rows as one more company filed. The merge reported
+`added: 1, unchanged: 1045`, confirming that dedupe distinguishes a genuinely
+new security from an unchanged one under real source movement.

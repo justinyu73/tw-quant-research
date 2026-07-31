@@ -4,6 +4,62 @@
   "observations": [
     {
       "schema": "tqr-fundamental-observation/v1",
+      "family": "balance_sheet",
+      "security_id": "1101",
+      "display_name": "台泥",
+      "period": "2026Q1",
+      "values": {
+        "assets": 597615286.0,
+        "liabilities": 292869670.0,
+        "equity": 304745616.0,
+        "current_assets": 184722314.0,
+        "current_liabilities": 82516661.0,
+        "bvps": 31.39,
+        "debt_ratio": 0.4900638870204535,
+        "current_ratio": 2.238606261588796
+      },
+      "provenance": {
+        "source_id": "twse_openapi",
+        "market": "TWSE",
+        "endpoint": "/v1/opendata/t187ap07_L_ci",
+        "license_ref": "https://data.gov.tw/license",
+        "attribution": "資料來源：臺灣證券交易所",
+        "available_at": "2026-07-28",
+        "available_at_basis": "exchange_batch_export_date",
+        "published_at": null,
+        "normalization_version": "tqr-fundamentals/v1"
+      }
+    },
+    {
+      "schema": "tqr-fundamental-observation/v1",
+      "family": "balance_sheet",
+      "security_id": "2330",
+      "display_name": "台積電",
+      "period": "2026Q1",
+      "values": {
+        "assets": 8000000.0,
+        "liabilities": 2000000.0,
+        "equity": 6000000.0,
+        "current_assets": 3000000.0,
+        "current_liabilities": 1000000.0,
+        "bvps": 150.0,
+        "debt_ratio": 0.25,
+        "current_ratio": 3.0
+      },
+      "provenance": {
+        "source_id": "twse_openapi",
+        "market": "TWSE",
+        "endpoint": "/v1/opendata/t187ap07_L_ci",
+        "license_ref": "https://data.gov.tw/license",
+        "attribution": "資料來源：臺灣證券交易所",
+        "available_at": "2026-07-28",
+        "available_at_basis": "exchange_batch_export_date",
+        "published_at": null,
+        "normalization_version": "tqr-fundamentals/v1"
+      }
+    },
+    {
+      "schema": "tqr-fundamental-observation/v1",
       "family": "income_statement",
       "security_id": "1101",
       "display_name": "台泥",

@@ -29,7 +29,8 @@ ATTRIBUTION = "資料來源：臺灣證券交易所"
 
 MONTHLY_REVENUE = "monthly_revenue"
 INCOME_STATEMENT = "income_statement"
-FAMILIES = (MONTHLY_REVENUE, INCOME_STATEMENT)
+BALANCE_SHEET = "balance_sheet"
+FAMILIES = (MONTHLY_REVENUE, INCOME_STATEMENT, BALANCE_SHEET)
 
 _SECURITY_ID = re.compile(r"^[0-9A-Z]{4,6}$")
 _ROC_YM = re.compile(r"^(\d{3})(\d{2})$")
@@ -168,6 +169,35 @@ def normalize_income_statement_row(row: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def normalize_balance_sheet_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    """One t187ap07_L_ci row -> one observation with leverage and liquidity."""
+    if not isinstance(row, Mapping):
+        raise FundamentalsError("row must be an object")
+    assets = _number(row, "資產總額")
+    liabilities = _number(row, "負債總額")
+    equity = _number(row, "權益總額")
+    current_assets = _number(row, "流動資產")
+    current_liabilities = _number(row, "流動負債")
+    return {
+        "schema": OBSERVATION_SCHEMA,
+        "family": BALANCE_SHEET,
+        "security_id": _security_id(row),
+        "display_name": str(row.get("公司名稱", "")).strip() or None,
+        "period": quarter_period(row.get("年度"), row.get("季別")),
+        "values": {
+            "assets": assets,
+            "liabilities": liabilities,
+            "equity": equity,
+            "current_assets": current_assets,
+            "current_liabilities": current_liabilities,
+            "bvps": _number(row, "每股參考淨值"),
+            "debt_ratio": _ratio(liabilities, assets),
+            "current_ratio": _ratio(current_assets, current_liabilities),
+        },
+        "provenance": _provenance(row, "/v1/opendata/t187ap07_L_ci"),
+    }
+
+
 def _provenance(row: Mapping[str, Any], endpoint: str) -> dict[str, Any]:
     export_date = roc_date_to_iso(row.get("出表日期"))
     return {
@@ -191,7 +221,11 @@ def normalize_rows(rows: Sequence[Mapping[str, Any]], family: str) -> list[dict[
     rather than partially admitted, and the caller sees the count difference."""
     if family not in FAMILIES:
         raise FundamentalsError(f"unknown family {family!r}")
-    normalizer = normalize_monthly_revenue_row if family == MONTHLY_REVENUE else normalize_income_statement_row
+    normalizer = {
+        MONTHLY_REVENUE: normalize_monthly_revenue_row,
+        INCOME_STATEMENT: normalize_income_statement_row,
+        BALANCE_SHEET: normalize_balance_sheet_row,
+    }[family]
     out = []
     for row in rows or []:
         try:
@@ -285,6 +319,7 @@ def coverage(series: Mapping[str, Any] | None, security_id: str, family: str, ex
 __all__ = [
     "ATTRIBUTION",
     "FAMILIES",
+    "BALANCE_SHEET",
     "INCOME_STATEMENT",
     "LICENSE_REF",
     "MONTHLY_REVENUE",
@@ -295,6 +330,7 @@ __all__ = [
     "coverage",
     "empty_series",
     "merge_observations",
+    "normalize_balance_sheet_row",
     "normalize_income_statement_row",
     "normalize_monthly_revenue_row",
     "normalize_rows",

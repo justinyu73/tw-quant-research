@@ -16,6 +16,7 @@ from urllib.parse import parse_qs, urlsplit
 from .alerts import ALERT_STORE_SCHEMA, AlertValidationError, evaluate_alerts, parse_alert_store, validate_alert
 from .fundamentals import (
     ATTRIBUTION,
+    BALANCE_SHEET,
     INCOME_STATEMENT,
     LICENSE_REF,
     MONTHLY_REVENUE,
@@ -282,6 +283,10 @@ class KlineCatalog:
             "income_statement": {
                 "observations": series_for(series, security_id, INCOME_STATEMENT, 8),
                 "coverage": coverage(series, security_id, INCOME_STATEMENT, 8),
+            },
+            "balance_sheet": {
+                "observations": series_for(series, security_id, BALANCE_SHEET, 8),
+                "coverage": coverage(series, security_id, BALANCE_SHEET, 8),
             },
             "attribution": ATTRIBUTION,
             "license_ref": LICENSE_REF,

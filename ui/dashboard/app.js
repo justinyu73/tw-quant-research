@@ -2009,7 +2009,8 @@
     var data = symbol ? fundamentalsFor(symbol) : null;
     var revenue = data && data.monthly_revenue.observations[0];
     var income = data && data.income_statement.observations[0];
-    if (!revenue && !income) {
+    var balance = data && data.balance_sheet && data.balance_sheet.observations[0];
+    if (!revenue && !income && !balance) {
       return '<div class="empty-state" data-testid="fundamental-snapshot-empty"><strong>此標的尚無已擷取的基本面期別。</strong><span>執行 <code>scripts/capture_twse_fundamentals.py</code> 擷取一期後才會顯示；不以價格推估，也不補 0。</span></div>';
     }
     function tile(label, value, hint, testid) {
@@ -2017,6 +2018,7 @@
     }
     var revenueValues = revenue ? revenue.values : {};
     var incomeValues = income ? income.values : {};
+    var balanceValues = balance ? balance.values : {};
     return '<div class="fundamental-metric-grid" data-testid="fundamental-snapshot">' +
       tile("月營收 YoY", revenue ? pctCell(revenueValues.revenue_yoy) : "—", revenue ? revenue.period : "未擷取", "fundamental-revenue-yoy") +
       tile("月營收 MoM", revenue ? pctCell(revenueValues.revenue_mom) : "—", revenue ? revenue.period : "未擷取", "fundamental-revenue-mom") +
@@ -2024,6 +2026,9 @@
       tile("毛利率", income ? pctCell(incomeValues.gross_margin) : "—", income ? income.period : "未擷取", "fundamental-gross-margin") +
       tile("營益率", income ? pctCell(incomeValues.operating_margin) : "—", income ? income.period : "未擷取", "fundamental-operating-margin") +
       tile("淨利率", income ? pctCell(incomeValues.net_margin) : "—", income ? income.period : "未擷取", "fundamental-net-margin") +
+      tile("負債比", balance ? pctCell(balanceValues.debt_ratio) : "—", balance ? balance.period : "未擷取", "fundamental-debt-ratio") +
+      tile("流動比", balance && balanceValues.current_ratio !== null ? core.formatNumber(balanceValues.current_ratio) : "—", balance ? balance.period : "未擷取", "fundamental-current-ratio") +
+      tile("每股淨值", balance && balanceValues.bvps !== null ? core.formatNumber(balanceValues.bvps) : "—", balance ? balance.period : "未擷取", "fundamental-bvps") +
       '</div>' +
       '<p class="valuation-note" data-testid="fundamental-provenance">來源 ' + text(data.attribution) + '｜available_at 採交易所整批出表日（保守上界），非公司公告時間；published_at 未接入。</p>';
   }
@@ -2054,12 +2059,22 @@
         '<td class="cell-mono">' + pctCell(v.revenue_yoy) + '</td>' +
         '<td class="cell-mono">' + pctCell(v.cumulative_yoy) + '</td></tr>';
     }).join("") : '<tr><td colspan="5">尚無已擷取的月份。</td></tr>';
+    var balances = data.balance_sheet ? data.balance_sheet.observations : [];
+    var balanceRows = balances.length ? balances.map(function (item) {
+      var v = item.values;
+      return '<tr data-testid="trend-balance-row"><td>' + text(item.period) + '</td>' +
+        '<td class="cell-mono">' + pctCell(v.debt_ratio) + '</td>' +
+        '<td class="cell-mono">' + (v.current_ratio === null ? "—" : core.formatNumber(v.current_ratio)) + '</td>' +
+        '<td class="cell-mono">' + (v.bvps === null ? "—" : core.formatNumber(v.bvps)) + '</td></tr>';
+    }).join("") : '<tr><td colspan="4">尚無已擷取的財務品質期別。</td></tr>';
     return '<div class="trend-coverage" data-testid="trend-coverage">' +
       '<span>季報深度 <strong data-testid="trend-coverage-quarters">' + text(data.income_statement.coverage.label) + '</strong></span>' +
       '<span>月營收深度 <strong data-testid="trend-coverage-months">' + text(data.monthly_revenue.coverage.label) + '</strong></span>' +
+      '<span>財務品質深度 <strong data-testid="trend-coverage-balance">' + text(data.balance_sheet ? data.balance_sheet.coverage.label : "0 / 8") + '</strong></span>' +
       '<span class="muted">forward accumulation：每次擷取只會多一期</span></div>' +
       '<div class="table-responsive"><table class="table" data-testid="trend-quarters"><thead><tr><th>季度</th><th>營收</th><th>毛利率</th><th>營益率</th><th>淨利率</th><th>EPS</th></tr></thead><tbody>' + quarterRows + '</tbody></table></div>' +
-      '<div class="table-responsive"><table class="table" data-testid="trend-months"><thead><tr><th>月份</th><th>營收</th><th>月增</th><th>年增</th><th>累計年增</th></tr></thead><tbody>' + monthRows + '</tbody></table></div>';
+      '<div class="table-responsive"><table class="table" data-testid="trend-months"><thead><tr><th>月份</th><th>營收</th><th>月增</th><th>年增</th><th>累計年增</th></tr></thead><tbody>' + monthRows + '</tbody></table></div>' +
+      '<div class="table-responsive"><table class="table" data-testid="trend-balance"><thead><tr><th>季度</th><th>負債比</th><th>流動比</th><th>每股淨值</th></tr></thead><tbody>' + balanceRows + '</tbody></table></div>';
   }
 
   function valuationPageMarkup() {

@@ -15,6 +15,7 @@ if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
 from tw_quant_engine.fundamentals import (  # noqa: E402
+    BALANCE_SHEET,
     INCOME_STATEMENT,
     MONTHLY_REVENUE,
     OBSERVATION_SCHEMA,
@@ -22,6 +23,7 @@ from tw_quant_engine.fundamentals import (  # noqa: E402
     coverage,
     empty_series,
     merge_observations,
+    normalize_balance_sheet_row,
     normalize_income_statement_row,
     normalize_monthly_revenue_row,
     normalize_rows,
@@ -72,6 +74,21 @@ class NormalizationTests(unittest.TestCase):
         self.assertAlmostEqual(values["operating_margin"], 2792191.0 / 33168148.0, places=12)
         self.assertAlmostEqual(values["net_margin"], 1204739.0 / 33168148.0, places=12)
         self.assertEqual(values["eps"], 0.10)
+
+    def test_balance_sheet_derives_leverage_and_liquidity(self) -> None:
+        observation = normalize_balance_sheet_row(FIXTURE["balance_sheet_capture_1"][0])
+        self.assertEqual(observation["family"], BALANCE_SHEET)
+        self.assertEqual(observation["period"], "2026Q1")
+        values = observation["values"]
+        self.assertAlmostEqual(values["debt_ratio"], 292869670.0 / 597615286.0, places=12)
+        self.assertAlmostEqual(values["current_ratio"], 184722314.0 / 82516661.0, places=12)
+        self.assertEqual(values["bvps"], 31.39)
+
+    def test_balance_sheet_missing_denominator_stays_none(self) -> None:
+        row = dict(FIXTURE["balance_sheet_capture_1"][0])
+        row["資產總額"] = "0"
+        values = normalize_balance_sheet_row(row)["values"]
+        self.assertIsNone(values["debt_ratio"])
 
     def test_export_date_is_available_at_and_never_published_at(self) -> None:
         observation = normalize_income_statement_row(FIXTURE["income_statement_capture_1"][0])
@@ -137,6 +154,16 @@ class ForwardAccumulationTests(unittest.TestCase):
         backward = self._capture(self._capture(empty_series(), "monthly_revenue_capture_2", MONTHLY_REVENUE),
                                  "monthly_revenue_capture_1", MONTHLY_REVENUE)
         self.assertEqual(forward["observations"], backward["observations"])
+
+    def test_three_families_accumulate_independently(self) -> None:
+        series = self._capture(empty_series(), "income_statement_capture_1", INCOME_STATEMENT)
+        series = self._capture(series, "balance_sheet_capture_1", BALANCE_SHEET)
+        series = self._capture(series, "monthly_revenue_capture_2", MONTHLY_REVENUE)
+        self.assertEqual(len(series_for(series, "1101", INCOME_STATEMENT, 8)), 1)
+        self.assertEqual(len(series_for(series, "1101", BALANCE_SHEET, 8)), 1)
+        self.assertEqual(len(series_for(series, "1101", MONTHLY_REVENUE, 12)), 1)
+        # Same period, different family: the key must keep them separate.
+        self.assertEqual(len(series["observations"]), 6)
 
     def test_coverage_reports_partial_depth_honestly(self) -> None:
         series = self._capture(empty_series(), "income_statement_capture_1", INCOME_STATEMENT)

@@ -12,7 +12,7 @@ const PREVIEW_DIR = path.join(ROOT, "outputs", "dashboard-preview");
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
   home: "ab3546148471254d72516ff191215be9c87ecd786bb6484160e767e7cccda10c",
-  company: "ea44b4eedc441b73b84f4389a73d83b4a16ded6c563e42daabd8151f67bed277",
+  company: "497f0faa8d76802ac1cbab1997a61bcde6923a67a05345f6f067971bb10636d1",
   watchlist: "68a95903574eddaad3e6369f4b2c574d2ee47645d6d6c4e9bd58185bf54c1b04",
   buyplan: "238a83ecdc5329f75de4e4ad140cb3c6721584aea051dfabaeeb61129f70bf80",
   review: "76df1ada2b07f10a73a031571a902f0d220f2f0f5a386f1de6b26f1f097dcae7",
@@ -237,6 +237,12 @@ async function main() {
     assert.match(await page.locator('[data-testid="fundamental-provenance"]').innerText(), /非公司公告時間/);
     assert.equal(await page.locator('[data-testid="trend-coverage-quarters"]').innerText(), "1 / 8");
     assert.equal(await page.locator('[data-testid="trend-coverage-months"]').innerText(), "2 / 12");
+    assert.equal(await page.locator('[data-testid="trend-coverage-balance"]').innerText(), "1 / 8");
+    // Balance-sheet ratios are derived, not read: 2,000,000 / 8,000,000 = 25%.
+    assert.equal(await page.locator('[data-testid="fundamental-debt-ratio"] strong').innerText(), "25.00%");
+    assert.equal(await page.locator('[data-testid="fundamental-current-ratio"] strong').innerText(), "3");
+    assert.equal(await page.locator('[data-testid="fundamental-bvps"] strong').innerText(), "150");
+    assert.equal(await page.locator('[data-testid="trend-balance-row"]').count(), 1);
     assert.equal(await page.locator('[data-testid="trend-quarter-row"]').count(), 1);
     // Only captured periods appear; the table must not pad to 12 rows.
     assert.equal(await page.locator('[data-testid="trend-month-row"]').count(), 2);
