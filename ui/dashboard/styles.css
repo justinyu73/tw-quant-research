@@ -1040,13 +1040,3 @@ input, select, textarea, button { font-family: inherit; }
 .system-topbar .btn-outline:hover { border-color: #7fa2ff; color: #fff; background: rgba(41, 98, 255, 0.18); }
 .system-topbar .system-global-search input::placeholder { color: rgba(154, 164, 178, 0.75); }
 
-/* Inside the nav bar the field is identified by its placeholder; the stacked
-   label was the only thing making the bar taller than --topnav-h. */
-.system-topbar .system-global-search label > span {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}

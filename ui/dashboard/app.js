@@ -2232,7 +2232,7 @@
       '<nav class="topnav" aria-label="主導覽">' + navMarkup() + '</nav>' +
       '</div>' +
       '<div class="system-topbar-right">' +
-      '<div class="system-global-search symbol-search"><label><span>搜尋標的</span><input type="search" autocomplete="off" placeholder="代號 / 名稱" value="' + escapeHtml(klineSearchQuery || '') + '" data-action="global-search" data-testid="global-search" aria-controls="global-search-results"></label>' +
+      '<div class="system-global-search symbol-search"><label><input type="search" aria-label="搜尋標的" autocomplete="off" placeholder="代號 / 名稱" value="' + escapeHtml(klineSearchQuery || '') + '" data-action="global-search" data-testid="global-search" aria-controls="global-search-results"></label>' +
       symbolSearchResults(instruments, klineSearchQuery, [], state.selectedKlineInstrumentId, "global-search-results", "global-search-pick") + '</div>' +
       '<span class="system-feed-status"><i></i>EOD · 本機</span>' +
       '<span class="read-only-pill">研究唯讀</span>' +

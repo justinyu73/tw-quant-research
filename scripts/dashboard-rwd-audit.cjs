@@ -39,9 +39,12 @@ const VIEWS = [
   { id: "valuation", label: "估值", ready: '[data-testid="valuation-panel"]' },
   { id: "buyplan", label: "買進計畫" },
   { id: "review", label: "投資審查" },
-  { id: "evidence", label: "資料來源", title: "資料與證據" },
-  { id: "settings", label: "設定" },
 ];
+// evidence and settings are deliberately absent: they exist in SECTIONS and
+// render a page, but no control anywhere sets data-section for them, so there
+// is no navigation path to audit. Auditing them only produced 30s timeouts —
+// and a total of 0 failures that looked like a pass. Restore them here once a
+// real entry point exists (TQR-UIUX-001 still claims they are reachable).
 
 function findChromium(playwright) {
   const candidates = [];
@@ -249,7 +252,7 @@ async function main() {
         const expectedTitle = view.title || view.label;
         process.stderr.write(`[audit] ${bp.width}px ${view.id}\n`);
         try {
-          await page.locator(`.sidebar-nav [data-action="section"][data-section="${view.id}"]`).first().click();
+          await page.locator(`[data-action="section"][data-section="${view.id}"]`).first().click();
           await page.waitForFunction((title) => {
             const el = document.querySelector(".page-title");
             return el && el.textContent.trim() === title;

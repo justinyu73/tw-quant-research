@@ -1,15 +1,75 @@
 <!-- This file is the single mutable state cursor. History = git log -p CURSOR.md -->
 # Cursor
 
-last_commit: e04b160
-branch: feat/tpex-fundamentals
-last_stage: TPEx 基本面納入（offline 完成，live capture 未跑）
+last_commit: 105250c
+branch: feat/top-nav-type-system
+last_stage: UI 重新定義——字級比例、上方導航取代左側導航、全中文化
 status: PARTIAL
-next_action: 由 JY 跑一次 TPEx live capture 驗收（見下方 Op-Demo）；之後只剩公告節奏跨月實測
+next_action: 逐張看過 outputs/dashboard-browser/*.png 確認每個 diff 都是有意的，再更新 smoke 的 EXPECTED_SCREENSHOTS 雜湊並重跑到 pass
 open_questions:
   - 免費官方是否存在財報歷史序列來源，或 forward accumulation 是唯一路徑
   - 各 endpoint 公告節奏（需跨月實測，不做推論）
   - 轉上市公司是否會同期同時出現在兩邊匯出檔（已設 conflict 防線，需 live 才能退場）
+  - CSS 十個 breakpoint 是否收斂到稽核認得的六個（併錯會改變未受稽核寬度的版面）
+
+---
+
+## UI 段落現況（branch `feat/top-nav-type-system`，未開 PR）
+
+四個 commit：
+
+| hash | 內容 |
+|---|---|
+| `3ec8128` | 字級三重定義收斂、刪死碼。**六張 screenshot hash 逐位元不變**，證明刪的是死碼 |
+| `5311509` | RWD 稽核 VIEWS 改看現行六頁——原本停在改版前十頁，八個視圖已刪除，等於空跑 |
+| `920aa05` | 字級比例重訂 + 上方深色導航取代左側 rail + 摘要磚與 topbar 高度修正 |
+| `a62d10f` | 導航與頁面標題全中文化 + 自選清單三欄位頂端對齊 |
+| `105250c` | 估值比例改 auto-fit + canonical 三處同步 |
+
+字級階梯（單一來源在 `ui/dashboard/styles.css` 唯一的 `:root`）：
+H1 28 / H2 19 / H3 15 / 導航 15 / 內文與輸入值 14 / label 12 / 徽章 11。
+11px 是中文可讀下限。圖示與數值讀數依資料尺寸，不套標題階梯。
+
+已量測通過：topbar 58px＝`--topnav-h`、首頁摘要 5 磚 1 列、自選清單三欄位
+label 頂端皆 549、六頁 1440 的 scrollWidth 均等於 innerWidth、headless 零 JS 錯誤。
+
+### 未完成（下個 session 從這裡接）
+
+1. **稽核已通過，且是真的 0**。六頁 × 六斷點 = 36 筆結果全部量到，
+   `SUM failures = 0`、無 ERR、`browser_errors` 0。改動前的三個缺陷都消失：
+   820px `.system-topbar-left` 溢出 15px（topbar 重建）、company@390
+   `.kline-chart-wrap` 截斷 8px 與 `.fundamental-metric-grid` 溢出 3px
+   （拿掉 236px 左側 rail 後寬度還給圖表）。
+
+   **中途出過兩次假綠，下個 session 要記得這個形狀**：
+   (a) 稽核的點擊選擇器還寫著 `.sidebar-nav`，左側 rail 刪掉後每頁都點不進去，
+       它回報 `SUM failures = 0`——那個 0 是「什麼都沒量到」。判斷 0 之前
+       先確認 summary 裡沒有 ERR、且 results 有 36 筆。
+   (b) 我為了縮短 topbar 高度加的 sr-only span（`width:1px; overflow:hidden`）
+       讓 `scrollWidth(48) > clientWidth(1)`，稽核分不出視覺隱藏與真截斷，
+       六頁 × 六斷點各報一個假失敗。改用 `aria-label`，元素不存在就沒有假陽性。
+2. **smoke 截圖基線未更新**，停在 `functional_pass_baseline_required`。
+   依 `uiux-review` 規定必須逐張看過 PNG 確認每個 diff 都是有意的才能更新雜湊。
+   我只看過首頁、估值、自選清單三張，其餘三張未看，所以沒有更新雜湊。
+
+3. **evidence／settings 兩個區塊全站無入口**。`data-section="evidence"`／
+   `"settings"` 在 app.js 出現 0 次，但 SECTIONS 有它們、頁面也渲染得出來。
+   這是既有漂移不是本次造成（舊左側導航也只渲染六個 primary）。
+   `TQR-UIUX-001` 仍寫著它們 "stay reachable from inside a page"。
+   已暫時移出稽核清單並在腳本註解記錄，補上入口後要放回去。
+4. **breakpoint 未收斂**（見 open question）。
+
+### 驗證方式
+
+轉埠（VS Code PORTS / ssh -L）一直不通，已放棄該路線。改為 headless 渲染後直接貼圖：
+
+```sh
+python3 scripts/serve_dashboard_app.py --data-dir ~/.local/share/io.github.justinyu73.twquantengine
+# 另一個終端機，用 playwright-core 對 127.0.0.1:5173 截圖到 outputs/ui-review/
+```
+
+`serve_dashboard_app.py` **只在啟動時建一次預覽包**——改完 CSS/JS 必須重啟，
+否則量到的是舊碼（這個坑本 session 踩過一次）。
 
 ---
 
@@ -123,7 +183,8 @@ python3 scripts/capture_fundamentals.py --market TPEx --dry-run
 ## Gate 指令
 
 ```sh
-python3 -B -m unittest discover -s tests        # 184 tests
+python3 -B -m unittest discover -s tests        # 193 tests
+python3 scripts/dashboard-rwd-audit.cjs 前先確認 summary 無 ERR 且 results 有 36 筆
 python3 scripts/lh_preflight.py
 python3 scripts/p4_research_closure.py
 python3 scripts/open_source_audit.py --strict
