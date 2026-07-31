@@ -29,18 +29,16 @@ const BREAKPOINTS = [
   { width: 390, height: 844 },
 ];
 
-// Sidebar sections in dashboard-core.js SECTIONS order (user-facing list).
+// Sections in dashboard-core.js SECTIONS order (user-facing list).
 // `title` is the rendered .page-title text; it differs from the nav label for
 // the evidence section (nav 資料來源 → title 資料與證據, see app.js mainMarkup).
 const VIEWS = [
-  { id: "overview", label: "市場首頁" },
-  { id: "market", label: "行情分析", ready: '[data-testid="kline-chart"]' },
-  { id: "products", label: "我的自選" },
-  { id: "features", label: "技術指標" },
-  { id: "research", label: "因子與公式" },
-  { id: "fundamentals", label: "財務追蹤" },
-  { id: "backtest", label: "驗證報告" },
-  { id: "stories", label: "研究筆記" },
+  { id: "home", label: "Home" },
+  { id: "watchlist", label: "Watchlist" },
+  { id: "company", label: "Company", ready: '[data-testid="kline-chart"]' },
+  { id: "valuation", label: "Valuation", ready: '[data-testid="valuation-panel"]' },
+  { id: "buyplan", label: "Buy Plan" },
+  { id: "review", label: "Review" },
   { id: "evidence", label: "資料來源", title: "資料與證據" },
   { id: "settings", label: "設定" },
 ];
