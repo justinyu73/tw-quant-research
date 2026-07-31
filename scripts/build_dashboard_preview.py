@@ -14,7 +14,9 @@ S8_FIXTURE = ROOT / "tests/fixtures/s8/product-view.json"
 TEMPLATE = ROOT / "ui/dashboard/index.template.html"
 SOURCE_DIR = ROOT / "ui/dashboard"
 CHART_VENDOR = SOURCE_DIR / "vendor/lightweight-charts.js"
-DEFAULT_OUTPUT = ROOT / "outputs/dashboard-preview"
+# A caller that must not disturb a running dev server (the browser smoke)
+# points this elsewhere; the dev server owns outputs/dashboard-preview.
+DEFAULT_OUTPUT = Path(os.environ["TQE_PREVIEW_OUTPUT"]).expanduser() if os.getenv("TQE_PREVIEW_OUTPUT") else ROOT / "outputs/dashboard-preview"
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "[::1]", "::1"}
 
 

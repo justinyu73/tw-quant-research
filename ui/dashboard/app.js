@@ -1041,17 +1041,28 @@
     render();
   }
 
-  function evaluateValuation() {
+  // Evaluation is a two-step flow; the reason it cannot run yet must reach the
+  // operator instead of being a disabled button or a silent return.
+  function valuationEvaluateBlocker() {
     var valuation = state.valuation || {};
     var worksheets = Array.isArray(valuation.worksheets) ? valuation.worksheets : [];
     var instrument = selectedKlineInstrument();
-    var symbol = instrument && instrument.symbol;
-    if (valuationEvaluateInFlight || !symbol) return;
-    if (!worksheets.length) {
-      state = core.reduce(state, { type: "VALUATION_ERROR", message: "尚無合理價工作表可計算" });
+    if (!(instrument && instrument.symbol)) return "請先選擇標的，才能計算合理價值";
+    if (!worksheets.length) return "請先按「加入估值工作表」建立工作表，才能計算合理價值";
+    return "";
+  }
+
+  function evaluateValuation() {
+    if (valuationEvaluateInFlight) return;
+    var blocker = valuationEvaluateBlocker();
+    if (blocker) {
+      state = core.reduce(state, { type: "VALUATION_ERROR", message: blocker });
       render();
       return;
     }
+    var valuation = state.valuation || {};
+    var worksheets = Array.isArray(valuation.worksheets) ? valuation.worksheets : [];
+    var symbol = selectedKlineInstrument().symbol;
     valuationEvaluateInFlight = true;
     var periods = state.valuationIndicatorPeriods || { zscore: 20, price_percentile: 60, ma_deviation: 20 };
     var indicators = ["zscore", "price_percentile", "ma_deviation"].map(function (type) {
@@ -1744,6 +1755,7 @@
     var instrument = selectedKlineInstrument();
     var symbol = instrument && instrument.symbol;
     var issues = core.valuationFormIssues(valuationDraft, { symbol: symbol });
+    var evaluateBlocker = valuationEvaluateBlocker();
 
     var worksheetCards = worksheets.length ? worksheets.map(function (definition) {
       var scenarios = definition.scenarios || {};
@@ -1773,7 +1785,8 @@
       '<div class="valuation-actions"><button class="btn btn-primary" type="button" data-action="valuation-add" data-testid="valuation-add"' + (issues.length ? " disabled" : "") + '>加入估值工作表</button>' +
       formIssuesMarkup(issues, "valuation-form-issues") + '</div></div>' +
       '<div class="valuation-worksheet-list" data-testid="valuation-worksheet-list">' + worksheetCards + '</div>' +
-      '<div class="alert-toolbar"><button class="btn btn-primary btn-sm" type="button" data-action="valuation-evaluate" data-testid="valuation-evaluate"' + ((worksheets.length && symbol) && !valuationEvaluateInFlight ? "" : " disabled") + '>' + (valuationEvaluateInFlight ? "計算中…" : "計算合理價值與買進區間") + '</button></div>' +
+      '<div class="alert-toolbar"><button class="btn btn-primary btn-sm" type="button" data-action="valuation-evaluate" data-testid="valuation-evaluate"' + (valuationEvaluateInFlight ? " disabled" : "") + '>' + (valuationEvaluateInFlight ? "計算中…" : "計算合理價值與買進區間") + '</button>' +
+      (evaluateBlocker ? '<span class="muted" data-testid="valuation-evaluate-hint">' + text(evaluateBlocker) + '</span>' : "") + '</div>' +
       statusMarkup +
       '<div class="valuation-result-list" data-testid="valuation-result-list">' + results.map(valuationResultCard).join("") + '</div>' +
       '<p class="valuation-note">所有 EPS 與本益比都是使用者假設（draft），不是官方資料、市場共識或法人預估。到價只提示，不給買賣建議；最後決策保留人工。官方基本面欄位仍等待來源准入，不會自動帶入，也不會因股價下跌自動下修 EPS。</p></section>';
