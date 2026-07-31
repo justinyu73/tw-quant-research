@@ -1,11 +1,11 @@
 <!-- This file is the single mutable state cursor. History = git log -p CURSOR.md -->
 # Cursor
 
-last_commit: 0d94ae3
-branch: fix/premium-label-and-tracking
+last_commit: 73f8992
+branch: fix/valuation-two-step-silent-failure
 last_stage: 價值投資工作台改寫 + TWSE 基本面接入 + 實機缺陷修正
 status: PARTIAL
-next_action: 修 Valuation 兩步流程的無聲失敗（填完 EPS×PE 直接按「計算」沒反應），再合併 PR #21
+next_action: 回到專案 goal——公告節奏跨月實測（Watchlist「下一個事件」的前置），或 TPEx 基本面納入
 open_questions:
   - 免費官方是否存在財報歷史序列來源，或 forward accumulation 是唯一路徑
   - 各 endpoint 公告節奏（需跨月實測，不做推論）
@@ -47,34 +47,29 @@ Source contract: `docs/tqr-fundamentals-source-contract.md`（`TQR-FUNDAMENTALS-
 
 **趨勢表深度目前為 1 期**。這是來源只發布單期的必然，不是缺陷。
 
-## PR #21（開啟中，CI 綠）
+## PR #21（已合併，main = cf9c804）
 
-https://github.com/justinyu73/tw-quant-research/pull/21
-
-修三個實機發現的缺陷：
+修兩個實機發現的缺陷：
 1. 溢價被顯示為折價（價格 2,440 / 合理價值 800 顯示「折價 205%」，語意反轉）
 2. 未追蹤公司記錄研究狀態後無處顯示且無提示
-3. browser smoke 覆寫 dev server 的預覽包，導致搜尋不到任何股票代號
+
+第三項「browser smoke 覆寫 dev server 的預覽包」的修正（`c66cc7b`）commit
+時間晚於 PR #21 合併，不在該 PR 內，隨下一個 PR 一起進 main。
+
+## D-OPEN-1：Valuation 兩步流程無聲失敗（已修，`73f8992`）
+
+「計算合理價值與買進區間」原本在缺工作表或缺標的時是灰的按鈕，
+且 `evaluateValuation()` 在 `!symbol` 時靜默 `return`，按了沒有任何回饋。
+
+改為按鈕恆可按（僅計算中停用），阻擋原因由 `valuationEvaluateBlocker()`
+單一來源產生，同時顯示為按鈕旁提示（`valuation-evaluate-hint`）與按下後的
+`valuation-status` 訊息。
+
+gate 已接上：smoke 補了「未加入工作表就按計算」的路徑斷言。
+反向對照做過——抽掉 app.js 的修正後 smoke exit 1
+（`valuation-evaluate-hint` locator timeout），確認不是空綠。
 
 ## 未完成
-
-### D-OPEN-1：Valuation 兩步流程無聲失敗（使用者已回報，未修）
-
-**現象**：填完 EPS × PE 後點「計算合理價值與買進區間」沒反應。
-
-**根因**：估值是兩步流程但介面沒說明。
-必須先按「加入估值工作表」建立 worksheet，「計算」按鈕才會啟用
-（`app.js` 的 disabled 條件為 `worksheets.length && symbol`）。
-使用者直接按第二顆時按鈕是灰的，沒有任何說明。
-另外 `evaluateValuation()` 在 `!symbol` 時是靜默 `return`（`app.js:1049`），
-同樣無使用者回饋。
-
-**為什麼 gate 沒擋住**：smoke 每次都先按「加入估值工作表」，
-從未測試「直接按計算」這條路徑。
-
-**建議修法**：合併成一顆按鈕，或在停用狀態下顯示原因
-（例如「請先加入估值工作表」），並移除靜默 return。
-修完要補 smoke 斷言：未加入工作表時按計算必須看到說明文字。
 
 ### 續押項目
 
@@ -82,15 +77,22 @@ https://github.com/justinyu73/tw-quant-research/pull/21
   刻意不做推論，避免產生看似確定實為猜測的欄位
 - **TPEx 基本面**：待 TWSE 正規化契約驗證後再加
 
-## 本次 session 的 alignment miss（供後續警惕）
+## alignment miss 清單（供後續警惕）
 
-四個已修、一個未修，共同形狀是**驗存在而非驗語意／驗因果**：
+五項全數已修，共同形狀是**驗存在而非驗語意／驗因果**：
 
 1. 公司研究欄位只接了讀取端沒接寫入端，Watchlist 五欄永遠是預設值 → 已修
 2. smoke 只斷言欄位有值，讓「溢價顯示為折價」的語意反轉出貨 → 已修
 3. smoke 在斷言前自動加入自選，把「必須先追蹤」的前提藏起來 → 已修
 4. smoke 覆寫共用預覽目錄，打爛使用者正在看的 dev server → 已修（根因）
-5. smoke 只走 happy path，沒測「直接按計算」→ **未修，見 D-OPEN-1**
+5. smoke 只走 happy path，沒測「直接按計算」→ 已修（D-OPEN-1）
+
+## 本機環境陷阱（每個新 clone 都要確認）
+
+本 clone 的 `remote.origin.fetch` 曾被設成單一分支 refspec，`git fetch`
+因此永遠不更新 `origin/main`——本機顯示落後 30+ commits 是假象，
+`git log origin/main..HEAD` 會列出一堆早已合併的 commit。已改回
+`+refs/heads/*:refs/remotes/origin/*`。判斷合併狀態前先 `git ls-remote origin main` 對真值。
 
 ## Gate 指令
 
