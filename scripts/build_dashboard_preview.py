@@ -11,7 +11,6 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 AS_OF = "2026-01-07T23:59:59Z"
 S8_FIXTURE = ROOT / "tests/fixtures/s8/product-view.json"
-S7_FIXTURE = ROOT / "tests/fixtures/s7/backtest.json"
 TEMPLATE = ROOT / "ui/dashboard/index.template.html"
 SOURCE_DIR = ROOT / "ui/dashboard"
 CHART_VENDOR = SOURCE_DIR / "vendor/lightweight-charts.js"
@@ -36,22 +35,11 @@ def build_view() -> dict[str, Any]:
     import sys
 
     sys.path.insert(0, str(ROOT / "src"))
-    from tw_quant_engine.backtest import BacktestConfig, run_backtest
     from tw_quant_engine.product_view import build_read_only_view, view_digest
 
     s8 = _load(S8_FIXTURE)
-    s7 = _load(S7_FIXTURE)
-    result = run_backtest(
-        s7["records"],
-        s7["provenance"],
-        s7["signals"],
-        as_of=s7["as_of"],
-        config=BacktestConfig(**s7["config"]),
-    )
     view = build_read_only_view(
         s8["product_rows"],
-        s8["feature_rows"],
-        result,
         as_of=AS_OF,
         evidence_links=s8["evidence_links"],
     )
@@ -96,7 +84,6 @@ def build_preview(output_dir: Path = DEFAULT_OUTPUT) -> dict[str, Any]:
         "as_of": view["as_of"],
         "view_digest": view["view_digest"],
         "product_count": len(view["products"]),
-        "feature_count": len(view["features"]),
     }
 
 

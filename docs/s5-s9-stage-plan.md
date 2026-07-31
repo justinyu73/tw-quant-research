@@ -70,71 +70,11 @@ as `unadmitted` and stop before deriving adjusted prices.
 
 `workflow/evidence/s5-quality-corporate-actions.acceptance.json`
 
-## S6 — deterministic feature pipeline
-
-### goal_intake
-
-Create a provider-neutral, point-in-time feature pipeline from admitted S4/S5
-rows. Every feature has a stable field ID, formula version, window, unit,
-missingness rule, and source lineage.
-
-### Allowed scope
-
-- Offline admitted fixtures only.
-- Deterministic price and revenue features such as 1/5/20-day returns,
-  rolling volatility, volume statistics, revenue MoM, and revenue YoY.
-- Exact calendar/trading-date windows and fail-closed missingness handling.
-- No model fitting, factor ranking, backtest, provider initialization, or
-  external data fetch.
-
-### Acceptance standard
-
-- Every feature is computed from rows visible at its `as_of` time.
-- Window boundaries are exact; missing observations are not silently filled.
-- First-window rows return an explicit null/reason code, not a partial value.
-- Known synthetic fixtures produce exact expected values and stable digest.
-- Feature metadata includes formula version, unit, window, `as_of`, source
-  snapshot IDs, and quality status.
-- S1–S5 tests and LH preflight remain green.
-
-### Evidence
-
-`workflow/evidence/s6-feature-pipeline.acceptance.json`
-
-## S7 — provider-neutral backtest engine
-
-### goal_intake
-
-Build a deterministic research-only backtest loop over admitted S6 features and
-prices. The engine must make signal timing, position timing, costs, slippage,
-cash, and metrics explicit and reproducible.
-
-### Allowed scope
-
-- Synthetic and captured offline fixtures only.
-- Long-only baseline strategy harness with explicit signal-to-next-bar timing.
-- Configurable transaction cost and slippage inputs with default zero only in
-  the synthetic acceptance fixture.
-- Deterministic equity curve, returns, drawdown, turnover, and trade ledger.
-- Qlib may be used only as a comparison/evaluation surface; the canonical
-  loop and data contract remain repo-native.
-
-### Acceptance standard
-
-- A known two/three-bar fixture produces an exact trade ledger and equity
-  curve.
-- A signal generated at `t` cannot trade using close or feature data first
-  available after `t`.
-- Costs and slippage change results exactly when non-zero and are never hidden.
-- No position is opened from an unadmitted row; missing data fails closed.
-- Metrics are defined and tested: cumulative return, annualized return only
-  with an explicit calendar convention, max drawdown, volatility, Sharpe/IR
-  only with declared assumptions, turnover, and trade count.
-- S1–S6 tests and LH preflight remain green; no investment-performance claim.
-
-### Evidence
-
-`workflow/evidence/s7-backtest.acceptance.json`
+> **S6 and S7 are retired.** `TQR-IA-003` removed the feature pipeline and the
+> backtest engine from the product; their code, tests, fixtures, evidence, and
+> stage sections were deleted. The full history remains in git. S8 now consumes
+> the S4–S5 read model directly. See
+> [`tqr-research-platform-spec.md`](tqr-research-platform-spec.md).
 
 ## S8 — read-only local product view
 
@@ -142,7 +82,7 @@ cash, and metrics explicit and reproducible.
 
 Expose a read-only local product view for aligned prices, fundamentals,
 features, backtest results, quality state, and provenance. The view is a
-consumer of the S4–S7 read models; it does not create new financial logic.
+consumer of the S4–S5 read models; it does not create new financial logic.
 
 ### Allowed scope
 
@@ -163,7 +103,7 @@ consumer of the S4–S7 read models; it does not create new financial logic.
 - Read-only boundary is tested: write methods and unknown routes fail closed.
 - Empty, missing, and conflicting data states have deterministic output.
 - Local output is reproducible from fixtures; no external call is observed.
-- S1–S7 tests and LH preflight remain green.
+- S1–S5 tests and LH preflight remain green.
 
 ### Evidence
 

@@ -16,13 +16,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from tw_quant_engine.backtest import BacktestConfig, run_backtest  # noqa: E402
 from tw_quant_engine.product_view import build_read_only_view, view_digest  # noqa: E402
 from release_hardening import REQUIRED_EVIDENCE, audit_forbidden_files, file_digest, normalized_json_digest, validate_evidence  # noqa: E402
 
 
 EVIDENCE_PATH = ROOT / "workflow/evidence/s9-release-hardening.acceptance.json"
-S7_PATH = ROOT / "tests/fixtures/s7/backtest.json"
 S8_PATH = ROOT / "tests/fixtures/s8/product-view.json"
 QLIB_PYTHON = Path("/tmp/tw-quant-engine-s1-venv/bin/python")
 
@@ -50,18 +48,14 @@ def main() -> int:
     evidence_digests_a = {stage: normalized_json_digest(ROOT / relative) for stage, relative in REQUIRED_EVIDENCE.items()}
     evidence_digests_b = {stage: normalized_json_digest(ROOT / relative) for stage, relative in REQUIRED_EVIDENCE.items()}
 
-    s7 = json.loads(S7_PATH.read_text(encoding="utf-8"))
     s8 = json.loads(S8_PATH.read_text(encoding="utf-8"))
     replay_probe = {"status": "pass", "network_requests": 0}
     try:
         with patch.object(socket, "socket", side_effect=AssertionError("S9 network is forbidden")):
-            result_a = run_backtest(s7["records"], s7["provenance"], s7["signals"], as_of=s7["as_of"], config=BacktestConfig(**s7["config"]))
-            view_a = build_read_only_view(s8["product_rows"], s8["feature_rows"], result_a, as_of="2026-01-07T23:59:59Z", evidence_links=s8["evidence_links"])
-            result_b = run_backtest(s7["records"], s7["provenance"], s7["signals"], as_of=s7["as_of"], config=BacktestConfig(**s7["config"]))
-            view_b = build_read_only_view(s8["product_rows"], s8["feature_rows"], result_b, as_of="2026-01-07T23:59:59Z", evidence_links=s8["evidence_links"])
+            view_a = build_read_only_view(s8["product_rows"], as_of="2026-01-07T23:59:59Z", evidence_links=s8["evidence_links"])
+            view_b = build_read_only_view(s8["product_rows"], as_of="2026-01-07T23:59:59Z", evidence_links=s8["evidence_links"])
     except Exception as exc:
         replay_probe = {"status": "fail", "network_requests": 0, "error_type": type(exc).__name__, "error": str(exc)}
-        result_a = result_b = {}
         view_a = view_b = {}
 
     default_tests = run_command([sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-v"], timeout=240)
@@ -87,7 +81,6 @@ def main() -> int:
     replay_checks = {
         "fixture_digests_match": fixture_digests_a == fixture_digests_b,
         "evidence_digests_match": evidence_digests_a == evidence_digests_b,
-        "backtest_digest_match": bool(result_a) and view_digest(result_a) == view_digest(result_b),
         "product_view_digest_match": bool(view_a) and view_digest(view_a) == view_digest(view_b),
     }
     hardening_checks = {

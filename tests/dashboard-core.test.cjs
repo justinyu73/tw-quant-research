@@ -13,8 +13,6 @@ const view = {
       bar: { trading_date: "2026-01-05", close_raw: 110 },
     },
   ],
-  features: [],
-  backtest: { status: "empty" },
   quality: { status_counts: { admitted: 1, unadmitted: 0, invalid: 0 } },
 };
 

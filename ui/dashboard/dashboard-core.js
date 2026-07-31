@@ -677,9 +677,7 @@
       admitted: Number(counts.admitted || 0),
       unadmitted: Number(counts.unadmitted || 0),
       invalid: Number(counts.invalid || 0),
-      productCount: Array.isArray(view && view.products) ? view.products.length : 0,
-      featureCount: Array.isArray(view && view.features) ? view.features.length : 0,
-      backtestStatus: view && view.backtest ? view.backtest.status : "empty"
+      productCount: Array.isArray(view && view.products) ? view.products.length : 0
     };
   }
 
