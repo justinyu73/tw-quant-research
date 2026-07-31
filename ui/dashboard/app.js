@@ -2037,7 +2037,7 @@
     var income = data && data.income_statement.observations[0];
     var balance = data && data.balance_sheet && data.balance_sheet.observations[0];
     if (!revenue && !income && !balance) {
-      return '<div class="empty-state" data-testid="fundamental-snapshot-empty"><strong>此標的尚無已擷取的基本面期別。</strong><span>執行 <code>scripts/capture_twse_fundamentals.py</code> 擷取一期後才會顯示；不以價格推估，也不補 0。</span></div>';
+      return '<div class="empty-state" data-testid="fundamental-snapshot-empty"><strong>此標的尚無已擷取的基本面期別。</strong><span>執行 <code>scripts/capture_fundamentals.py</code> 擷取一期後才會顯示；不以價格推估，也不補 0。</span></div>';
     }
     function tile(label, value, hint, testid) {
       return '<article class="fundamental-metric" data-testid="' + testid + '"><span>' + text(label) + '</span><strong>' + text(value) + '</strong><small>' + text(hint) + '</small></article>';

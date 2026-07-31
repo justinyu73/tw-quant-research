@@ -60,6 +60,20 @@ NEEDED = {
 }
 PERIOD_KEYS = ["資料年月", "年度", "季別", "Year", "Season"]
 
+# The admission state that the probe measurements now support. Kept here so a
+# re-probe reproduces it instead of silently reverting the committed record.
+IMPLEMENTATION = {
+    "normalization": "src/tw_quant_engine/fundamentals.py",
+    "capture": "scripts/capture_fundamentals.py",
+    "markets": {"TWSE": "live_proven", "TPEx": "offline_proven_live_capture_owed"},
+    "families": ["monthly_revenue", "income_statement", "balance_sheet"],
+    "column_mapping_is_per_family": True,
+    "tpex_balance_sheet_totals": {"資產總計": "assets", "負債總計": "liabilities", "權益總計": "equity"},
+    "absent_mapped_column": "FundamentalsMappingError_aborts_capture",
+    "observation_key_excludes_market": True,
+    "cross_market_same_key": "reported_as_conflict_and_refused",
+}
+
 
 def digest(payload: bytes) -> str:
     return "sha256:" + hashlib.sha256(payload).hexdigest()
@@ -154,14 +168,16 @@ def main() -> int:
     records = [probe(*candidate) for candidate in CANDIDATES]
     contract = {
         "schema": "tqr-fundamentals-source-contract/v1",
-        "status": "probe_complete_pending_human_approval",
-        "purpose": "Answer the admission questions for the value-research fundamentals pipeline. This file admits nothing and enables no field.",
+        "status": "twse_live_proven_tpex_offline_proven_forward_accumulation",
+        "purpose": "Record what the candidate endpoints measurably return. Admission and enablement decisions live in the doc this points at.",
         "license": {
             "id": "government-data-open-license-v1",
             "url": "https://data.gov.tw/license",
             "attribution_text": "資料來源：臺灣證券交易所、財團法人中華民國證券櫃檯買賣中心",
+            "per_observation_attribution": True,
         },
         "spec": {"path": "docs/tqr-research-platform-spec.md", "decision": "TQR-IA-003"},
+        "implementation": IMPLEMENTATION,
         "probed_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "sources": records,
     }
