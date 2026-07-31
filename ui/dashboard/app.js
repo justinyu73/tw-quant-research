@@ -374,19 +374,14 @@
   }
 
   function navMarkup() {
-    var symbols = { home: "\u2302", watchlist: "\u25a6", company: "\u25a5", valuation: "\u25c8", buyplan: "\u2317", review: "\u2713" };
-    return '<div class="nav-section"><div class="nav-label">\u50f9\u503c\u7814\u7a76</div><div class="nav-group">' +
-      core.PRIMARY_SECTION_IDS.map(function (id) {
-        var item = core.SECTIONS.find(function (section) { return section.id === id; });
-        var active = item && item.id === state.activeSection;
-        return '<button class="nav-link' + (active ? " active" : "") +
-          '" type="button" data-action="section" data-section="' + id +
-          '" aria-current="' + (active ? "page" : "false") + '">' +
-          '<span class="nav-symbol" aria-hidden="true">' + symbols[id] + "</span>" +
-          '<span class="nav-text">' + text(item && item.label) + "</span>" +
-          (active ? '<span class="nav-active-mark" aria-hidden="true"></span>' : "") +
-          "</button>";
-      }).join("") + '</div></div>';
+    return core.PRIMARY_SECTION_IDS.map(function (id) {
+      var item = core.SECTIONS.find(function (section) { return section.id === id; });
+      var active = item && item.id === state.activeSection;
+      return '<button class="nav-link' + (active ? " active" : "") +
+        '" type="button" data-action="section" data-section="' + id +
+        '" aria-current="' + (active ? "page" : "false") + '">' +
+        text(item && item.label) + "</button>";
+    }).join("");
   }
 
   function pageHeader(title, pretitle) {
@@ -2230,14 +2225,23 @@
   }
 
   function systemTopbarMarkup() {
-    var active = state.activeSection;
-    var links = [{ id: "watchlist", label: "自選" }, { id: "company", label: "公司" }, { id: "valuation", label: "估值" }, { id: "buyplan", label: "買進計畫" }, { id: "review", label: "審查" }];
     var instruments = core.klineInstruments(state.view);
-    return '<header class="topbar system-topbar"><div class="system-topbar-left"><div class="breadcrumb"><span>VALUE RESEARCH</span><span class="sep">/</span><span class="current">' + text(core.SECTIONS.find(function (item) { return item.id === active; }).label) + '</span></div><nav class="system-quick-nav" aria-label="快速工具">' + links.map(function (link) { return '<button class="system-quick-link' + (active === link.id ? ' active' : '') + '" type="button" data-action="section" data-section="' + link.id + '">' + text(link.label) + '</button>'; }).join('') + '</nav></div><div class="system-topbar-right"><div class="system-global-search symbol-search"><label><span>搜尋標的</span><input type="search" autocomplete="off" placeholder="代號 / 名稱" value="' + escapeHtml(klineSearchQuery || '') + '" data-action="global-search" data-testid="global-search" aria-controls="global-search-results"></label>' + symbolSearchResults(instruments, klineSearchQuery, [], state.selectedKlineInstrumentId, "global-search-results", "global-search-pick") + '</div><span class="system-feed-status"><i></i>EOD · 本機</span><span class="read-only-pill">研究唯讀</span><button class="btn btn-outline btn-sm" type="button" data-action="reset">重設視圖</button></div></header>';
+    return '<header class="topbar system-topbar">' +
+      '<div class="system-topbar-left">' +
+      '<a class="topnav-brand" href="#main-content"><img class="brand-logo" src="./tqr-logo.svg" alt=""><span class="brand-name">Value Research</span></a>' +
+      '<nav class="topnav" aria-label="主導覽">' + navMarkup() + '</nav>' +
+      '</div>' +
+      '<div class="system-topbar-right">' +
+      '<div class="system-global-search symbol-search"><label><span>搜尋標的</span><input type="search" autocomplete="off" placeholder="代號 / 名稱" value="' + escapeHtml(klineSearchQuery || '') + '" data-action="global-search" data-testid="global-search" aria-controls="global-search-results"></label>' +
+      symbolSearchResults(instruments, klineSearchQuery, [], state.selectedKlineInstrumentId, "global-search-results", "global-search-pick") + '</div>' +
+      '<span class="system-feed-status"><i></i>EOD · 本機</span>' +
+      '<span class="read-only-pill">研究唯讀</span>' +
+      '<button class="btn btn-outline btn-sm" type="button" data-action="reset">重設視圖</button>' +
+      '</div></header>';
   }
 
   function render() {
-    root.innerHTML = '<div class="app-shell"><aside class="sidebar"><div class="sidebar-brand"><img class="brand-logo" src="./tqr-logo.svg" alt="Value Research Workspace"><span class="brand-name">Value Research <small>台股價值投資研究工作台</small></span></div><nav class="sidebar-nav" aria-label="主導覽">' + navMarkup() + '</nav><div class="sidebar-footer"><div class="sidebar-note"><span class="read-only-icon">唯</span><p><strong>免費優先 · 本機記錄</strong><span>財報決定價值、估值決定買進價格；市場只提供成交機會。</span></p></div></div></aside><main class="main">' + systemTopbarMarkup() + '<div class="page-wrapper" id="main-content" tabindex="-1">' + mainMarkup() + '</div><footer class="footer"><span>資料格式 ' + text(view.schema) + '</span><span>本機資料 · 人工估值 · 最後決策保留人工</span></footer></main></div>' + detailDialog();
+    root.innerHTML = '<div class="app-shell">' + systemTopbarMarkup() + '<main class="main"><div class="page-wrapper" id="main-content" tabindex="-1">' + mainMarkup() + '</div><footer class="footer"><span>資料格式 ' + text(view.schema) + '</span><span>本機資料 · 人工估值 · 最後決策保留人工</span></footer></main></div>' + detailDialog();
     renderKlineChart();
     ensureKlineRuntime();
     ensureFundamentals();

@@ -186,18 +186,20 @@ async function main() {
     const response = await page.goto(`${baseUrl}/index.html`, { waitUntil: "networkidle" });
     assert.equal(response.status(), 200);
     assert.equal(await page.locator("#app .app-shell").count(), 1);
-    assert.equal(await page.locator(".sidebar").count(), 1);
+    assert.equal(await page.locator(".topbar .topnav").count(), 1);
+    // The retired left rail must not come back alongside the top nav.
+    assert.equal(await page.locator(".sidebar").count(), 0);
     assert.equal(await page.locator(".card").count() > 0, true);
     assert.equal(await page.locator(".read-only-pill").innerText(), "研究唯讀");
 
     // IA contract: exactly the six primary value-research sections, in order.
-    assert.equal(await page.locator(".sidebar .nav-link").count(), 6);
+    assert.equal(await page.locator(".topnav .nav-link").count(), 6);
     assert.deepEqual(
-      await page.locator(".sidebar .nav-link .nav-text").allInnerTexts(),
+      await page.locator(".topnav .nav-link").allInnerTexts(),
       ["Home", "Watchlist", "Company", "Valuation", "Buy Plan", "Review"],
     );
     for (const removed of ["research", "backtest", "features", "products", "market", "fundamentals", "stories", "overview"]) {
-      assert.equal(await page.locator(`.sidebar [data-section="${removed}"]`).count(), 0, `retired section still in nav: ${removed}`);
+      assert.equal(await page.locator(`.topnav [data-section="${removed}"]`).count(), 0, `retired section still in nav: ${removed}`);
     }
 
     assert.equal(await page.locator(".page-title").innerText(), "Home");
