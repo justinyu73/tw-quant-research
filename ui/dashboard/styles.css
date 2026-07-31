@@ -972,7 +972,9 @@ input, select, textarea, button { font-family: inherit; }
 .valuation-scenario h4 { margin: 0; font-size: var(--type-helper); font-weight: 700; }
 .valuation-scenario label { display: grid; gap: 4px; }
 
-.valuation-ratio-row, .valuation-basis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 12px; border: 1px solid var(--border-light); border-radius: var(--radius); background: var(--surface-secondary); }
+.valuation-ratio-row, .valuation-basis { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--border-light); border-radius: var(--radius); background: var(--surface-secondary); }
+.valuation-ratio-row { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.valuation-basis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .valuation-ratio-row h4, .valuation-basis h4 { grid-column: 1 / -1; margin: 0; font-size: var(--type-helper); font-weight: 700; }
 .valuation-ratio-row label, .valuation-basis label { display: grid; gap: 4px; min-width: 0; }
 .valuation-actions { display: grid; gap: 8px; justify-items: start; }

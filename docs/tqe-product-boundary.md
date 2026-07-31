@@ -70,13 +70,24 @@ The shared visual contract is:
 
 - Font: `Noto Sans TC`, then the platform Chinese UI font; numeric identifiers
   and values use a monospace fallback.
-- Type scale: body 14 px / 1.55, helper 12 px / 1.5, card title 16 px / 1.3,
-  section title 18 px / 1.3, page title 30 px / 1.18, display title 36 px / 1.12.
-- Layout: fixed desktop navigation, 62 px top bar, content max-width 1,440 px,
-  16–28 px page padding, 8–18 px component gaps, and 36–40 px form controls.
+- Type ladder (single source: the one `:root` in `ui/dashboard/styles.css`):
+  page title 28 px / 1.18, card+panel title 19 px / 1.3, subsection title 15 px,
+  top-nav item 15 px, body and human input value 14 px / 1.55, label and
+  subtitle 12 px, badge 11 px. 11 px is the floor: Traditional Chinese
+  strokes blur below it. Numeric readouts and icons are sized for the datum
+  or glyph and are deliberately outside this ladder.
+- Layout: a single 58 px top navigation bar carrying the six primary sections
+  on dark chrome (`#131722`); there is no left rail. Content max-width
+  1,440 px, 16–28 px page padding, 8–18 px component gaps, 36–40 px form
+  controls.
 - Responsive behavior: 1,100 px collapses multi-column work areas, 820 px
   collapses dense grids and preserves horizontal table scrolling, and 720 px
-  switches to a compact navigation rail with single-column controls.
+  goes single-column. The nav strip never wraps or collapses into a rail: it
+  scrolls horizontally inside its own container so all six sections stay
+  reachable at 390 px.
+- Any block whose element count does not divide its column count uses
+  `auto-fit` rather than a fixed track: a five-tile strip in a four-column
+  grid leaves a visible hole.
 - Interaction: every input/select keeps focus while typing or choosing; destructive
   actions are explicit and confirmable; deleting a custom watchlist group never
   deletes its instruments from another group or from the global saved watchlist.

@@ -200,7 +200,8 @@ stop-loss, AI bottom-calling, Bloomberg/TradingView clones.
 
 Decision: `TQR-WIREFRAME-003`
 
-Every screen uses the shared terminal shell: fixed desktop navigation, one page
+Every screen uses the shared terminal shell: one 58 px top navigation bar on
+dark chrome carrying the six primary sections (there is no left rail), one page
 header, one card hierarchy, 34–40 px controls, and table overflow only inside a
 `.table-responsive` wrapper.
 
@@ -215,9 +216,10 @@ document must never gain a horizontal scrollbar.
 
 ## Acceptance criteria
 
-- Primary navigation renders exactly six sections in the order above, and no
-  retired section (`research`, `backtest`, `features`, `products`, `market`,
-  `fundamentals`, `stories`, `overview`) is reachable from it.
+- The top navigation renders exactly six sections in the order above, labelled
+  首頁 / 自選清單 / 公司研究 / 估值 / 買進計畫 / 投資審查, and no retired section
+  (`research`, `backtest`, `features`, `products`, `market`, `fundamentals`,
+  `stories`, `overview`) is reachable from it.
 - A user can add/remove a watchlist symbol with a regular click and select a
   group without holding the mouse button; deleting a custom group asks for
   confirmation and cannot delete the default group.

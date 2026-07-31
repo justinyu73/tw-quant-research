@@ -11,12 +11,14 @@ professional financial terminal, not a generic AI dashboard.
 
 ## Rule 0: read the design tokens first
 
-Before editing `ui/dashboard/styles.css`, read the two `:root` blocks (top of
-file and the "Canonical TQR-UIUX-001" section) and work from the existing
-tokens — never introduce a parallel scale:
+Before editing `ui/dashboard/styles.css`, read the single `:root` block at the
+top of the file and work from the existing tokens — never introduce a parallel
+scale, and never redeclare a rule the ladder already owns (three competing
+`.page-title` rules once made two thirds of the file dead code):
 
-- Type: `--type-page` (26) / `--type-card` (17) / `--type-section` (14) /
-  `--type-body` (14) / `--type-helper` (12), `--leading-body`, `--leading-tight`.
+- Type: `--type-page` (28) / `--type-card` (19) / `--type-nav` (15) /
+  `--type-section` (15) / `--type-body` (14) / `--type-helper` (12) /
+  `--type-micro` (11), `--leading-body`, `--leading-tight`. 11 px is the floor.
 - Controls: `--control-h` (38px), `--touch-min` (40px).
 - Color: `--primary` blue accent, `--success` / `--warning` / `--danger`,
   `--green` / `--yellow` / `--red`, neutrals (`--text`, `--text-secondary`,
@@ -26,17 +28,17 @@ tokens — never introduce a parallel scale:
 
 ## Type ladder (apply consistently)
 
-- 大標題 H1: `.page-title` → `var(--type-page)` (26px, 760 weight).
+- 大標題 H1: `.page-title` → `var(--type-page)` (28px, 760 weight).
 - 中標題 card/section: `.card-title`, `.terminal-panel-heading h2`,
-  `.data-update-heading h2`, dialog/builder header h2 → `var(--type-card)` (17px).
+  `.data-update-heading h2`, dialog/builder header h2 → `var(--type-card)` (19px).
 - 小標題 subsection: `.subsection-heading h2`, note/story item titles →
-  `var(--type-section)` (14px); eyebrow/pretitle labels → `var(--type-helper)`.
+  `var(--type-section)` (15px); eyebrow/pretitle labels → `var(--type-helper)`.
 - Numeric displays (quote price, stat values) are not headings — size them for
   the data, but keep them inside their containers (see RWD rules).
 
 ## Badges / pills
 
-One size scale: `padding: 4px 8px; border-radius: 3px; font-size: 10px;
+One size scale: `padding: 4px 8px; border-radius: 3px; font-size: var(--type-micro);
 font-weight: 700; letter-spacing: 0.02em` (see the "UIUX convergence" block).
 Semantic colors only: neutral (muted on `--surface-secondary`), positive
 (`--success` tint), warning (amber tint), info (blue tint). Do not add new
@@ -45,7 +47,8 @@ badge colors that are not already in the token set.
 ## Form controls
 
 - Every text input / select / textarea: `min-height: var(--control-h)` (38px),
-  `padding: 0 10px`, `font-size: var(--type-helper)` — enlarge dense 27–32px
+  `padding: 0 10px`, and `font-size: var(--type-body)` (14px) for the value the
+  human types — labels stay `var(--type-helper)`. Enlarge dense 27–32px
   stragglers instead of inventing new heights.
 - Labels: 10–12px, muted, 4–8px gap above the control; keep them consistent
   across toolbars and panels.
@@ -75,7 +78,7 @@ badge colors that are not already in the token set.
 
 ## Color principles (de-AI)
 
-- Neutral deep blue-gray chrome (sidebar `#131722`), light warm-gray body,
+- Neutral deep blue-gray chrome (top nav `#131722`), light warm-gray body,
   white surfaces, **one** accent blue (`--primary` `#2962ff`).
 - 台股慣例： `.positive` = red (`--red`), `.negative` = green (`--green`) — never
   invert these.
@@ -96,18 +99,21 @@ badge colors that are not already in the token set.
 - Mono numeric values (technical readings, metric labels) need
   `overflow-wrap: anywhere` and/or `auto-fit` grids so they never spill.
 - Tables may only scroll inside `.table-responsive` (TQR-WIREFRAME-002).
-- The topbar breadcrumb truncation at 720px (`.system-topbar-left .breadcrumb`
-  `max-width: 96px; overflow: hidden`) is **intentional** — the one accepted
-  audit failure; do not "fix" it.
+- The breadcrumb is retired along with the left rail, so the old "intentional
+  720px breadcrumb clip" exemption no longer applies: the audit's expected
+  failure count is now 0.
+- Any block whose element count does not divide its column count must use
+  `auto-fit`; a fixed track leaves a hole (five summary tiles in four columns).
 
 ## Verification flow (offline, loopback only)
 
-1. `node scripts/dashboard-rwd-audit.cjs` — walks all nine views × six
-   breakpoints; failures must be 0 except the intentional 720px breadcrumb
-   clip (9 entries, `kind: clipped`, class `breadcrumb`). Writes
+1. `node scripts/dashboard-rwd-audit.cjs` — walks the eight current views ×
+   six breakpoints; failures must be 0. Its `VIEWS` list must match
+   `dashboard-core.js` SECTIONS: it once still listed the ten pre-rewrite views
+   and so audited nothing that shipped. Writes
    `outputs/dashboard-rwd-audit.json`. Reuses 127.0.0.1:5173 when reachable,
    otherwise spawns its own server (5199/8770) with a fresh preview build.
-2. Screenshot self-review: capture all nine views at 1440 and 390 (Playwright,
+2. Screenshot self-review: capture all eight views at 1440 and 390 (Playwright,
    same harness as the audit) and **look at every image** — hierarchy, badge
    sizes, control heights, spacing, and color tone must read consistently; no
    clipped or wrapped-awkward content.
