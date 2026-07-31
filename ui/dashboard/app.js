@@ -1938,7 +1938,7 @@
   function homePageMarkup() {
     var watched = (state.watchlist && state.watchlist.items || []).length;
     var stages = core.buyStageSummary(state);
-    return pageHeader("Home", "今天哪些公司接近我的合理買進價格") +
+    return pageHeader("首頁", "今天哪些公司接近我的合理買進價格") +
       '<section class="system-command-bar" data-testid="system-command-bar"><div><span class="eyebrow">VALUE RESEARCH WORKSPACE</span><strong>投資摘要</strong><span>本機 EOD · 截止 ' + text(view.as_of || "—") + '</span></div><div class="system-command-actions"><button class="btn btn-primary" type="button" data-action="section" data-section="watchlist">開啟 Watchlist</button><button class="btn btn-outline" type="button" data-action="section" data-section="valuation">估值工作表</button></div></section>' +
       '<div class="system-metric-strip" data-testid="investment-summary">' +
       summaryTile("追蹤標的", watched, "Watchlist 公司數", "summary-tracked") +
@@ -1982,13 +1982,13 @@
   }
 
   function watchlistPageMarkup() {
-    return pageHeader("Watchlist", "追蹤清單 · 合理價值 · 折價幅度 · 買進階段") +
+    return pageHeader("自選清單", "追蹤清單 · 合理價值 · 折價幅度 · 買進階段") +
       '<div class="data-source-banner"><strong>免費資料本地保存</strong><span>目前顯示已核准的本機資料；未接入付費訂閱、即時行情或券商。</span></div>' +
       dataUpdateMarkup() + watchlistMarkup();
   }
 
   function companyPageMarkup() {
-    return pageHeader("Company", "公司研究工作區 · Thesis · 財報 · 趨勢 · 價格參考") +
+    return pageHeader("公司研究", "公司研究工作區 · Thesis · 財報 · 趨勢 · 價格參考") +
       quoteHeaderMarkup() +
       card("Thesis 投資假設", "為什麼研究這家公司；什麼情況代表假設失效", thesisMarkup(), "") +
       card("研究筆記", "支持、反證與下一個檢查點", notesMarkup(), "") +
@@ -2099,7 +2099,7 @@
   }
 
   function valuationPageMarkup() {
-    return pageHeader("Valuation", "Bear／Base／Bull · 合理本益比 · 買進區間") + valuationMarkup();
+    return pageHeader("估值", "Bear／Base／Bull · 合理本益比 · 買進區間") + valuationMarkup();
   }
 
   function buyPlanAllocField(key, label, testid) {
@@ -2112,7 +2112,7 @@
     var instrumentId = state.selectedKlineInstrumentId;
     var symbol = instrument && instrument.symbol;
     if (!instrumentId || !symbol) {
-      return pageHeader("Buy Plan", "總預算 · 分段價格 · 分段比例 · 到價提示") +
+      return pageHeader("買進計畫", "總預算 · 分段價格 · 分段比例 · 到價提示") +
         card("分段買進計畫", "先選一家公司", '<div class="empty-state" data-testid="buyplan-no-instrument"><strong>尚未選擇公司。</strong><span>在 Watchlist 或 Company 選定標的後，才能為它建立分段買進計畫。</span></div>', "");
     }
     var issues = core.buyPlanFormIssues(buyPlanDraft);
@@ -2132,7 +2132,7 @@
       ? '<div class="buyplan-prompt" data-testid="buyplan-prompt"><strong>價格已進入' + text(reached[reached.length - 1].label) + '區間。</strong><span>請確認投資假設是否仍成立，再由你自己決定是否買進。系統不代為判斷。</span></div>'
       : '<div class="buyplan-prompt muted" data-testid="buyplan-prompt-idle"><strong>尚未進入任何分段區間。</strong><span>到價時這裡只會提示你回頭檢查 Thesis。</span></div>';
 
-    return pageHeader("Buy Plan", "總預算 · 分段價格 · 分段比例 · 到價提示") +
+    return pageHeader("買進計畫", "總預算 · 分段價格 · 分段比例 · 到價提示") +
       card("分段買進計畫", text(symbol) + " · 價格由 Valuation 的買進區間帶入", 
         '<div class="buyplan-form" data-testid="buyplan-form">' +
         '<label><span>總預算</span><input type="number" min="0" step="1000" inputmode="decimal" value="' + escapeHtml(buyPlanDraft.totalBudget) + '" data-action="buyplan-input" data-field="totalBudget" data-testid="buyplan-budget"></label>' +
@@ -2170,7 +2170,7 @@
     var instrumentId = state.selectedKlineInstrumentId;
     var instrument = selectedKlineInstrument();
     if (!instrumentId || !instrument) {
-      return pageHeader("Review", "月／季審查 · 假設是否仍成立") +
+      return pageHeader("投資審查", "月／季審查 · 假設是否仍成立") +
         card("投資審查", "先選一家公司", '<div class="empty-state" data-testid="review-no-instrument"><strong>尚未選擇公司。</strong><span>在 Watchlist 或 Company 選定標的後才能建立審查記錄。</span></div>', "");
     }
     var issues = core.reviewFormIssues(reviewDraft);
@@ -2190,7 +2190,7 @@
       }).join("") + '</tbody></table></div>'
       : '<div class="empty-state" data-testid="review-history-empty"><strong>尚無審查記錄。</strong><span>每月或每季回答上方問題，留下你當時的判斷依據。</span></div>';
 
-    return pageHeader("Review", "月／季審查 · 假設是否仍成立") +
+    return pageHeader("投資審查", "月／季審查 · 假設是否仍成立") +
       card("本次審查", text(instrument.symbol) + " · 避免買進後忘記原本理由",
         '<div class="review-form" data-testid="review-form">' + questions +
         '<label><span>審查結果</span><select data-action="review-input" data-field="outcome" data-testid="review-outcome-select">' +

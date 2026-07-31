@@ -196,13 +196,13 @@ async function main() {
     assert.equal(await page.locator(".topnav .nav-link").count(), 6);
     assert.deepEqual(
       await page.locator(".topnav .nav-link").allInnerTexts(),
-      ["Home", "Watchlist", "Company", "Valuation", "Buy Plan", "Review"],
+      ["首頁", "自選清單", "公司研究", "估值", "買進計畫", "投資審查"],
     );
     for (const removed of ["research", "backtest", "features", "products", "market", "fundamentals", "stories", "overview"]) {
       assert.equal(await page.locator(`.topnav [data-section="${removed}"]`).count(), 0, `retired section still in nav: ${removed}`);
     }
 
-    assert.equal(await page.locator(".page-title").innerText(), "Home");
+    assert.equal(await page.locator(".page-title").innerText(), "首頁");
     assert.equal(await page.locator('[data-testid="investment-summary"] article').count(), 5);
     assert.match(await page.locator('[data-testid="summary-tracked"]').innerText(), /追蹤標的/);
     assert.equal(await page.locator('[data-testid="opportunity-empty"]').count(), 1);
@@ -364,7 +364,7 @@ async function main() {
 
     // Valuation is now its own page, not a card buried under the chart.
     await page.locator('[data-action="section"][data-section="valuation"]').first().click();
-    assert.equal(await page.locator(".page-title").innerText(), "Valuation");
+    assert.equal(await page.locator(".page-title").innerText(), "估值");
     await page.locator('[data-testid="valuation-panel"]').waitFor();
     assert.equal(await page.locator('[data-testid="valuation-empty"]').count(), 1);
     // Evaluating before a worksheet exists must say why, not do nothing: this
@@ -485,7 +485,7 @@ async function main() {
 
     page.once("dialog", (dialog) => dialog.accept());
     await page.locator('[data-action="reset"]').click();
-    assert.equal(await page.locator(".page-title").innerText(), "Home");
+    assert.equal(await page.locator(".page-title").innerText(), "首頁");
 
     // The watchlist command area owns the responsive contract, so measure it on
     // its own page rather than on Home.

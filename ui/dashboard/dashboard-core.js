@@ -8,12 +8,12 @@
   "use strict";
 
   var SECTIONS = Object.freeze([
-    { id: "home", label: "Home" },
-    { id: "watchlist", label: "Watchlist" },
-    { id: "company", label: "Company" },
-    { id: "valuation", label: "Valuation" },
-    { id: "buyplan", label: "Buy Plan" },
-    { id: "review", label: "Review" },
+    { id: "home", label: "首頁" },
+    { id: "watchlist", label: "自選清單" },
+    { id: "company", label: "公司研究" },
+    { id: "valuation", label: "估值" },
+    { id: "buyplan", label: "買進計畫" },
+    { id: "review", label: "投資審查" },
     { id: "evidence", label: "資料來源" },
     { id: "settings", label: "設定" }
   ]);

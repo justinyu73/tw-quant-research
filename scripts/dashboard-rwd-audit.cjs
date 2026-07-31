@@ -33,12 +33,12 @@ const BREAKPOINTS = [
 // `title` is the rendered .page-title text; it differs from the nav label for
 // the evidence section (nav 資料來源 → title 資料與證據, see app.js mainMarkup).
 const VIEWS = [
-  { id: "home", label: "Home" },
-  { id: "watchlist", label: "Watchlist" },
-  { id: "company", label: "Company", ready: '[data-testid="kline-chart"]' },
-  { id: "valuation", label: "Valuation", ready: '[data-testid="valuation-panel"]' },
-  { id: "buyplan", label: "Buy Plan" },
-  { id: "review", label: "Review" },
+  { id: "home", label: "首頁" },
+  { id: "watchlist", label: "自選清單" },
+  { id: "company", label: "公司研究", ready: '[data-testid="kline-chart"]' },
+  { id: "valuation", label: "估值", ready: '[data-testid="valuation-panel"]' },
+  { id: "buyplan", label: "買進計畫" },
+  { id: "review", label: "投資審查" },
   { id: "evidence", label: "資料來源", title: "資料與證據" },
   { id: "settings", label: "設定" },
 ];
