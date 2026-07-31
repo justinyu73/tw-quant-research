@@ -12,8 +12,8 @@ const PREVIEW_DIR = path.join(ROOT, "outputs", "dashboard-preview");
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
   home: "ab3546148471254d72516ff191215be9c87ecd786bb6484160e767e7cccda10c",
-  company: "b719e2716277a4104fa04e68409b20bacae64ef3a9a92bd22cc45060ab0b1f55",
-  watchlist: "b74507e759fdc49f1266135af344f126f98edf373ea053094df4791b54e5e002",
+  company: "ea44b4eedc441b73b84f4389a73d83b4a16ded6c563e42daabd8151f67bed277",
+  watchlist: "68a95903574eddaad3e6369f4b2c574d2ee47645d6d6c4e9bd58185bf54c1b04",
   buyplan: "238a83ecdc5329f75de4e4ad140cb3c6721584aea051dfabaeeb61129f70bf80",
   review: "76df1ada2b07f10a73a031571a902f0d220f2f0f5a386f1de6b26f1f097dcae7",
   valuation: "5db657d0268482f36008bd878f467dc3e2551e2e3ec73232b35fac3964eb6a95",
@@ -229,7 +229,6 @@ async function main() {
     await page.locator('[data-testid="thesis-invalidation"]').fill("連續兩季營收年增轉負");
     await page.locator('[data-testid="thesis-check"]').click();
     assert.doesNotMatch(await page.locator('[data-testid="thesis-last-checked"]').innerText(), /尚未檢查/);
-    assert.equal(await page.locator('[data-testid="financial-tracker"]').count(), 1);
     // Fundamentals come from the locally accumulated series, with honest depth.
     await page.locator('[data-testid="fundamental-snapshot"]').waitFor();
     assert.equal(await page.locator('[data-testid="fundamental-eps"] strong').innerText(), "15.42");
@@ -249,11 +248,18 @@ async function main() {
     assert.equal(await page.locator('[data-testid="note-card"]').count(), 1);
     assert.match(await page.locator('[data-testid="note-card"]').innerText(), /2330 研究觀察/);
 
-    await page.locator('[data-testid="financial-review-industry"]').selectOption("Memory");
-    await page.locator('[data-testid="financial-review-score"]').selectOption("4");
-    await page.locator('[data-testid="financial-review-note"]').fill("等待下一次公告，確認毛利率與庫存。");
-    await page.locator('[data-testid="financial-review-save"]').click();
-    assert.match(await page.locator('[data-testid="financial-review-status"]').innerText(), /已儲存/);
+    // Company research status: the human's own judgement fields. These must
+    // reach Watchlist columns, Watchlist filters, and the Home counters —
+    // rendering them is not enough, they have to be writable and to propagate.
+    await page.locator('[data-testid="company-status"]').waitFor();
+    await page.locator('[data-testid="company-industry"]').selectOption("Memory");
+    await page.locator('[data-testid="company-fundamental-state"]').selectOption("轉弱");
+    await page.locator('[data-testid="company-thesis-state"]').selectOption("待確認");
+    await page.locator('[data-testid="company-position-state"]').selectOption("持有");
+    await page.locator('[data-testid="company-score"]').selectOption("4");
+    await page.locator('[data-testid="company-next-event"]').fill("8 月營收公布");
+    await page.locator('[data-testid="company-note"]').fill("等待下一次公告，確認毛利率與庫存。");
+    assert.doesNotMatch(await page.locator('[data-testid="company-status-updated"]').innerText(), /尚未更新/);
     await settle(page);
     screenshots.company = screenshotHash(await page.screenshot({
       path: path.join(SCREENSHOT_DIR, "company.png"),
@@ -300,6 +306,30 @@ async function main() {
     await page.locator('[data-action="section"][data-section="watchlist"]').first().click();
     await page.locator('[data-testid="watchlist-table"]').waitFor();
     assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 1);
+
+    // The judgement fields set on Company must appear on this row, not defaults.
+    const firstRow = page.locator('[data-testid="watchlist-row"]').first();
+    assert.match(await firstRow.innerText(), /Memory/);
+    assert.match(await firstRow.innerText(), /轉弱/);
+    assert.match(await firstRow.innerText(), /待確認/);
+    assert.match(await firstRow.innerText(), /8 月營收公布/);
+
+    // ...and they must actually drive the filters, not just render.
+    await page.locator('[data-testid="watchlist-filter-thesis_state"]').selectOption("待確認");
+    assert.equal(await page.locator('[data-testid="watchlist-row"]').count(), 1);
+    await page.locator('[data-testid="watchlist-filter-thesis_state"]').selectOption("成立");
+    assert.equal(await page.locator('[data-testid="watchlist-row"]').count(), 0);
+    await page.locator('[data-testid="watchlist-filter-thesis_state"]').selectOption("");
+    await page.locator('[data-testid="watchlist-filter-industry"]').selectOption("Power Infrastructure");
+    assert.equal(await page.locator('[data-testid="watchlist-row"]').count(), 0);
+    await page.locator('[data-testid="watchlist-filter-industry"]').selectOption("");
+    assert.equal(await page.locator('[data-testid="watchlist-row"]').count(), 1);
+
+    // ...and reach the Home summary, which was structurally stuck at 0 before.
+    await page.locator('[data-action="section"][data-section="home"]').first().click();
+    assert.equal(await page.locator('[data-testid="summary-pending"] strong').innerText(), "1");
+    await page.locator('[data-action="section"][data-section="watchlist"]').first().click();
+    await page.locator('[data-testid="watchlist-table"]').waitFor();
 
     await page.locator('[data-testid="watchlist-group-name"]').fill("半導體");
     await page.locator('[data-testid="watchlist-group-create"]').click();

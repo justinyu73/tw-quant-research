@@ -19,7 +19,6 @@
   var ALERTS_LOCAL_STORAGE_KEY = "tqe-in-app-alerts.v1";
   var ALERTS_SESSION_STORAGE_KEY = "tqe-in-app-alerts.session";
   var VALUATION_LOCAL_STORAGE_KEY = "tqr-scenario-valuation-worksheets.v1";
-  var FINANCIAL_REVIEW_LOCAL_STORAGE_KEY = "tw-quant-engine-financial-review.prototype-v1";
   var watchlistModelRequests = {};
   var klineInstrumentsAttempts = 0;
   var KLINE_INSTRUMENTS_MAX_ATTEMPTS = 40;
@@ -36,8 +35,6 @@
   var chartDrawings = [];
   var chartDrawingModelKey = null;
   var chartTemplateName = "default";
-  var financialReviewDraft = defaultFinancialReviewDraft();
-  var financialReviewSaved = false;
   var dataUpdateInFlight = false;
   var alertsLoadStarted = false;
   var alertsPersistenceAvailable = null;
@@ -124,6 +121,7 @@
   var buyPlansLoaded = false;
   var fundamentalsCache = {};
   var fundamentalsRequests = {};
+  var COMPANY_RESEARCH_LOCAL_STORAGE_KEY = "tqr-company-research.v1";
   var THESIS_LOCAL_STORAGE_KEY = "tqr-theses.v1";
   var REVIEW_LOCAL_STORAGE_KEY = "tqr-reviews.v1";
   var researchStoresLoaded = false;
@@ -133,10 +131,20 @@
     return { revenue: "", eps: "", margin: "", outlook: "", thesis: "", outcome: "", review_date: todayIso(), note: "" };
   }
 
+  function persistCompanyResearch() {
+    try {
+      window.localStorage.setItem(COMPANY_RESEARCH_LOCAL_STORAGE_KEY, JSON.stringify(core.companyResearchPayload(state)));
+    } catch (error) {
+      // Browser preview without storage keeps the in-memory record.
+    }
+  }
+
   function loadResearchStores() {
     if (researchStoresLoaded) return;
     researchStoresLoaded = true;
     try {
+      var companyRecords = window.localStorage.getItem(COMPANY_RESEARCH_LOCAL_STORAGE_KEY);
+      if (companyRecords) state = core.reduce(state, { type: "LOAD_COMPANY_RESEARCH", payload: JSON.parse(companyRecords) });
       var theses = window.localStorage.getItem(THESIS_LOCAL_STORAGE_KEY);
       if (theses) state = core.reduce(state, { type: "LOAD_THESES", payload: JSON.parse(theses) });
       var reviews = window.localStorage.getItem(REVIEW_LOCAL_STORAGE_KEY);
@@ -335,14 +343,6 @@
   }
 
 
-  function defaultFinancialReviewDraft() {
-    return {
-      industry: "Other",
-      watch_status: "基本面待確認",
-      score: "",
-      note: ""
-    };
-  }
 
 
   function loadPrototypeDraft(key, defaults) {
@@ -371,7 +371,6 @@
   }
 
   function loadPrototypeDrafts() {
-    financialReviewDraft = loadPrototypeDraft(FINANCIAL_REVIEW_LOCAL_STORAGE_KEY, defaultFinancialReviewDraft());
   }
 
   function navMarkup() {
@@ -460,12 +459,33 @@
 
 
 
-  function financialTrackerMarkup() {
-    var quote = selectedQuoteSnapshot();
-    var instrument = quote.instrument || {};
-    var instrumentLabel = (instrument.symbol || state.selectedKlineInstrumentId || "尚未選取") + " " + (instrument.display_name || "");
-    var reviewStatus = financialReviewSaved ? "已儲存至本機 prototype 草稿" : "尚未儲存；不會寫入官方資料";
-    return '<section class="financial-tracker" data-testid="financial-tracker"><header class="financial-tracker-header"><div><span class="eyebrow">PERSONAL FUNDAMENTAL TRACKER</span><h2>財務追蹤統計表</h2><p>目前標的：' + text(instrumentLabel) + '。數值欄位只顯示已接入、可追溯的資料；其餘維持未接入。</p></div><span class="status status-' + (financialReviewSaved ? "saved" : "draft") + '" data-testid="financial-review-status">' + text(reviewStatus) + '</span></header><div class="table-responsive"><table class="table financial-tracker-table"><thead><tr><th>營運成長</th><th>獲利品質</th><th>財務品質</th><th>估值</th><th>資料狀態</th></tr></thead><tbody><tr><td><strong>月營收 YoY</strong><small>未接入</small></td><td><strong>毛利率／ROE</strong><small>未接入</small></td><td><strong>自由現金流／負債比</strong><small>未接入</small></td><td><strong>PIT TTM PE／PB</strong><small>未接入</small></td><td>' + statusBadge("unavailable") + '<small>等待免費官方來源與 PIT 契約</small></td></tr></tbody></table></div><div class="financial-review-form" data-testid="financial-review-form"><label><span>產業主線</span><select data-action="financial-review-input" data-field="industry" data-testid="financial-review-industry">' + selectOptionMarkup(["Power Infrastructure", "Server Interconnect", "Passive Components", "Memory", "Edge AI", "Other"], financialReviewDraft.industry) + '</select></label><label><span>觀察狀態</span><select data-action="financial-review-input" data-field="watch_status" data-testid="financial-review-status-select">' + selectOptionMarkup(["核心持續追蹤", "等待合理估值", "等待止跌", "基本面待確認", "暫停觀察", "排除"], financialReviewDraft.watch_status) + '</select></label><label><span>人工基本面評分</span><select data-action="financial-review-input" data-field="score" data-testid="financial-review-score">' + selectOptionMarkup(["", "1", "2", "3", "4", "5"], financialReviewDraft.score) + '</select></label><label class="financial-review-note"><span>人工備註</span><textarea rows="3" maxlength="500" placeholder="支持、反證、一次性收益與下次財報檢查點" data-action="financial-review-input" data-field="note" data-testid="financial-review-note">' + escapeHtml(financialReviewDraft.note) + '</textarea></label><div class="financial-review-actions"><span>這是本機研究草稿，不會改寫官方資料或觸發計算。</span><button class="btn btn-primary" type="button" data-action="financial-review-save" data-testid="financial-review-save">儲存追蹤草稿</button></div></div></section>';
+  function companyStatusMarkup() {
+    var instrumentId = state.selectedKlineInstrumentId;
+    var instrument = selectedKlineInstrument();
+    if (!instrumentId || !instrument) {
+      return '<div class="empty-state" data-testid="company-status-empty"><strong>尚未選擇公司。</strong><span>選定標的後才能記錄研究狀態。</span></div>';
+    }
+    var record = core.companyRecord(state, instrumentId);
+    function select(field, label, options, testid) {
+      return '<label><span>' + text(label) + '</span><select data-action="company-record" data-field="' + field + '" data-testid="' + testid + '">' +
+        options.map(function (option) {
+          return '<option value="' + escapeHtml(option) + '"' + (record[field] === option ? " selected" : "") + '>' + text(option || "未評分") + '</option>';
+        }).join("") + '</select></label>';
+    }
+    return '<section class="company-status" data-testid="company-status">' +
+      '<div class="company-status-grid">' +
+      select("industry", "產業分類", core.INDUSTRY_OPTIONS, "company-industry") +
+      select("fundamental_state", "基本面狀態", core.FUNDAMENTAL_STATES, "company-fundamental-state") +
+      select("thesis_state", "投資假設", core.THESIS_STATES, "company-thesis-state") +
+      select("position_state", "投資狀態", core.POSITION_STATES, "company-position-state") +
+      select("score", "人工基本面評分", ["", "1", "2", "3", "4", "5"], "company-score") +
+      '<label><span>下一個事件</span><input type="text" maxlength="120" placeholder="例如 8 月營收公布" value="' + escapeHtml(record.next_event) + '" data-action="company-record" data-field="next_event" data-testid="company-next-event"></label>' +
+      '<label class="company-status-held"><span>是否已持有</span><select data-action="company-record" data-field="held" data-testid="company-held">' +
+      '<option value="false"' + (record.held ? "" : " selected") + '>未持有</option>' +
+      '<option value="true"' + (record.held ? " selected" : "") + '>已持有</option></select></label>' +
+      '<label class="company-status-note"><span>人工備註</span><textarea rows="3" maxlength="500" placeholder="支持、反證、一次性收益與下次財報檢查點" data-action="company-record" data-field="note" data-testid="company-note">' + escapeHtml(record.note) + '</textarea></label>' +
+      '</div>' +
+      '<p class="valuation-note" data-testid="company-status-updated">這些是你自己的判斷，直接寫入本機研究記錄並驅動 Watchlist 欄位、篩選器與 Home 統計；不會改寫官方資料。最後更新：' + text(record.updated_at || "尚未更新") + '</p></section>';
   }
 
 
@@ -1952,7 +1972,7 @@
       card("Thesis 投資假設", "為什麼研究這家公司；什麼情況代表假設失效", thesisMarkup(), "") +
       card("研究筆記", "支持、反證與下一個檢查點", notesMarkup(), "") +
       card("Fundamental Snapshot", "已擷取期別的核心財報欄位", fundamentalSnapshotMarkup(), "") +
-      card("人工覆核", "產業、觀察狀態與備註", financialTrackerMarkup(), "") +
+      card("研究狀態", "產業、基本面、投資假設與下一個事件；驅動 Watchlist 與 Home", companyStatusMarkup(), "") +
       card("Trend Table", "最近 8 季與最近 12 個月", trendTableMarkup(), "") +
       card("Price Reference", "歷史價格位置 · 前高前低 · 回檔幅度；不參與價值判斷", klineMarkup(), "");
   }
@@ -2233,9 +2253,6 @@
       installAppUpdate();
       return;
     }
-    if (action === "financial-review-save") {
-      financialReviewSaved = savePrototypeDraft(FINANCIAL_REVIEW_LOCAL_STORAGE_KEY, financialReviewDraft);
-    }
     if (action === "kline-fit" && chartInstance) {
       chartInstance.timeScale().fitContent();
       return;
@@ -2361,11 +2378,6 @@
       render();
       return;
     }
-    if (target.getAttribute("data-action") === "financial-review-input") {
-      financialReviewDraft[target.getAttribute("data-field")] = target.value;
-      financialReviewSaved = false;
-      return;
-    }
     if (target.getAttribute("data-action") === "alert-input") {
       alertDraft[target.getAttribute("data-field")] = target.value;
       var alertIssuesOnChange = core.alertFormIssues(alertDraft, { symbol: (selectedKlineInstrument() || {}).symbol });
@@ -2407,6 +2419,20 @@
       refreshSearchResults("global-search-results", symbolSearchResults(core.klineInstruments(state.view), klineSearchQuery, [], state.selectedKlineInstrumentId, "global-search-results", "global-search-pick"));
       return;
     }
+    if (target.getAttribute("data-action") === "company-record") {
+      var companyField = target.getAttribute("data-field");
+      var companyValue = companyField === "held" ? target.value === "true" : target.value;
+      state = core.reduce(state, {
+        type: "SET_COMPANY_RECORD",
+        instrumentId: state.selectedKlineInstrumentId,
+        field: companyField,
+        value: companyValue,
+        now: todayIso()
+      });
+      persistCompanyResearch();
+      render();
+      return;
+    }
     if (target.getAttribute("data-action") === "thesis-input") {
       state = core.reduce(state, { type: "SET_THESIS_FIELD", instrumentId: state.selectedKlineInstrumentId, field: target.getAttribute("data-field"), value: target.value });
       persistResearchStores();
@@ -2434,11 +2460,6 @@
     }
     if (target.getAttribute("data-action") === "note-input") {
       state = core.reduce(state, { type: "SET_NOTE_DRAFT", field: target.getAttribute("data-field"), value: target.value });
-      return;
-    }
-    if (target.getAttribute("data-action") === "financial-review-input") {
-      financialReviewDraft[target.getAttribute("data-field")] = target.value;
-      financialReviewSaved = false;
       return;
     }
     if (target.getAttribute("data-action") === "alert-input") {

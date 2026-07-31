@@ -274,7 +274,7 @@
     if (event.type === "SET_WATCHLIST_SORT") {
       return Object.assign({}, current, { watchlistSort: event.value });
     }
-    if (event.type === "SET_COMPANY_RECORD") {
+    if (event.type === "SET_COMPANY_RECORD" && companyFieldAccepts(event.field, event.value)) {
       var records = Object.assign({}, current.companyResearch);
       var record = Object.assign(defaultCompanyRecord(event.instrumentId), records[event.instrumentId] || {});
       record[event.field] = event.value;
@@ -298,6 +298,9 @@
       thesis[event.field] = typeof event.value === "string" ? event.value.slice(0, 2000) : "";
       theses[event.instrumentId] = thesis;
       return Object.assign({}, current, { theses: theses });
+    }
+    if (event.type === "LOAD_COMPANY_RESEARCH") {
+      return Object.assign({}, current, { companyResearch: normalizeCompanyResearch(event.payload) });
     }
     if (event.type === "LOAD_THESES") {
       return Object.assign({}, current, { theses: normalizeThesisStore(event.payload) });
@@ -934,8 +937,27 @@
       position_state: "觀察",
       next_event: "",
       held: false,
+      score: "",
+      note: "",
       updated_at: ""
     };
+  }
+
+  // Enum fields accept only their declared vocabulary; free-text fields accept a
+  // bounded string. Anything else leaves the record untouched.
+  function companyFieldAccepts(field, value) {
+    var vocabularies = {
+      industry: INDUSTRY_OPTIONS,
+      fundamental_state: FUNDAMENTAL_STATES,
+      thesis_state: THESIS_STATES,
+      position_state: POSITION_STATES,
+      score: ["", "1", "2", "3", "4", "5"]
+    };
+    if (vocabularies[field]) return vocabularies[field].indexOf(value) >= 0;
+    if (field === "next_event") return typeof value === "string" && value.length <= 120;
+    if (field === "note") return typeof value === "string" && value.length <= 500;
+    if (field === "held") return value === true || value === false;
+    return false;
   }
 
   function companyRecord(state, instrumentId) {
@@ -956,6 +978,8 @@
       if (THESIS_STATES.indexOf(record.thesis_state) >= 0) merged.thesis_state = record.thesis_state;
       if (POSITION_STATES.indexOf(record.position_state) >= 0) merged.position_state = record.position_state;
       if (typeof record.next_event === "string") merged.next_event = record.next_event.slice(0, 120);
+      if (["", "1", "2", "3", "4", "5"].indexOf(record.score) >= 0) merged.score = record.score;
+      if (typeof record.note === "string") merged.note = record.note.slice(0, 500);
       merged.held = record.held === true;
       if (typeof record.updated_at === "string") merged.updated_at = record.updated_at.slice(0, 40);
       out[key] = merged;
@@ -1250,6 +1274,7 @@
     POSITION_STATES: POSITION_STATES,
     defaultCompanyRecord: defaultCompanyRecord,
     companyRecord: companyRecord,
+    companyFieldAccepts: companyFieldAccepts,
     normalizeCompanyResearch: normalizeCompanyResearch,
     companyResearchPayload: companyResearchPayload,
     watchlistViewRows: watchlistViewRows,
