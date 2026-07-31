@@ -8,7 +8,10 @@ const os = require("node:os");
 const { spawn, spawnSync } = require("node:child_process");
 
 const ROOT = path.resolve(__dirname, "..");
-const PREVIEW_DIR = path.join(ROOT, "outputs", "dashboard-preview");
+// Built into a throwaway dir: writing into outputs/dashboard-preview would
+// overwrite a running dev server's bundle with this run's random sidecar
+// port, silently breaking it until the next restart.
+const PREVIEW_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "tqr-preview-"));
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
   home: "07c16dbb6b1411fd529f410541c83b4d1069476262758722125f79eae4edcbbb",
@@ -148,7 +151,7 @@ async function main() {
   const build = spawnSync("python3", ["scripts/build_dashboard_preview.py"], {
     cwd: ROOT,
     encoding: "utf8",
-    env: { ...process.env, TQE_SIDECAR_URL: sidecarBaseUrl },
+    env: { ...process.env, TQE_SIDECAR_URL: sidecarBaseUrl, TQE_PREVIEW_OUTPUT: PREVIEW_DIR },
   });
   assert.equal(build.status, 0, build.stderr || build.stdout);
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
