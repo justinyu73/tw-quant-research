@@ -466,13 +466,19 @@
       return '<div class="empty-state" data-testid="company-status-empty"><strong>尚未選擇公司。</strong><span>選定標的後才能記錄研究狀態。</span></div>';
     }
     var record = core.companyRecord(state, instrumentId);
+    var tracked = core.watchlistItemsForActiveGroup(state).indexOf(instrumentId) >= 0;
+    var trackingBanner = tracked
+      ? '<div class="company-tracking tracked" data-testid="company-tracking">已在追蹤清單，這裡的判斷會出現在 Watchlist 與 Home。</div>'
+      : '<div class="company-tracking untracked" data-testid="company-tracking-missing"><div><strong>這家公司還沒加入追蹤清單。</strong>' +
+        '<span>研究狀態仍會保存，但 Watchlist 欄位、篩選器與 Home 統計只涵蓋追蹤中的公司，所以你在這裡的判斷還不會顯示出來。</span></div>' +
+        '<button class="btn btn-primary btn-sm" type="button" data-action="watchlist-toggle" data-testid="company-track-add">加入追蹤</button></div>';
     function select(field, label, options, testid) {
       return '<label><span>' + text(label) + '</span><select data-action="company-record" data-field="' + field + '" data-testid="' + testid + '">' +
         options.map(function (option) {
           return '<option value="' + escapeHtml(option) + '"' + (record[field] === option ? " selected" : "") + '>' + text(option || "未評分") + '</option>';
         }).join("") + '</select></label>';
     }
-    return '<section class="company-status" data-testid="company-status">' +
+    return '<section class="company-status" data-testid="company-status">' + trackingBanner +
       '<div class="company-status-grid">' +
       select("industry", "產業分類", core.INDUSTRY_OPTIONS, "company-industry") +
       select("fundamental_state", "基本面狀態", core.FUNDAMENTAL_STATES, "company-fundamental-state") +
@@ -1469,6 +1475,13 @@
     return value === null || value === undefined ? "—" : core.formatPercent(value);
   }
 
+  // Price above fair value is a premium, not a discount. Rendering +205% under a
+  // column headed 折價 would invert the meaning of the core number in this app.
+  function discountLabel(value) {
+    if (value === null || value === undefined) return "—";
+    return (value < 0 ? "折價 " : value > 0 ? "溢價 " : "持平 ") + core.formatPercent(Math.abs(value));
+  }
+
   function num(value) {
     return value === null || value === undefined ? "—" : core.formatNumber(value);
   }
@@ -1511,7 +1524,7 @@
         '<td><span class="cell-strong">' + text(row.name) + '</span><small>' + text(row.industry) + '</small></td>' +
         '<td class="cell-mono">' + num(row.price) + '</td>' +
         '<td class="cell-mono" data-testid="watchlist-base-value">' + num(row.base_value) + '</td>' +
-        '<td class="cell-mono ' + (row.discount !== null && row.discount < 0 ? "tone-down" : "") + '" data-testid="watchlist-discount">' + pct(row.discount) + '</td>' +
+        '<td class="cell-mono ' + (row.discount === null ? "" : row.discount < 0 ? "tone-up" : "tone-down") + '" data-testid="watchlist-discount">' + discountLabel(row.discount) + '</td>' +
         '<td class="cell-mono">' + num(row.first_price) + '</td>' +
         '<td class="cell-mono">' + num(row.sweet_price) + '</td>' +
         '<td>' + text(row.fundamental_state) + '</td>' +
@@ -1521,7 +1534,7 @@
         '<td class="table-action"><button class="btn btn-outline btn-sm" type="button" data-action="watchlist-remove" data-instrument-id="' + escapeHtml(row.instrument_id) + '">移除</button></td></tr>';
     }).join("") : '<tr><td colspan="12">目前篩選條件下沒有標的。</td></tr>';
     return watchlistFilterMarkup() + '<div class="table-responsive"><table class="table watchlist-table" data-testid="watchlist-table"><thead><tr>' +
-      '<th>代號</th><th>公司／產業</th><th>現價</th><th>合理價值</th><th>折價</th><th>第一買進價</th><th>甜蜜價</th><th>基本面</th><th>投資假設</th><th>下一事件</th><th>買進階段</th><th></th>' +
+      '<th>代號</th><th>公司／產業</th><th>現價</th><th>合理價值</th><th>折／溢價</th><th>第一買進價</th><th>甜蜜價</th><th>基本面</th><th>投資假設</th><th>下一事件</th><th>買進階段</th><th></th>' +
       '</tr></thead><tbody>' + body + '</tbody></table></div>' +
       '<p class="watchlist-note">合理價值來自你在 Valuation 建立的 Base 工作表；未建立估值的標的，合理價值、折價與買進價一律顯示「—」，不以價格反推。</p>';
   }
@@ -1718,7 +1731,7 @@
       '<div><span class="detail-label">極端錯價</span><strong>' + core.formatNumber(zone.extreme) + '</strong></div>' +
       '</div>' +
       '<div class="valuation-compare"><span>現價 <strong>' + core.formatNumber(result.current_price) + '</strong></span>' +
-      '<span>折價 <strong data-testid="valuation-discount">' + core.formatPercent(comparison.discount_pct) + '</strong></span>' +
+      '<span data-testid="valuation-discount-cell"><strong data-testid="valuation-discount">' + discountLabel(comparison.discount_pct) + '</strong></span>' +
       '<span>目前階段 <strong data-testid="valuation-stage">' + text(core.STAGE_LABELS[result.stage]) + '</strong></span></div>' +
       '<small class="valuation-result-params">EPS ' + text(basis.eps_period) + '（' + (basis.eps_kind === "actual" ? "實際值" : "預估值") + '）· PE 理由 ' + text(basis.pe_rationale || "未記錄") +
       ' · 財報日 ' + text(basis.financial_data_date || "未記錄") + ' · 估值日 ' + text(basis.valuation_date) + ' · 公式版本 ' + text(result.formula_version) + '</small></article>';
@@ -1936,12 +1949,12 @@
     if (!rows.length) {
       return '<div class="empty-state" data-testid="opportunity-empty"><strong>尚無可排序的價值機會。</strong><span>先在 Valuation 建立 Base 合理價值，這裡才會依折價幅度排序；不以價格推估合理價值。</span></div>';
     }
-    return '<div class="table-responsive"><table class="table" data-testid="opportunity-list"><thead><tr><th>股票</th><th>現價</th><th>合理價值</th><th>折價</th><th>狀態</th></tr></thead><tbody>' +
+    return '<div class="table-responsive"><table class="table" data-testid="opportunity-list"><thead><tr><th>股票</th><th>現價</th><th>合理價值</th><th>折／溢價</th><th>狀態</th></tr></thead><tbody>' +
       rows.map(function (row) {
         return '<tr data-testid="opportunity-row"><td><span class="cell-strong">' + text(row.symbol) + '</span><small>' + text(row.name) + '</small></td>' +
           '<td class="cell-mono">' + core.formatNumber(row.price) + '</td>' +
           '<td class="cell-mono">' + core.formatNumber(row.base_value) + '</td>' +
-          '<td class="cell-mono ' + (row.discount < 0 ? "tone-down" : "tone-up") + '">' + core.formatPercent(row.discount) + '</td>' +
+          '<td class="cell-mono ' + (row.discount < 0 ? "tone-up" : "tone-down") + '" data-testid="opportunity-discount">' + discountLabel(row.discount) + '</td>' +
           '<td>' + text(row.stage_label) + '</td></tr>';
       }).join("") + '</tbody></table></div>';
   }

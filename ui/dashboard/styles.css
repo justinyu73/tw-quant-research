@@ -1082,3 +1082,9 @@ input, select, textarea, button { font-family: inherit; }
 .trend-coverage { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--border-light); border-radius: var(--radius); background: var(--surface-secondary); color: var(--text-muted); font-size: 11px; }
 .trend-coverage strong { color: var(--text); font-family: var(--font-mono, ui-monospace, monospace); }
 .trend-coverage + .table-responsive { margin-bottom: 12px; }
+
+.company-tracking { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; padding: 10px 12px; border-radius: var(--radius); font-size: 11px; line-height: 1.5; }
+.company-tracking.tracked { border: 1px solid var(--border-light); background: var(--surface-secondary); color: var(--text-muted); }
+.company-tracking.untracked { border: 1px solid #d6b45a; background: #fdf8e8; }
+.company-tracking strong { display: block; }
+.company-tracking span { color: var(--text-secondary); }
