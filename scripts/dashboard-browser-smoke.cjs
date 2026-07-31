@@ -365,6 +365,17 @@ async function main() {
     assert.equal(await page.locator(".page-title").innerText(), "Valuation");
     await page.locator('[data-testid="valuation-panel"]').waitFor();
     assert.equal(await page.locator('[data-testid="valuation-empty"]').count(), 1);
+    // Evaluating before a worksheet exists must say why, not do nothing: this
+    // is the two-step flow the happy path used to hide.
+    assert.match(
+      await page.locator('[data-testid="valuation-evaluate-hint"]').innerText(),
+      /加入估值工作表/,
+    );
+    assert.equal(await page.locator('[data-testid="valuation-evaluate"]').isDisabled(), false);
+    await page.locator('[data-testid="valuation-evaluate"]').click();
+    const blockedStatus = await page.locator('[data-testid="valuation-status"]').innerText();
+    assert.match(blockedStatus, /加入估值工作表/, `evaluate-before-worksheet said: ${blockedStatus}`);
+    assert.equal(await page.locator('[data-testid="valuation-result-card"]').count(), 0);
     await page.locator('[data-testid="valuation-ws-label"]').fill("2330 三情境合理價");
     await page.locator('[data-testid="valuation-ws-bear-eps"]').fill("30");
     await page.locator('[data-testid="valuation-ws-bear-pe"]').fill("15");
