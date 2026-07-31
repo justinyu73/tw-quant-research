@@ -15,12 +15,12 @@ from urllib.parse import parse_qs, urlsplit
 
 from .alerts import ALERT_STORE_SCHEMA, AlertValidationError, evaluate_alerts, parse_alert_store, validate_alert
 from .fundamentals import (
-    ATTRIBUTION,
     BALANCE_SHEET,
     INCOME_STATEMENT,
     LICENSE_REF,
     MONTHLY_REVENUE,
     SERIES_SCHEMA,
+    attribution_for,
     coverage,
     series_for,
 )
@@ -272,23 +272,26 @@ class KlineCatalog:
         if not security_id or len(security_id) > 16 or not security_id.isalnum():
             return 400, {"error": "invalid_security_id"}
         series = self.fundamentals
+        monthly = series_for(series, security_id, MONTHLY_REVENUE, 12)
+        income = series_for(series, security_id, INCOME_STATEMENT, 8)
+        balance = series_for(series, security_id, BALANCE_SHEET, 8)
         return 200, {
             "schema": SIDECAR_FUNDAMENTALS_SCHEMA,
             "read_only": True,
             "security_id": security_id,
             "monthly_revenue": {
-                "observations": series_for(series, security_id, MONTHLY_REVENUE, 12),
+                "observations": monthly,
                 "coverage": coverage(series, security_id, MONTHLY_REVENUE, 12),
             },
             "income_statement": {
-                "observations": series_for(series, security_id, INCOME_STATEMENT, 8),
+                "observations": income,
                 "coverage": coverage(series, security_id, INCOME_STATEMENT, 8),
             },
             "balance_sheet": {
-                "observations": series_for(series, security_id, BALANCE_SHEET, 8),
+                "observations": balance,
                 "coverage": coverage(series, security_id, BALANCE_SHEET, 8),
             },
-            "attribution": ATTRIBUTION,
+            "attribution": attribution_for(monthly + income + balance),
             "license_ref": LICENSE_REF,
         }
 

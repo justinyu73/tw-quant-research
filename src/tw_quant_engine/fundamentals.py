@@ -1,4 +1,4 @@
-"""TWSE fundamentals normalization and append-only period accumulation.
+"""TWSE/TPEx fundamentals normalization and append-only period accumulation.
 
 Encodes the measured findings of TQR-FUNDAMENTALS-SOURCE-001
 (docs/tqr-fundamentals-source-contract.md):
@@ -11,6 +11,13 @@ Encodes the measured findings of TQR-FUNDAMENTALS-SOURCE-001
   (security_id, period) plus the financial values, never on a response digest;
 - missing inputs stay ``None``. Nothing is padded, interpolated, carried forward
   from an adjacent period, or estimated from price.
+
+The two exchanges do not name their columns the same way, and the differences
+are not uniform per exchange: they vary per family. Every mapping in ``_FIELDS``
+was read off a recorded sample under ``tests/fixtures/tqr-fundamentals/``, not
+off documentation. Because a mismapped column would otherwise normalize to a
+silent ``None``, an absent mapped column is a ``FundamentalsMappingError`` and
+aborts the capture instead of producing rows full of holes.
 """
 from __future__ import annotations
 
@@ -22,15 +29,54 @@ from typing import Any, Iterable, Mapping, Sequence
 OBSERVATION_SCHEMA = "tqr-fundamental-observation/v1"
 SERIES_SCHEMA = "tqr-fundamental-series/v1"
 NORMALIZATION_VERSION = "tqr-fundamentals/v1"
-SOURCE_ID = "twse_openapi"
-MARKET = "TWSE"
 LICENSE_REF = "https://data.gov.tw/license"
-ATTRIBUTION = "資料來源：臺灣證券交易所"
+
+TWSE = "TWSE"
+TPEX = "TPEx"
+MARKETS = (TWSE, TPEX)
 
 MONTHLY_REVENUE = "monthly_revenue"
 INCOME_STATEMENT = "income_statement"
 BALANCE_SHEET = "balance_sheet"
 FAMILIES = (MONTHLY_REVENUE, INCOME_STATEMENT, BALANCE_SHEET)
+
+_SOURCES = {
+    TWSE: {
+        "source_id": "twse_openapi",
+        "attribution": "資料來源：臺灣證券交易所",
+        "endpoints": {
+            MONTHLY_REVENUE: "/v1/opendata/t187ap05_L",
+            INCOME_STATEMENT: "/v1/opendata/t187ap06_L_ci",
+            BALANCE_SHEET: "/v1/opendata/t187ap07_L_ci",
+        },
+    },
+    TPEX: {
+        "source_id": "tpex_openapi",
+        "attribution": "資料來源：財團法人中華民國證券櫃檯買賣中心",
+        "endpoints": {
+            MONTHLY_REVENUE: "/openapi/v1/mopsfin_t187ap05_O",
+            INCOME_STATEMENT: "/openapi/v1/mopsfin_t187ap06_O_ci",
+            BALANCE_SHEET: "/openapi/v1/mopsfin_t187ap07_O_ci",
+        },
+    },
+}
+
+_TWSE_IDENTITY = {"security_id": "公司代號", "display_name": "公司名稱", "export_date": "出表日期"}
+_TPEX_IDENTITY = {"security_id": "SecuritiesCompanyCode", "display_name": "CompanyName", "export_date": "Date"}
+
+# TPEx repeats the TWSE column names verbatim for monthly revenue, renames only
+# the identity columns on the income statement, and on the balance sheet mixes
+# both conventions while spelling the three totals 總計 where TWSE writes 總額.
+_FIELDS = {
+    (TWSE, MONTHLY_REVENUE): dict(_TWSE_IDENTITY, month="資料年月"),
+    (TWSE, INCOME_STATEMENT): dict(_TWSE_IDENTITY, year="年度", quarter="季別"),
+    (TWSE, BALANCE_SHEET): dict(_TWSE_IDENTITY, year="年度", quarter="季別",
+                                assets="資產總額", liabilities="負債總額", equity="權益總額"),
+    (TPEX, MONTHLY_REVENUE): dict(_TWSE_IDENTITY, month="資料年月"),
+    (TPEX, INCOME_STATEMENT): dict(_TPEX_IDENTITY, year="Year", quarter="Season"),
+    (TPEX, BALANCE_SHEET): dict(_TPEX_IDENTITY, year="年度", quarter="季別",
+                                assets="資產總計", liabilities="負債總計", equity="權益總計"),
+}
 
 _SECURITY_ID = re.compile(r"^[0-9A-Z]{4,6}$")
 _ROC_YM = re.compile(r"^(\d{3})(\d{2})$")
@@ -39,6 +85,23 @@ _ROC_DATE = re.compile(r"^(\d{3})(\d{2})(\d{2})$")
 
 class FundamentalsError(ValueError):
     """Raised when a source row or series payload fails fail-closed validation."""
+
+
+class FundamentalsMappingError(RuntimeError):
+    """A mapped column is absent from the whole response.
+
+    Deliberately not a ``FundamentalsError``: bad rows are dropped, but a column
+    the mapping expects and the source never carries is a defect in the mapping
+    itself, and dropping every row quietly would look like an empty period.
+    """
+
+
+def _fields(market: str, family: str) -> dict[str, str]:
+    if family not in FAMILIES:
+        raise FundamentalsError(f"unknown family {family!r}")
+    if market not in MARKETS:
+        raise FundamentalsError(f"unknown market {market!r}")
+    return _FIELDS[(market, family)]
 
 
 def _digest(value: Any) -> str:
@@ -94,10 +157,11 @@ def _number(row: Mapping[str, Any], key: str) -> float | None:
         return None
 
 
-def _security_id(row: Mapping[str, Any]) -> str:
-    value = str(row.get("公司代號", "")).strip()
+def _security_id(row: Mapping[str, Any], fields: Mapping[str, str]) -> str:
+    key = fields["security_id"]
+    value = str(row.get(key, "")).strip()
     if not _SECURITY_ID.match(value):
-        raise FundamentalsError(f"公司代號 must be 4-6 alphanumeric chars, got {value!r}")
+        raise FundamentalsError(f"{key} must be 4-6 alphanumeric chars, got {value!r}")
     return value
 
 
@@ -107,11 +171,12 @@ def _ratio(numerator: float | None, denominator: float | None) -> float | None:
     return numerator / denominator
 
 
-def normalize_monthly_revenue_row(row: Mapping[str, Any]) -> dict[str, Any]:
-    """One t187ap05_L row -> one observation. YoY is only derived when the source
-    itself supplies last year's same-month figure; it is never inferred."""
+def normalize_monthly_revenue_row(row: Mapping[str, Any], market: str) -> dict[str, Any]:
+    """One monthly-revenue row -> one observation. YoY is only derived when the
+    source itself supplies last year's same-month figure; it is never inferred."""
     if not isinstance(row, Mapping):
         raise FundamentalsError("row must be an object")
+    fields = _fields(market, MONTHLY_REVENUE)
     current = _number(row, "營業收入-當月營收")
     previous = _number(row, "營業收入-上月營收")
     last_year = _number(row, "營業收入-去年當月營收")
@@ -120,10 +185,10 @@ def normalize_monthly_revenue_row(row: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "schema": OBSERVATION_SCHEMA,
         "family": MONTHLY_REVENUE,
-        "security_id": _security_id(row),
-        "display_name": str(row.get("公司名稱", "")).strip() or None,
+        "security_id": _security_id(row, fields),
+        "display_name": str(row.get(fields["display_name"], "")).strip() or None,
         "industry": str(row.get("產業別", "")).strip() or None,
-        "period": roc_month_to_iso(row.get("資料年月")),
+        "period": roc_month_to_iso(row.get(fields["month"])),
         "values": {
             "monthly_revenue": current,
             "monthly_revenue_previous_month": previous,
@@ -137,14 +202,15 @@ def normalize_monthly_revenue_row(row: Mapping[str, Any]) -> dict[str, Any]:
             "cumulative_yoy": _ratio(cumulative - cumulative_last_year, cumulative_last_year)
             if cumulative is not None and cumulative_last_year is not None else None,
         },
-        "provenance": _provenance(row, "/v1/opendata/t187ap05_L"),
+        "provenance": _provenance(row, fields, market, MONTHLY_REVENUE),
     }
 
 
-def normalize_income_statement_row(row: Mapping[str, Any]) -> dict[str, Any]:
-    """One t187ap06_L_ci row -> one observation with the three margins and EPS."""
+def normalize_income_statement_row(row: Mapping[str, Any], market: str) -> dict[str, Any]:
+    """One income-statement row -> one observation with the three margins and EPS."""
     if not isinstance(row, Mapping):
         raise FundamentalsError("row must be an object")
+    fields = _fields(market, INCOME_STATEMENT)
     revenue = _number(row, "營業收入")
     gross = _number(row, "營業毛利（毛損）")
     operating = _number(row, "營業利益（損失）")
@@ -152,9 +218,9 @@ def normalize_income_statement_row(row: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "schema": OBSERVATION_SCHEMA,
         "family": INCOME_STATEMENT,
-        "security_id": _security_id(row),
-        "display_name": str(row.get("公司名稱", "")).strip() or None,
-        "period": quarter_period(row.get("年度"), row.get("季別")),
+        "security_id": _security_id(row, fields),
+        "display_name": str(row.get(fields["display_name"], "")).strip() or None,
+        "period": quarter_period(row.get(fields["year"]), row.get(fields["quarter"])),
         "values": {
             "revenue": revenue,
             "gross_profit": gross,
@@ -165,25 +231,26 @@ def normalize_income_statement_row(row: Mapping[str, Any]) -> dict[str, Any]:
             "operating_margin": _ratio(operating, revenue),
             "net_margin": _ratio(net, revenue),
         },
-        "provenance": _provenance(row, "/v1/opendata/t187ap06_L_ci"),
+        "provenance": _provenance(row, fields, market, INCOME_STATEMENT),
     }
 
 
-def normalize_balance_sheet_row(row: Mapping[str, Any]) -> dict[str, Any]:
-    """One t187ap07_L_ci row -> one observation with leverage and liquidity."""
+def normalize_balance_sheet_row(row: Mapping[str, Any], market: str) -> dict[str, Any]:
+    """One balance-sheet row -> one observation with leverage and liquidity."""
     if not isinstance(row, Mapping):
         raise FundamentalsError("row must be an object")
-    assets = _number(row, "資產總額")
-    liabilities = _number(row, "負債總額")
-    equity = _number(row, "權益總額")
+    fields = _fields(market, BALANCE_SHEET)
+    assets = _number(row, fields["assets"])
+    liabilities = _number(row, fields["liabilities"])
+    equity = _number(row, fields["equity"])
     current_assets = _number(row, "流動資產")
     current_liabilities = _number(row, "流動負債")
     return {
         "schema": OBSERVATION_SCHEMA,
         "family": BALANCE_SHEET,
-        "security_id": _security_id(row),
-        "display_name": str(row.get("公司名稱", "")).strip() or None,
-        "period": quarter_period(row.get("年度"), row.get("季別")),
+        "security_id": _security_id(row, fields),
+        "display_name": str(row.get(fields["display_name"], "")).strip() or None,
+        "period": quarter_period(row.get(fields["year"]), row.get(fields["quarter"])),
         "values": {
             "assets": assets,
             "liabilities": liabilities,
@@ -194,18 +261,19 @@ def normalize_balance_sheet_row(row: Mapping[str, Any]) -> dict[str, Any]:
             "debt_ratio": _ratio(liabilities, assets),
             "current_ratio": _ratio(current_assets, current_liabilities),
         },
-        "provenance": _provenance(row, "/v1/opendata/t187ap07_L_ci"),
+        "provenance": _provenance(row, fields, market, BALANCE_SHEET),
     }
 
 
-def _provenance(row: Mapping[str, Any], endpoint: str) -> dict[str, Any]:
-    export_date = roc_date_to_iso(row.get("出表日期"))
+def _provenance(row: Mapping[str, Any], fields: Mapping[str, str], market: str, family: str) -> dict[str, Any]:
+    source = _SOURCES[market]
+    export_date = roc_date_to_iso(row.get(fields["export_date"]))
     return {
-        "source_id": SOURCE_ID,
-        "market": MARKET,
-        "endpoint": endpoint,
+        "source_id": source["source_id"],
+        "market": market,
+        "endpoint": source["endpoints"][family],
         "license_ref": LICENSE_REF,
-        "attribution": ATTRIBUTION,
+        "attribution": source["attribution"],
         # 出表日期 is the exchange's batch export date. It is later than the real
         # filing date, so it is a conservative available_at; published_at stays
         # null until a per-company filing timestamp source is admitted.
@@ -216,20 +284,36 @@ def _provenance(row: Mapping[str, Any], endpoint: str) -> dict[str, Any]:
     }
 
 
-def normalize_rows(rows: Sequence[Mapping[str, Any]], family: str) -> list[dict[str, Any]]:
+def normalize_rows(rows: Sequence[Mapping[str, Any]], family: str, market: str) -> list[dict[str, Any]]:
     """Normalize a full-market response. Rows that fail validation are dropped
-    rather than partially admitted, and the caller sees the count difference."""
-    if family not in FAMILIES:
-        raise FundamentalsError(f"unknown family {family!r}")
+    rather than partially admitted, and the caller sees the count difference.
+
+    A mapped column that no row carries aborts instead: the two exchanges name
+    these columns differently per family, and reading a TPEx balance sheet with
+    the TWSE 總額 spelling would otherwise yield rows whose totals and ratios are
+    all ``None`` while every count still looks healthy.
+    """
+    fields = _fields(market, family)
     normalizer = {
         MONTHLY_REVENUE: normalize_monthly_revenue_row,
         INCOME_STATEMENT: normalize_income_statement_row,
         BALANCE_SHEET: normalize_balance_sheet_row,
     }[family]
+    present = set()
+    for row in rows or []:
+        if isinstance(row, Mapping):
+            present.update(row)
+    # display_name is cosmetic; its absence degrades a label, not a number.
+    required = {name: column for name, column in fields.items() if name != "display_name"}
+    missing = sorted({column for column in required.values() if column not in present})
+    if rows and missing:
+        raise FundamentalsMappingError(
+            f"{market} {family} response carries none of {missing}; the column mapping is wrong"
+        )
     out = []
     for row in rows or []:
         try:
-            out.append(normalizer(row))
+            out.append(normalizer(row, market))
         except FundamentalsError:
             continue
     return out
@@ -258,6 +342,11 @@ def merge_observations(
     A repeat capture of an unchanged period is a no-op even though its export
     date advanced. A genuine restatement replaces the values and records the
     supersession instead of silently overwriting history.
+
+    The key deliberately excludes market so that a company moving between TPEx
+    and TWSE keeps one continuous series. That makes a same-key/different-market
+    pair ambiguous rather than a restatement, so it is reported as a conflict and
+    the existing observation is kept.
     """
     current = series if isinstance(series, Mapping) else empty_series()
     if current.get("schema") != SERIES_SCHEMA:
@@ -266,12 +355,22 @@ def merge_observations(
     added = 0
     restated = 0
     unchanged = 0
+    conflicts = []
     for observation in observations:
         key = observation_key(observation)
         previous = existing.get(key)
         if previous is None:
             existing[key] = dict(observation)
             added += 1
+            continue
+        kept_market = previous.get("provenance", {}).get("market")
+        incoming_market = observation.get("provenance", {}).get("market")
+        if kept_market != incoming_market:
+            conflicts.append({
+                "key": list(key),
+                "kept_market": kept_market,
+                "rejected_market": incoming_market,
+            })
             continue
         if observation_value_digest(previous) == observation_value_digest(observation):
             unchanged += 1
@@ -288,7 +387,7 @@ def merge_observations(
         "schema": SERIES_SCHEMA,
         "version": 1,
         "observations": ordered,
-        "last_merge": {"added": added, "restated": restated, "unchanged": unchanged},
+        "last_merge": {"added": added, "restated": restated, "unchanged": unchanged, "conflicts": conflicts},
     }
 
 
@@ -304,6 +403,17 @@ def series_for(series: Mapping[str, Any] | None, security_id: str, family: str, 
     return selected[: max(0, limit)]
 
 
+def attribution_for(observations: Iterable[Mapping[str, Any]]) -> str:
+    """Attribution of the observations actually returned, not of whichever
+    exchange happened to be implemented first. Both exchanges publish under the
+    Government Data Open License, which requires naming the right one."""
+    names = sorted({
+        str((item.get("provenance") or {}).get("attribution") or "").strip()
+        for item in observations
+    } - {""})
+    return "、".join(names)
+
+
 def coverage(series: Mapping[str, Any] | None, security_id: str, family: str, expected: int) -> dict[str, Any]:
     """Honest depth report: `n of expected`, never padded to look complete."""
     captured = len(series_for(series, security_id, family, expected))
@@ -317,16 +427,20 @@ def coverage(series: Mapping[str, Any] | None, security_id: str, family: str, ex
 
 
 __all__ = [
-    "ATTRIBUTION",
     "FAMILIES",
     "BALANCE_SHEET",
     "INCOME_STATEMENT",
     "LICENSE_REF",
+    "MARKETS",
     "MONTHLY_REVENUE",
     "NORMALIZATION_VERSION",
     "OBSERVATION_SCHEMA",
     "SERIES_SCHEMA",
+    "TPEX",
+    "TWSE",
     "FundamentalsError",
+    "FundamentalsMappingError",
+    "attribution_for",
     "coverage",
     "empty_series",
     "merge_observations",

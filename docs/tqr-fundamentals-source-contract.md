@@ -2,7 +2,7 @@
 
 Authority: [`tqr-research-platform-spec.md`](tqr-research-platform-spec.md)
 Decision: `TQR-FUNDAMENTALS-SOURCE-001`
-Status: `twse_implemented_forward_accumulation` (TPEx deferred)
+Status: `twse_live_proven_tpex_offline_proven_forward_accumulation`
 Verified: 2026-07-31 (live probe, `scripts/probe_fundamentals_sources.py`)
 
 Machine-readable record:
@@ -69,13 +69,40 @@ values are unchanged.
 digest would create a fresh "new" record on every capture and corrupt the
 period series.
 
-## Finding 4 — the exchanges name the same fields differently
+## Finding 4 — the exchanges name the same fields differently, per family
 
-TPEx statement endpoints use `SecuritiesCompanyCode` / `Year` / `Season` / `Date`
-where TWSE uses `公司代號` / `年度` / `季別` / `出表日期`. This is a per-source
-mapping task, not a missing field. An earlier probe pass reported these two TPEx
-endpoints as rejected; that was a defect in the probe's column matching, not a
-source defect, and is corrected here.
+Corrected 2026-07-31 against the recorded sample rows under
+`tests/fixtures/tqr-fundamentals/tpex_*.sample.json`. The earlier wording —
+"TPEx statement endpoints use `SecuritiesCompanyCode` / `Year` / `Season` /
+`Date` where TWSE uses `公司代號` / `年度` / `季別` / `出表日期`" — was right about
+the income statement and wrong about the other two families. The divergence is
+per family, not per exchange:
+
+| Family | Identity / period columns | Divergence from TWSE |
+| --- | --- | --- |
+| `tpex_monthly_revenue` | `出表日期` / `資料年月` / `公司代號` / `公司名稱` / `產業別` | none — the TWSE column names verbatim |
+| `tpex_income_statement` | `Date` / `Year` / `Season` / `SecuritiesCompanyCode` / `CompanyName` | identity columns only; financial columns stay Chinese and match TWSE |
+| `tpex_balance_sheet` | `Date` / `年度` / `季別` / `SecuritiesCompanyCode` / `CompanyName` | mixed convention — it does **not** use `Year` / `Season` |
+
+The balance sheet also renames the three totals, which the earlier finding did
+not record at all:
+
+| Concept | TWSE | TPEx |
+| --- | --- | --- |
+| Total assets | `資產總額` | `資產總計` |
+| Total liabilities | `負債總額` | `負債總計` |
+| Total equity | `權益總額` | `權益總計` |
+
+**Why this one is dangerous rather than merely different.** A missing datum
+normalizes to `None` by design and a malformed row is dropped, but a column the
+mapping never finds does neither: every row normalizes, no row is dropped, the
+capture report shows a healthy count, and `assets`, `liabilities`, `equity`,
+`debt_ratio` and `current_ratio` are all silently `None`. Normalization therefore
+treats an absent *mapped* column as a `FundamentalsMappingError` that aborts the
+capture, distinct from the row-level `FundamentalsError` that only drops a row.
+
+An earlier probe pass reported the two TPEx statement endpoints as rejected; that
+was a defect in the probe's column matching, not a source defect.
 
 ## Finding 5 — the value-investing minimum fields are all present
 
@@ -91,8 +118,15 @@ keeps the `forward_eps` prohibition intact.
    forward accumulation the only admissible path?
 2. What is the exact publication cadence per endpoint, so a capture reminder can
    be scheduled without polling?
-3. Should TPEx be admitted in the same slice as TWSE, or deferred until the TWSE
-   normalization contract is proven?
+3. ~~Should TPEx be admitted in the same slice as TWSE, or deferred until the
+   TWSE normalization contract is proven?~~ Answered 2026-07-31: deferred, then
+   admitted once the TWSE contract was proven by live capture. TPEx is
+   implemented offline-first; no TPEx live capture has been run yet.
+4. Does a company that moves between TPEx and TWSE ever appear in both exports
+   for the same period? The observation key excludes market so that such a
+   company keeps one continuous series, which makes a same-key/different-market
+   pair ambiguous. It is reported as a merge conflict and refused rather than
+   guessed; only a live capture across a real listing move can retire this.
 
 ## What this contract does not authorize
 
@@ -113,16 +147,17 @@ do.
 
 ## Implementation status (2026-07-31)
 
-TWSE only, per the human decision to prove the normalization contract before
-adding TPEx.
+Both exchanges are mapped. TWSE is proven by live capture; TPEx is implemented
+and covered offline only, and its first live capture is still owed.
 
 | Piece | Where |
 | --- | --- |
 | Normalization + forward accumulation | `src/tw_quant_engine/fundamentals.py` |
 | Families implemented | monthly_revenue, income_statement, balance_sheet |
-| Human-run capture | `scripts/capture_twse_fundamentals.py` |
+| Markets implemented | TWSE (live-proven), TPEx (offline-proven) |
+| Human-run capture | `scripts/capture_fundamentals.py` (`--market`, `--family`) |
 | Read model route | `GET /fundamentals?security_id=` |
-| Offline tests | `tests/test_tqr_fundamentals.py` (19 cases) |
+| Offline tests | `tests/test_tqr_fundamentals.py` (28 cases) |
 
 Live capture on 2026-07-31 normalized 1,082 monthly-revenue rows (period
 2026-06) and 1,045 income-statement rows (period 2026Q1) with zero drops. A
@@ -134,9 +169,15 @@ Cross-check: the recomputed 台泥 2026-06 revenue YoY of 32.3988% matches the
 source's own `營業收入-去年同月增減(%)` column of 32.39878166305348, so the ratio
 convention is correct while remaining independently computed.
 
-TPEx (`mopsfin_t187ap05_O`, `mopsfin_t187ap06_O_ci`) stays unimplemented. Its
-`SecuritiesCompanyCode` / `Year` / `Season` / `Date` naming needs its own mapping
-entry before admission.
+TPEx (`mopsfin_t187ap05_O`, `mopsfin_t187ap06_O_ci`, `mopsfin_t187ap07_O_ci`) is
+mapped per Finding 4 and covered by offline tests over the recorded sample rows,
+including an assertion that the balance-sheet totals and both derived ratios are
+real numbers rather than the silent `None` the 總額/總計 split would otherwise
+produce. Attribution now follows each observation's own provenance, so TPEx data
+is credited to 證券櫃檯買賣中心 and never to 證交所.
+
+No TPEx live capture has been run. Row counts, distinct periods, and drop counts
+for TPEx therefore remain unmeasured, and this contract does not claim them.
 
 ### Balance sheet (added 2026-07-31)
 

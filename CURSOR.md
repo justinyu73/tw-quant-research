@@ -1,15 +1,15 @@
 <!-- This file is the single mutable state cursor. History = git log -p CURSOR.md -->
 # Cursor
 
-last_commit: 73f8992
-branch: fix/valuation-two-step-silent-failure
-last_stage: 價值投資工作台改寫 + TWSE 基本面接入 + 實機缺陷修正
+last_commit: e04b160
+branch: feat/tpex-fundamentals
+last_stage: TPEx 基本面納入（offline 完成，live capture 未跑）
 status: PARTIAL
-next_action: 回到專案 goal——公告節奏跨月實測（Watchlist「下一個事件」的前置），或 TPEx 基本面納入
+next_action: 由 JY 跑一次 TPEx live capture 驗收（見下方 Op-Demo）；之後只剩公告節奏跨月實測
 open_questions:
   - 免費官方是否存在財報歷史序列來源，或 forward accumulation 是唯一路徑
   - 各 endpoint 公告節奏（需跨月實測，不做推論）
-  - TPEx 何時納入（待 TWSE 正規化契約驗證後）
+  - 轉上市公司是否會同期同時出現在兩邊匯出檔（已設 conflict 防線，需 live 才能退場）
 
 ---
 
@@ -68,6 +68,32 @@ Source contract: `docs/tqr-fundamentals-source-contract.md`（`TQR-FUNDAMENTALS-
 gate 已接上：smoke 補了「未加入工作表就按計算」的路徑斷言。
 反向對照做過——抽掉 app.js 的修正後 smoke exit 1
 （`valuation-evaluate-hint` locator timeout），確認不是空綠。
+
+## TPEx 基本面（`e04b160`，offline 完成）
+
+欄名映射改為 per (market, family)，依實抓 fixture 而非契約敘述。契約 Finding 4
+原本的描述對損益表正確、對另外兩個 family 錯誤，已一併修正。
+
+最關鍵的一項：TPEx 資產負債表三個總計是 `資產總計`/`負債總計`/`權益總計`，
+TWSE 是 `總額`。照抄會靜默失敗——每列正規化成功、零丟棄、count 漂亮，但
+assets/liabilities/equity/debt_ratio/current_ratio 全是 None。已把「映射欄位
+整份回應都不存在」升級為 `FundamentalsMappingError` 中止擷取。
+
+反向對照做過：把映射改回 `資產總額` 拼法，
+`test_balance_sheet_totals_are_real_numbers_not_silent_nones` 轉紅（assets is None）。
+
+**live capture 未跑**——TPEx 的 row count、distinct periods、drop count 目前
+全部未測，契約沒有宣稱它們。這是這段唯一的缺口。
+
+### Op-Demo（要 JY 親自跑）
+
+```sh
+python3 scripts/capture_fundamentals.py --market TPEx --dry-run
+```
+
+看 `captures` 三個 family 的 `source_rows` / `normalized` / `dropped`，
+`dropped` 應為 0、`periods` 各只有一期。確認後拿掉 `--dry-run` 實際寫入，
+再開 App 找一支上櫃股（例如 1240 茂生農經）看負債比／流動比是否有數字。
 
 ## 未完成
 
