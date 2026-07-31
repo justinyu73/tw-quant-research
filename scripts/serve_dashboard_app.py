@@ -27,11 +27,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=5173)
     parser.add_argument("--sidecar-port", type=int, default=8767)
+    parser.add_argument("--data-dir", type=Path, default=None,
+                        help="local app data directory holding fundamentals-series.json and k6a snapshots")
     args = parser.parse_args()
 
     host = validate_loopback_host("127.0.0.1")
-    catalog = load_catalog(ROOT / "tests" / "fixtures")
-    sidecar = create_server(catalog, host=host, port=args.sidecar_port)
+    catalog = load_catalog(ROOT / "tests" / "fixtures", data_dir=args.data_dir)
+    sidecar = create_server(catalog, host=host, port=args.sidecar_port, fixture_root=ROOT / "tests" / "fixtures", data_dir=args.data_dir)
     sidecar_url = f"http://{host}:{args.sidecar_port}"
     threading.Thread(target=sidecar.serve_forever, daemon=True).start()
     print(f"TQR sidecar listening on {sidecar_url} instruments={len(catalog.instruments)}", flush=True)
