@@ -1,30 +1,95 @@
 <!-- This file is the single mutable state cursor. History = git log -p CURSOR.md -->
 # Cursor
 
-last_commit: fecccb5
-branch: main
-last_stage: v0.3.0 已發版——深色轉為主要外觀、資訊分層、趨勢表對齊；PR #24 已 merge，tag v0.3.0 已推
+last_commit: bcb04de
+branch: fix/kline-instrument-truth
+last_stage: v0.3.0 桌面版實測回報的四個缺陷全部修完，並補上「畫布＝標題＝輸入框」三者一致閘
 status: PARTIAL
-next_action: 實測打磨。desktop-release 由 tag 觸發，產出是 Draft；要不要發布由 JY 決定
+next_action: v0.3.0 Draft 維持不發佈（JY 決定：還有缺口）。等 PR merge 後，缺口清單見 open_questions
 open_questions:
   - sparkline 已實作但畫不出線：各指標只有 1 期，需累積 2 期以上才會出現（刻意不補值）
   - :focus 與 disabled 兩種互動態仍無任何閘覆蓋（hover 已納入 dark-audit）
-  - v0.3.0 桌面版人為實測回報四個缺陷（尚未修，尚未定位根因）：
-    1. K 線不隨選股更新——選了新標的圖不動，要再點【期間】才會跳成正確標的。
-       研究工具顯示錯誤標的的線圖是最高風險的一個。
-       非本次改版造成：41518ff 未觸及 renderKlineChart 呼叫點與 kline-search-pick，
-       該路徑最後變動於 920aa05
-    2. 已在自選清單中的股票，在搜尋框輸入代號回「找不到符合的商品」——
-       商品存在，只是已被追蹤，訊息說謊
-    3. 公司研究的 K 線沒有自選清單下拉，只能靠打字搜尋
-    4. 資料尚未下載時跳「本機資料服務無法連線；請重新啟動 TQR」——
-       實際上 sidecar 正常，只是還沒抓資料，訊息指向錯誤的根因
+  - 桌面版（WKWebView）尚未複測這四個修正；瀏覽器預覽 5173 已逐項量到
   - .research-module / .terminal-watchlist-row / .analysis-check 是死 CSS，六頁都渲染不出來，本次未刪
   - 「抓不到股票代碼」原因未明：JY 回報 Mac 端 curl 8767 有跑通，所以不是轉埠問題
   - 免費官方是否存在財報歷史序列來源，或 forward accumulation 是唯一路徑
   - 各 endpoint 公告節奏（需跨月實測，不做推論）
   - 轉上市公司是否會同期同時出現在兩邊匯出檔（首次雙市場擷取 0 conflicts）
   - CSS 十個 breakpoint 是否收斂到稽核認得的六個（併錯會改動未受稽核寬度）
+
+
+## v0.3.0 實測四缺陷：已修（branch `fix/kline-instrument-truth`）
+
+在 5173 逐個動作量測「klineSearchQuery / selectedKlineInstrumentId / 畫布實際標的」
+三者。畫布標的的真相來源是 **交給 lightweight-charts 的那份 series**（攔
+`createChart → pane.addSeries → series.setData`），不是 DOM——canvas 問不出它在畫誰。
+
+### #1 的判定：是「輸入框謊報」，不是「重繪沒觸發」
+
+量到的事實：下拉點選、topbar 全域搜尋、連點兩次快速切換，三條路徑的重繪都正確，
+畫布資料每次都換成新標的。**真正壞掉的是打字這條路**：輸入 `2317` 後
+
+- 按 Enter：沒有任何 handler 處理，state 不動
+- 點別處（blur）：`change` 只把文字存進 `klineSearchQuery`，state 不動
+
+而 `klineMarkup()` 用 `klineSearchQuery || selectedId` 當 input value，所以那個
+「2317」**會一直留著**，跨越後續每一次 render——輸入框寫 2317、標題與畫布是台積電，
+且不會自己恢復。研究工具上這等於掛著別人的代號看線圖。
+
+修法（`ui/dashboard/app.js`）：
+
+- 新增 `selectKlineInstrument()`，下拉點選、全域搜尋、Enter、自選下拉四條路徑
+  共用同一個 commit 點，不再各寫一份
+- `change`（Enter 與 blur 都會觸發）走 `commitKlineSearch()`：能解析成完整標的就
+  選它；解析不出來就**就地**把輸入框改回目前標的，不重繪
+- commit 的重繪 `setTimeout(…, 0)` 延後一拍。`change` 發生在 mousedown 與 mouseup
+  之間，當場重繪會把使用者正在按的按鈕換掉，click 事件永遠不會成立——第一版就是
+  這樣把「打字後點【期間】」的那一下吃掉了
+
+### #2 已在自選的股票被回「找不到符合的商品」
+
+`symbolSearchResults()` 把 `excluded`（自選清單）整個濾掉，濾空之後就印那句話。
+改成保留、標「已在自選清單」並 disabled；加入鈕本來就會說「此商品已在目前群組」。
+真的不存在的代號仍然回原本那句。
+
+### #3 公司研究沒有自選下拉
+
+K 線工具列新增 `kline-watchlist-select`，列出目前群組的自選標的，沿用
+`watchlist-group-select` 的 select + change 模式。空清單時 disabled 並顯示
+「自選清單是空的」。
+
+### #4 沒下載資料被講成「服務無法連線」
+
+`/kline` 404 時 `requestKlineModel` 的 catch 直接丟 `KLINE_ERROR` 而且**沒帶
+message**，於是套用預設字串「本機資料服務無法連線；請重新啟動 TQR」，還把
+`klineRuntimeStatus` 整個翻成 error——單一標的沒資料害整個 runtime 被判死。
+
+改成分流：`kline_not_found` / `unsupported_period` / `instrument_not_found` 走新的
+`KLINE_DATA_MISSING`，runtime 維持 ready、topbar 不出錯誤條，空狀態說「這個標的與
+期間還沒有已下載的 K 線資料；請用『更新本機資料』下載後再看」。真的連不上或逾時
+才走 `KLINE_ERROR`，而且現在會把 `sidecarErrorMessage(error)` 帶進去（原本逾時也
+被講成無法連線）。
+
+### 閘：畫布 == 標題 == 輸入框
+
+`scripts/dashboard-browser-smoke.cjs` 的 `assertChartIdentity()`，CI 有跑、assert
+會讓它 exit 1（阻擋）。四個切換點各驗一次：開頁、Enter commit、下拉點選、切回。
+比對的是畫布 series 的根數與最後一根日期／收盤，對上 sidecar 該標的的 model。
+也順帶擋「state 換了但完全沒重繪」——動作前清空記錄，等不到新的 candles 就紅。
+
+**已證明它會紅**：把 #1 的修正還原後跑 smoke，停在
+`after committing 2317 with Enter`，exit 1。
+
+`company` / `company_dark` 兩張 pixel 基準線因為多了自選下拉而重釘，其餘十張逐位元
+不變——證明視覺改動只落在公司研究頁。**這兩張要 JY 親眼看過**：
+`outputs/dashboard-browser/company.png`、`company-dark.png`。
+
+### 這一段學到的
+
+`page.addInitScript` 包 `window.LightweightCharts` 時，**用 `=` 賦值會靜靜失敗**：
+UMD 匯出的屬性是 non-writable，sloppy mode 下對繼承屬性賦值不報錯也不生效，於是
+hook 一筆都沒錄到、圖卻照畫，看起來像「圖表根本沒重繪」。全部改走
+`Object.defineProperty` 才錄得到。
 
 ---
 

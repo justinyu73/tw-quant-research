@@ -700,6 +700,12 @@
     if (message === "instrument_not_found") {
       return "找不到這個自選標的，請重新載入商品清單。";
     }
+    if (message === "kline_not_found") {
+      return "這個標的與期間還沒有已下載的 K 線資料；請用「更新本機資料」下載後再看。";
+    }
+    if (message === "unsupported_period") {
+      return "這個期間沒有可用的 K 線資料。";
+    }
     if (/^TWSE (returned|response)/i.test(message)) {
       return "官方 TWSE 資料回應失敗：" + message;
     }
@@ -1226,11 +1232,44 @@
     }) || null;
   }
 
+  // The search box is the only way to change instrument, so a value it keeps
+  // showing after the chart has moved on is a false report of what is drawn.
+  // Every commit goes through here; an uncommitted query is reset to the
+  // instrument actually on screen.
+  function selectKlineInstrument(instrumentId, deferRender) {
+    if (!instrumentId) return;
+    klineSearchQuery = instrumentId;
+    klineSearchFocused = false;
+    state = core.reduce(state, { type: "SELECT_KLINE_INSTRUMENT", instrumentId: instrumentId });
+    if (deferRender) {
+      setTimeout(function () { render(); requestKlineModel(); }, 0);
+      return;
+    }
+    render();
+    requestKlineModel();
+  }
+
+  function commitKlineSearch(input) {
+    var match = resolveSearchSelection(core.klineInstruments(state.view), input.value);
+    if (match) {
+      // change fires between mousedown and mouseup, so repainting now would
+      // move the control out from under the pointer and swallow the click.
+      selectKlineInstrument(match.instrument_id, true);
+      return;
+    }
+    // Nothing is committed behind this text; correct it in place rather than
+    // leaving the box asserting a symbol the chart is not drawing.
+    klineSearchQuery = state.selectedKlineInstrumentId || "";
+    klineSearchFocused = false;
+    input.value = klineSearchQuery;
+  }
+
   function symbolSearchResults(instruments, query, excluded, selectedId, testId, action) {
     var normalizedQuery = String(query || "").trim().toLowerCase();
     var blocked = excluded || [];
+    // An already-tracked stock is a match, not an absence. Dropping it made the
+    // box answer "找不到符合的商品" for a product that exists and is tracked.
     var matches = instruments.filter(function (instrument) {
-      if (blocked.indexOf(instrument.instrument_id) >= 0) return false;
       return !normalizedQuery || symbolSearchText(instrument).indexOf(normalizedQuery) >= 0;
     });
     matches.sort(function (left, right) {
@@ -1243,10 +1282,11 @@
     return '<div class="symbol-search-results" role="listbox" data-testid="' + testId + '">' +
       (matches.length ? matches.map(function (instrument) {
         var selected = instrument.instrument_id === selectedId;
-        return '<button class="symbol-search-result' + (selected ? " selected" : "") + '" type="button" role="option" aria-selected="' + (selected ? "true" : "false") +
-          '" data-action="' + action + '" data-instrument-id="' + escapeHtml(instrument.instrument_id) + '">' +
+        var tracked = blocked.indexOf(instrument.instrument_id) >= 0;
+        return '<button class="symbol-search-result' + (selected ? " selected" : "") + (tracked ? " tracked" : "") + '" type="button" role="option" aria-selected="' + (selected ? "true" : "false") +
+          '" data-action="' + action + '" data-instrument-id="' + escapeHtml(instrument.instrument_id) + '"' + (tracked ? ' disabled' : '') + '>' +
           '<span class="symbol-search-result-main"><strong>' + text(instrument.symbol || instrument.instrument_id) + '</strong><span>' + text(instrument.display_name) + '</span><small>' + text(instrument.instrument_id) + '</small></span>' +
-          '<span class="symbol-search-result-market">' + text(instrument.market) + '</span></button>';
+          '<span class="symbol-search-result-market">' + text(tracked ? "已在自選清單" : instrument.market) + '</span></button>';
       }).join("") : '<span class="symbol-search-empty">找不到符合的商品；請改用代號、名稱或市場搜尋。</span>') +
       '</div>';
   }
@@ -1294,6 +1334,10 @@
     });
   }
 
+  function klineDataGap(error) {
+    return ["kline_not_found", "unsupported_period", "instrument_not_found"].indexOf(error && error.message) >= 0;
+  }
+
   function requestKlineModel() {
     if (!state.selectedKlineInstrumentId || !state.selectedKlinePeriod) return;
     var selectedId = state.selectedKlineInstrumentId;
@@ -1310,8 +1354,14 @@
         if (!payload || !payload.data) throw new Error("sidecar returned no K-line data");
         state = core.reduce(state, { type: "SET_KLINE_MODEL", model: payload.data });
       })
-      .catch(function () {
-        if (klineRequestKey === requestKey) state = core.reduce(state, { type: "KLINE_ERROR" });
+      .catch(function (error) {
+        if (klineRequestKey !== requestKey) return;
+        // A stock with nothing downloaded yet is a data gap, not a dead
+        // service; reporting it as one told the user to restart TQR.
+        state = core.reduce(state, {
+          type: klineDataGap(error) ? "KLINE_DATA_MISSING" : "KLINE_ERROR",
+          message: sidecarErrorMessage(error)
+        });
       })
       .then(function () {
         if (klineRequestKey === requestKey) {
@@ -1615,6 +1665,22 @@
       }).join("") + '</div><p class="technical-snapshot-note">若顯示「—」，代表該期間沒有足夠歷史窗口，不以填值或插值掩蓋資料不足。</p></section>';
   }
 
+  // Typing a code was the only way to change instrument; the watchlist the user
+  // already curated was unreachable from the chart.
+  function klineWatchlistPickerMarkup(selectedId) {
+    var items = core.watchlistItemsForActiveGroup(state);
+    var options = items.map(function (instrumentId) {
+      var instrument = instrumentForId(instrumentId);
+      var label = instrument ? (instrument.symbol || instrumentId) + " · " + (instrument.display_name || instrumentId) : instrumentId;
+      return '<option value="' + escapeHtml(instrumentId) + '"' + (instrumentId === selectedId ? ' selected' : '') + '>' + text(label) + '</option>';
+    }).join("");
+    var placeholder = !items.length
+      ? '<option value="" selected>自選清單是空的</option>'
+      : (items.indexOf(selectedId) >= 0 ? "" : '<option value="" selected>從自選清單選擇</option>');
+    return '<div class="kline-control"><span>自選清單</span><select class="kline-watchlist-select" data-action="kline-watchlist-select" data-testid="kline-watchlist-select"' +
+      (items.length ? "" : " disabled") + '>' + placeholder + options + '</select></div>';
+  }
+
   function klineMarkup() {
     var model = core.selectedKline(state);
     var instrument = selectedKlineInstrument();
@@ -1656,11 +1722,13 @@
       ? '<div class="empty-state kline-empty" data-testid="kline-loading"><strong>載入中。</strong><span>正在從本機資料服務載入已納入的 K6a/K6b 資料。</span></div>'
       : bars.length
       ? '<div class="kline-chart-frame" data-testid="kline-chart"><div class="kline-chart-canvas"></div><div class="kline-tooltip" data-testid="kline-tooltip" hidden></div></div>'
-      : '<div class="empty-state kline-empty" data-testid="kline-empty"><strong>' + text(STATUS_LABELS[status] || status) + '。</strong><span>此商品與期間沒有已納入的 K 線；不替換成其他期間。</span></div>';
+      : '<div class="empty-state kline-empty" data-testid="kline-empty"><strong>' + text(STATUS_LABELS[status] || status) + '。</strong><span>' +
+        text(state.klineSelectionMessage || "此商品與期間沒有已納入的 K 線；不替換成其他期間。") + '</span></div>';
     var indicatorSummary = model && model.indicators && model.indicators[state.activeKlineIndicator];
     return card("行情與 K 線", "收盤資料 · 截止日快照 · 唯讀分析", '<div class="kline-toolbar" data-testid="kline-toolbar">' +
       '<div class="kline-control symbol-search' + (klineSearchFocused ? " search-open" : "") + '"><label><span>搜尋商品</span><input type="search" autocomplete="off" placeholder="代號、名稱或市場" value="' + escapeHtml(klineSearchQuery || selectedId || "") + '" data-action="kline-search" data-testid="kline-instrument" aria-controls="kline-symbol-results"></label>' +
       symbolSearchResults(instruments, klineSearchQuery || selectedId || "", [], selectedId, "kline-symbol-results", "kline-search-pick") + '</div>' +
+      klineWatchlistPickerMarkup(selectedId) +
       '<div class="kline-control"><span>期間</span><div class="period-buttons">' + periodButtons + '</div></div>' +
       '<div class="kline-control"><span>指標</span><div class="indicator-buttons">' + indicatorButtons + '</div></div>' +
       '<div class="kline-control chart-tools"><span>圖表工具</span><div class="chart-tool-buttons">' +
@@ -2454,15 +2522,9 @@
       watchlistSearchQuery = watchlistSearchSelection;
       watchlistSearchFocused = false;
     }
-    if (action === "kline-search-pick") {
-      klineSearchQuery = target.getAttribute("data-instrument-id");
-      klineSearchFocused = false;
-      state = core.reduce(state, { type: "SELECT_KLINE_INSTRUMENT", instrumentId: klineSearchQuery });
-    }
-    if (action === "global-search-pick") {
-      klineSearchQuery = target.getAttribute("data-instrument-id");
-      klineSearchFocused = false;
-      state = core.reduce(state, { type: "SELECT_KLINE_INSTRUMENT", instrumentId: klineSearchQuery });
+    if (action === "kline-search-pick" || action === "global-search-pick") {
+      selectKlineInstrument(target.getAttribute("data-instrument-id"));
+      return;
     }
     if (action === "kline-drawing") chartDrawingMode = !chartDrawingMode;
     if (action === "kline-drawing-clear") chartDrawings = [];
@@ -2510,15 +2572,19 @@
       }
     }
     render();
-    if (action === "kline-period" || action === "kline-search-pick" || action === "global-search-pick") requestKlineModel();
+    if (action === "kline-period") requestKlineModel();
     if (action === "watchlist-add" || action === "watchlist-toggle") requestWatchlistModels();
   });
 
   root.addEventListener("change", function (event) {
     var target = event.target;
     if (!target) return;
-    if (target.getAttribute("data-action") === "kline-search") {
-      klineSearchQuery = target.value;
+    if (target.getAttribute("data-action") === "kline-search" || target.getAttribute("data-action") === "global-search") {
+      commitKlineSearch(target);
+      return;
+    }
+    if (target.getAttribute("data-action") === "kline-watchlist-select") {
+      selectKlineInstrument(target.value);
       return;
     }
     if (target.getAttribute("data-action") === "watchlist-group-select") {

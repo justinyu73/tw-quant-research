@@ -178,13 +178,15 @@ td small { display: block; margin-top: 3px; color: var(--text-muted); font-size:
 .lineage-grid p, .detail-grid p { margin: 0; overflow-wrap: anywhere; color: var(--text-secondary); font-size: var(--type-helper); line-height: 1.5; }
 .kline-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px; margin-bottom: 18px; padding: 12px; border: 1px solid var(--border-light); border-radius: var(--radius); background: var(--surface-secondary); }
 .kline-control { display: grid; min-width: 190px; gap: 6px; color: var(--text-muted); font-size: var(--type-helper); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
-.kline-control input, .watchlist-picker input { min-height: 31px; padding: 0 9px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--surface); font-size: var(--type-helper); text-transform: none; }
+.kline-control input, .kline-control select, .watchlist-picker input { min-height: 31px; padding: 0 9px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--surface); font-size: var(--type-helper); text-transform: none; }
 .symbol-search { position: relative; }
 .symbol-search > label { display: grid; gap: 6px; }
 .symbol-search-results { position: absolute; top: calc(100% + 4px); left: 0; z-index: 5; display: none; width: min(420px, calc(100vw - 48px)); max-height: 260px; overflow: auto; padding: 4px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); box-shadow: var(--shadow); }
 .symbol-search:focus-within .symbol-search-results, .symbol-search.search-open .symbol-search-results { display: grid; }
 .symbol-search-result { display: flex; min-height: 36px; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 8px; border: 0; border-radius: var(--radius-sm); color: var(--text-secondary); background: transparent; text-align: left; }
 .symbol-search-result:hover, .symbol-search-result.selected { color: var(--primary-dk); background: var(--primary-lt); }
+.symbol-search-result.tracked { color: var(--text-muted); background: transparent; cursor: default; }
+.symbol-search-result.tracked .symbol-search-result-market { color: var(--primary-dk); }
 .symbol-search-result-main { display: grid; min-width: 0; gap: 2px; }
 .symbol-search-result-main strong, .symbol-search-result-main span, .symbol-search-result-main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .symbol-search-result-main strong { color: var(--text); font-family: "SF Mono", Monaco, Consolas, "Liberation Mono", monospace; font-size: var(--type-micro); }
@@ -930,7 +932,7 @@ input, select, textarea, button { font-family: inherit; }
 .alert-event-badge { border-color: var(--border); color: var(--text-secondary); background: var(--surface-secondary); }
 .terminal-watchlist-controls label, .terminal-watchlist-group { font-size: var(--type-helper); }
 .system-global-search label { font-size: var(--type-helper); }
-.kline-control input, .terminal-watchlist-controls input, .terminal-watchlist-group select, .system-global-search input, .valuation-field input, .valuation-field select, .valuation-indicator input, .note-composer input, .research-toolbar select, .research-toolbar input, .alert-form input, .alert-form select {
+.kline-control input, .kline-control select, .terminal-watchlist-controls input, .terminal-watchlist-group select, .system-global-search input, .valuation-field input, .valuation-field select, .valuation-indicator input, .note-composer input, .research-toolbar select, .research-toolbar input, .alert-form input, .alert-form select {
   min-height: var(--control-h);
   padding: 0 10px;
   font-size: var(--type-helper);
