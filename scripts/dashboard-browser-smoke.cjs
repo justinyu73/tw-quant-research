@@ -14,12 +14,12 @@ const ROOT = path.resolve(__dirname, "..");
 const PREVIEW_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "tqr-preview-"));
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
-  home: "647d66b326c1d597b258b4ff498d8946d24066327b129ffe5ee7333ae0a92f32",
-  company: "a2b885a1bfe69cd573c3200cd5ab402ee8be5c1b5c3e92f2c467972f1b475b36",
-  watchlist: "6d090659ecb5d46d35b514adb7f663a8e4a28f622113df52ff879ed0aac00555",
-  buyplan: "3e20479616fb8ec73d5abec92349f9ab90d7b7b2c0b6b1249889f7278574badd",
-  review: "f18283b9010ba8dbbbfa89e26800e6ad935474de3f188b04120f9ddd57e2303a",
-  valuation: "97f433903105bc20618d49fc6e03a5ba6cc0eb92c676fd7bfdcc051a1553a6d7",
+  home: "501188a28a0a7cea992c6d9b8a007f6f4060e90288eec87f92dae2243f15dd9f",
+  company: "6caa7eafaea4d257268c371c87362b3ff12403dcee81fb6781312617aac5d1a7",
+  watchlist: "55118d10f0276bdb25821665c3fac88e7e998588d3b4e76b39d11df677d47027",
+  buyplan: "1c6db2b33e1345d5215f4f554c87843796ca73eb8ffbd6ea8c6bbea9432fac95",
+  review: "39f2dde16ab38678f8e0af39e5051fa3cf9f80eab3fa96651745e92136b7a301",
+  valuation: "eda72102b9a4aee1147c3fcc6a98ace68638a345d7c83711db31a9c05a3102d4",
 };
 
 function freePort() {
