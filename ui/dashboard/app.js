@@ -1798,6 +1798,25 @@
       '<p class="valuation-note">所有 EPS 與本益比都是使用者假設（draft），不是官方資料、市場共識或法人預估。到價只提示，不給買賣建議；最後決策保留人工。官方基本面欄位仍等待來源准入，不會自動帶入，也不會因股價下跌自動下修 EPS。</p></section>';
   }
 
+  function chartPalette() {
+    var css = getComputedStyle(document.documentElement);
+    function token(name, fallback) {
+      var value = css.getPropertyValue(name).trim();
+      return value || fallback;
+    }
+    return {
+      surface: token("--surface", "#ffffff"),
+      textSecondary: token("--text-secondary", "#596273"),
+      border: token("--border", "#dfe3e8"),
+      borderLight: token("--border-light", "#edf0f2"),
+      primary: token("--primary", "#6d5ae6"),
+      yellow: token("--yellow", "#c38300"),
+      // 台股紅漲綠跌 — market convention, not a theme choice.
+      up: token("--red", "#d94b4b"),
+      down: token("--green", "#0b8f70")
+    };
+  }
+
   function renderKlineChart() {
     if (chartResizeObserver) chartResizeObserver.disconnect();
     chartResizeObserver = null;
@@ -1819,14 +1838,22 @@
       canvas.textContent = "圖表元件不可用。";
       return;
     }
+    // lightweight-charts paints on canvas, so it cannot inherit the CSS token
+    // layer; read the tokens instead of keeping a second palette in sync.
     var colorType = api.ColorType && api.ColorType.Solid ? api.ColorType.Solid : "solid";
+    var palette = chartPalette();
     var chart = api.createChart(canvas, {
       width: Math.max(canvas.clientWidth || 640, 240),
       height: 340,
-      layout: { background: { type: colorType, color: "#ffffff" }, textColor: "#596273" },
-      grid: { vertLines: { color: "#edf0f2" }, horzLines: { color: "#edf0f2" } },
-      rightPriceScale: { borderColor: "#dfe3e8" },
-      timeScale: { borderColor: "#dfe3e8", timeVisible: false },
+      layout: {
+        background: { type: colorType, color: palette.surface },
+        textColor: palette.textSecondary,
+        // Pane separators are DOM, not canvas, and default to a light #E0E3EB.
+        panes: { separatorColor: palette.border, separatorHoverColor: palette.borderLight }
+      },
+      grid: { vertLines: { color: palette.borderLight }, horzLines: { color: palette.borderLight } },
+      rightPriceScale: { borderColor: palette.border },
+      timeScale: { borderColor: palette.border, timeVisible: false },
       crosshair: { mode: api.CrosshairMode ? api.CrosshairMode.Normal : 0 }
     });
     var mainPane = chart.panes()[0];
@@ -1839,8 +1866,8 @@
     volumePane = chart.addPane();
     volumePane.setStretchFactor(0.22);
     var candleSeries = mainPane.addSeries(api.CandlestickSeries, {
-      upColor: "#d94b4b", downColor: "#0b8f70", borderVisible: false,
-      wickUpColor: "#d94b4b", wickDownColor: "#0b8f70"
+      upColor: palette.up, downColor: palette.down, borderVisible: false,
+      wickUpColor: palette.up, wickDownColor: palette.down
     });
     candleSeries.setData(model.bars.map(function (bar) {
       return { time: bar.trading_date, open: bar.open, high: bar.high, low: bar.low, close: bar.close };
@@ -1865,15 +1892,15 @@
       return series;
     }
     if (indicator && ["ma", "ema", "rsi", "atr"].indexOf(state.activeKlineIndicator) >= 0) {
-      addIndicatorLine(indicator.values, state.activeKlineIndicator === "ma" ? "#2962ff" : state.activeKlineIndicator === "ema" ? "#c38300" : "#0b8f70", state.activeKlineIndicator.toUpperCase());
+      addIndicatorLine(indicator.values, state.activeKlineIndicator === "ma" ? palette.primary : state.activeKlineIndicator === "ema" ? palette.yellow : palette.down, state.activeKlineIndicator.toUpperCase());
     }
     if (indicator && state.activeKlineIndicator === "macd") {
-      addIndicatorLine(indicator.values, "#2962ff", "MACD");
-      addIndicatorLine(indicator.signal_values, "#c38300", "Signal");
+      addIndicatorLine(indicator.values, palette.primary, "MACD");
+      addIndicatorLine(indicator.signal_values, palette.yellow, "Signal");
     }
     if (indicator && state.activeKlineIndicator === "kd") {
-      addIndicatorLine(indicator.values, "#2962ff", "K");
-      addIndicatorLine(indicator.d_values, "#c38300", "D");
+      addIndicatorLine(indicator.values, palette.primary, "K");
+      addIndicatorLine(indicator.d_values, palette.yellow, "D");
     }
     chart.timeScale().fitContent();
     var tooltip = frame.querySelector('[data-testid="kline-tooltip"]');
@@ -1892,7 +1919,7 @@
       var bar = model.bars.find(function (item) { return item.trading_date === param.time; });
       if (!bar) return;
       chartDrawings = chartDrawings.filter(function (item) { return item.time !== param.time; });
-      chartDrawings.push({ time: param.time, position: "aboveBar", color: "#2962ff", shape: "circle", text: "標記", size: 1 });
+      chartDrawings.push({ time: param.time, position: "aboveBar", color: chartPalette().primary, shape: "circle", text: "標記", size: 1 });
       markers.setMarkers(chartDrawings);
       var clearButton = root.querySelector('[data-testid="kline-drawing-clear"]');
       if (clearButton) clearButton.disabled = false;
@@ -1919,9 +1946,47 @@
 
 
 
-  function card(title, subtitle, body, action) {
-    return '<section class="card"><header class="card-header"><div><h2 class="card-title">' + text(title) +
-      '</h2><div class="card-subtitle">' + text(subtitle) + '</div></div>' +
+  // 16px stroke glyphs, drawn in currentColor so they follow the token layer.
+  var ICON_PATHS = {
+    bell: '<path d="M4 6.5a4 4 0 0 1 8 0V10l1.2 2H2.8L4 10Z"/><path d="M6.4 12.6a1.7 1.7 0 0 0 3.2 0"/>',
+    book: '<path d="M3 3h4a2 2 0 0 1 2 2v8a1.6 1.6 0 0 0-1.6-1.4H3Z"/><path d="M13 3H9.6"/><path d="M13 3v8.6H9.6"/>',
+    chart: '<path d="M2.5 13.5V8"/><path d="M6.2 13.5V4.5"/><path d="M9.8 13.5V9.5"/><path d="M13.5 13.5V6"/>',
+    clipboard: '<path d="M6 2.8h4v1.8H6Z"/><path d="M10.6 3.7H13v9.8H3V3.7h2.4"/><path d="M5.6 8.6h4.8"/><path d="M5.6 11h3"/>',
+    clock: '<circle cx="8" cy="8" r="5.6"/><path d="M8 4.9V8l2.1 1.5"/>',
+    layers: '<path d="M8 2.5 14 6l-6 3.5L2 6Z"/><path d="m2.6 9.4 5.4 3.1 5.4-3.1"/>',
+    lightbulb: '<path d="M8 2.4a4 4 0 0 0-2.4 7.2v1.3h4.8V9.6A4 4 0 0 0 8 2.4Z"/><path d="M6.6 13.2h2.8"/>',
+    note: '<path d="M11.4 2.6 13.6 4.8 6.4 12H4.2V9.8Z"/><path d="M9.9 4.1 12.1 6.3"/>',
+    refresh: '<path d="M13.2 7.2a5.2 5.2 0 1 0-.5 3.3"/><path d="M13.4 3.6v3.6h-3.6"/>',
+    shield: '<path d="M8 2.3 13 4.1v4c0 2.6-2 4.6-5 5.6-3-1-5-3-5-5.6v-4Z"/><path d="m5.9 8 1.5 1.5L10.4 6.6"/>',
+    sliders: '<path d="M3 5.2h10"/><path d="M3 10.8h10"/><circle cx="6.2" cy="5.2" r="1.5"/><circle cx="10.4" cy="10.8" r="1.5"/>',
+    star: '<path d="m8 2.6 1.7 3.5 3.8.5-2.8 2.7.7 3.8L8 11.3 4.6 13.1l.7-3.8L2.5 6.6l3.8-.5Z"/>',
+    target: '<circle cx="8" cy="8" r="5.6"/><circle cx="8" cy="8" r="2.4"/>',
+    theme: '<circle cx="8" cy="8" r="5.4"/><path d="M8 2.6v10.8"/><path d="M8 4.6a3.4 3.4 0 0 1 0 6.8Z" fill="currentColor" stroke="none"/>',
+    trending: '<path d="M2.6 11.4 6.2 7.8l2.4 2.4 4.8-5.4"/><path d="M9.9 4.8h3.5v3.5"/>'
+  };
+  // Keyed by the card's canonical title. A title with no entry renders without
+  // an icon rather than a placeholder, so a rename degrades quietly.
+  var CARD_ICONS = {
+    "故事追蹤": "book", "研究提醒": "bell", "應用程式更新": "refresh", "外觀主題": "theme",
+    "自選清單": "star", "行情與 K 線": "chart", "價值機會": "target", "基本面更新": "refresh",
+    "買進計畫狀態": "clipboard", "投資假設": "lightbulb", "研究筆記": "note",
+    "基本面快照": "sliders", "研究狀態": "sliders", "趨勢表": "trending", "價格參考": "chart",
+    "分段買進計畫": "layers", "分段狀態": "clipboard", "投資審查": "shield",
+    "本次審查": "clipboard", "審查歷史": "clock", "證據登錄表": "book"
+  };
+
+  function cardIcon(name) {
+    var paths = ICON_PATHS[name];
+    if (!paths) return "";
+    return '<span class="card-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" ' +
+      'stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">' + paths + '</svg></span>';
+  }
+
+  function card(title, subtitle, body, action, icon) {
+    return '<section class="card"><header class="card-header"><div class="card-heading">' +
+      cardIcon(icon || CARD_ICONS[title]) +
+      '<div class="card-heading-text"><h2 class="card-title">' + text(title) +
+      '</h2><div class="card-subtitle">' + text(subtitle) + '</div></div></div>' +
       (action || "") + '</header><div class="card-body">' + body + '</div></section>';
   }
 
@@ -2035,6 +2100,26 @@
     return value === null || value === undefined ? "—" : core.formatPercent(value);
   }
 
+  // Axis-free trend glyph. Fewer than two real points cannot describe a
+  // trend, so it says so instead of drawing a flat line — the series is not
+  // padded, interpolated, or carried forward.
+  function sparkline(values, testid) {
+    var points = (values || []).filter(function (value) { return typeof value === "number" && isFinite(value); });
+    if (points.length < 2) return '<span class="sparkline-empty" data-testid="' + testid + '">走勢需 2 期以上</span>';
+    var min = Math.min.apply(null, points);
+    var max = Math.max.apply(null, points);
+    var span = max - min || 1;
+    var path = points.map(function (value, index) {
+      var x = 2 + (index * 92) / (points.length - 1);
+      var y = 22 - ((value - min) / span) * 20;
+      return (index ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1);
+    }).join(" ");
+    // 台股紅漲綠跌 — the glyph follows the same convention as the K line.
+    var rising = points[points.length - 1] >= points[0];
+    return '<svg class="sparkline ' + (rising ? "rising" : "falling") + '" viewBox="0 0 96 24" preserveAspectRatio="none" ' +
+      'role="img" aria-label="' + (rising ? "走勢上升" : "走勢下降") + '" data-testid="' + testid + '"><path d="' + path + '"/></svg>';
+  }
+
   function fundamentalSnapshotMarkup() {
     var instrument = selectedKlineInstrument();
     var symbol = instrument && instrument.symbol;
@@ -2045,22 +2130,28 @@
     if (!revenue && !income && !balance) {
       return '<div class="empty-state" data-testid="fundamental-snapshot-empty"><strong>此標的尚無已擷取的基本面期別。</strong><span>執行 <code>scripts/capture_fundamentals.py</code> 擷取一期後才會顯示；不以價格推估，也不補 0。</span></div>';
     }
-    function tile(label, value, hint, testid) {
-      return '<article class="fundamental-metric" data-testid="' + testid + '"><span>' + text(label) + '</span><strong>' + text(value) + '</strong><small>' + text(hint) + '</small></article>';
+    function tile(label, value, hint, testid, series) {
+      return '<article class="fundamental-metric" data-testid="' + testid + '"><span>' + text(label) + '</span><strong>' + text(value) + '</strong>' +
+        sparkline(series, testid + "-spark") + '<small>' + text(hint) + '</small></article>';
+    }
+    // Observations arrive newest-first; a sparkline reads left-to-right in time.
+    function seriesOf(block, key) {
+      if (!block || !block.observations) return [];
+      return block.observations.map(function (item) { return item.values[key]; }).reverse();
     }
     var revenueValues = revenue ? revenue.values : {};
     var incomeValues = income ? income.values : {};
     var balanceValues = balance ? balance.values : {};
     return '<div class="fundamental-metric-grid" data-testid="fundamental-snapshot">' +
-      tile("月營收 YoY", revenue ? pctCell(revenueValues.revenue_yoy) : "—", revenue ? revenue.period : "未擷取", "fundamental-revenue-yoy") +
-      tile("月營收 MoM", revenue ? pctCell(revenueValues.revenue_mom) : "—", revenue ? revenue.period : "未擷取", "fundamental-revenue-mom") +
-      tile("EPS", income && incomeValues.eps !== null ? core.formatNumber(incomeValues.eps) : "—", income ? income.period : "未擷取", "fundamental-eps") +
-      tile("毛利率", income ? pctCell(incomeValues.gross_margin) : "—", income ? income.period : "未擷取", "fundamental-gross-margin") +
-      tile("營益率", income ? pctCell(incomeValues.operating_margin) : "—", income ? income.period : "未擷取", "fundamental-operating-margin") +
-      tile("淨利率", income ? pctCell(incomeValues.net_margin) : "—", income ? income.period : "未擷取", "fundamental-net-margin") +
-      tile("負債比", balance ? pctCell(balanceValues.debt_ratio) : "—", balance ? balance.period : "未擷取", "fundamental-debt-ratio") +
-      tile("流動比", balance && balanceValues.current_ratio !== null ? core.formatNumber(balanceValues.current_ratio) : "—", balance ? balance.period : "未擷取", "fundamental-current-ratio") +
-      tile("每股淨值", balance && balanceValues.bvps !== null ? core.formatNumber(balanceValues.bvps) : "—", balance ? balance.period : "未擷取", "fundamental-bvps") +
+      tile("月營收 YoY", revenue ? pctCell(revenueValues.revenue_yoy) : "—", revenue ? revenue.period : "未擷取", "fundamental-revenue-yoy", seriesOf(data && data.monthly_revenue, "revenue_yoy")) +
+      tile("月營收 MoM", revenue ? pctCell(revenueValues.revenue_mom) : "—", revenue ? revenue.period : "未擷取", "fundamental-revenue-mom", seriesOf(data && data.monthly_revenue, "revenue_mom")) +
+      tile("EPS", income && incomeValues.eps !== null ? core.formatNumber(incomeValues.eps) : "—", income ? income.period : "未擷取", "fundamental-eps", seriesOf(data && data.income_statement, "eps")) +
+      tile("毛利率", income ? pctCell(incomeValues.gross_margin) : "—", income ? income.period : "未擷取", "fundamental-gross-margin", seriesOf(data && data.income_statement, "gross_margin")) +
+      tile("營益率", income ? pctCell(incomeValues.operating_margin) : "—", income ? income.period : "未擷取", "fundamental-operating-margin", seriesOf(data && data.income_statement, "operating_margin")) +
+      tile("淨利率", income ? pctCell(incomeValues.net_margin) : "—", income ? income.period : "未擷取", "fundamental-net-margin", seriesOf(data && data.income_statement, "net_margin")) +
+      tile("負債比", balance ? pctCell(balanceValues.debt_ratio) : "—", balance ? balance.period : "未擷取", "fundamental-debt-ratio", seriesOf(data && data.balance_sheet, "debt_ratio")) +
+      tile("流動比", balance && balanceValues.current_ratio !== null ? core.formatNumber(balanceValues.current_ratio) : "—", balance ? balance.period : "未擷取", "fundamental-current-ratio", seriesOf(data && data.balance_sheet, "current_ratio")) +
+      tile("每股淨值", balance && balanceValues.bvps !== null ? core.formatNumber(balanceValues.bvps) : "—", balance ? balance.period : "未擷取", "fundamental-bvps", seriesOf(data && data.balance_sheet, "bvps")) +
       '</div>' +
       '<p class="valuation-note" data-testid="fundamental-provenance">來源 ' + text(data.attribution) + '｜available_at 採交易所整批出表日（保守上界），非公司公告時間；published_at 未接入。</p>';
   }
@@ -2104,9 +2195,9 @@
       '<span>月營收深度 <strong data-testid="trend-coverage-months">' + text(data.monthly_revenue.coverage.label) + '</strong></span>' +
       '<span>財務品質深度 <strong data-testid="trend-coverage-balance">' + text(data.balance_sheet ? data.balance_sheet.coverage.label : "0 / 8") + '</strong></span>' +
       '<span class="muted">forward accumulation：每次擷取只會多一期</span></div>' +
-      '<div class="table-responsive"><table class="table" data-testid="trend-quarters"><thead><tr><th>季度</th><th>營收</th><th>毛利率</th><th>營益率</th><th>淨利率</th><th>EPS</th></tr></thead><tbody>' + quarterRows + '</tbody></table></div>' +
-      '<div class="table-responsive"><table class="table" data-testid="trend-months"><thead><tr><th>月份</th><th>營收</th><th>月增</th><th>年增</th><th>累計年增</th></tr></thead><tbody>' + monthRows + '</tbody></table></div>' +
-      '<div class="table-responsive"><table class="table" data-testid="trend-balance"><thead><tr><th>季度</th><th>負債比</th><th>流動比</th><th>每股淨值</th></tr></thead><tbody>' + balanceRows + '</tbody></table></div>';
+      '<div class="table-responsive"><table class="table table-trend" data-testid="trend-quarters"><thead><tr><th>季度</th><th>營收</th><th>毛利率</th><th>營益率</th><th>淨利率</th><th>EPS</th></tr></thead><tbody>' + quarterRows + '</tbody></table></div>' +
+      '<div class="table-responsive"><table class="table table-trend" data-testid="trend-months"><thead><tr><th>月份</th><th>營收</th><th>月增</th><th>年增</th><th>累計年增</th></tr></thead><tbody>' + monthRows + '</tbody></table></div>' +
+      '<div class="table-responsive"><table class="table table-trend" data-testid="trend-balance"><thead><tr><th>季度</th><th>負債比</th><th>流動比</th><th>每股淨值</th></tr></thead><tbody>' + balanceRows + '</tbody></table></div>';
   }
 
   function valuationPageMarkup() {
