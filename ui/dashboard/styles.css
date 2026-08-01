@@ -1052,3 +1052,16 @@ input, select, textarea, button { font-family: inherit; }
 .topnav-utility-link { min-height: 32px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); color: var(--nav-text); background: transparent; font-size: var(--type-helper); font-weight: 600; white-space: nowrap; }
 .topnav-utility-link:hover { color: #d5dee8; background: rgba(255, 255, 255, 0.07); }
 .topnav-utility-link.active { color: var(--nav-text-active); background: rgba(41, 98, 255, 0.2); }
+
+/* Company research record: eight human-entry controls. Without an explicit
+   track they collapsed into one cramped row with no gaps and a squeezed
+   free-text field. Two to three rows, note and next-event given room. */
+.company-status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3) var(--space-4); }
+.company-status-grid > label { display: grid; min-width: 0; gap: var(--space-1); }
+.company-status-grid > label > span { color: var(--text-muted); font-size: var(--type-helper); font-weight: 700; }
+.company-status-grid select,
+.company-status-grid input,
+.company-status-grid textarea { width: 100%; min-width: 0; min-height: var(--control-h); padding: 0 var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--surface); font-size: var(--type-body); }
+.company-status-grid textarea { min-height: 76px; padding: var(--space-2); line-height: var(--leading-body); resize: vertical; }
+.company-status-grid .company-status-note { grid-column: 1 / -1; }
+@media (max-width: 720px) { .company-status-grid { grid-template-columns: minmax(0, 1fr); } }

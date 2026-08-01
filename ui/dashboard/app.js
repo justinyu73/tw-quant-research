@@ -669,10 +669,15 @@
     return sidecarUrlPromise;
   }
 
+  // A hung loopback call must not strand the UI: without this the evaluate
+  // button stays at 計算中… forever with no message and no way to retry.
+  var SIDECAR_TIMEOUT_MS = 15000;
+
   function sidecarRequest(path, options) {
     var base = sidecarBaseUrl();
     if (!base) return Promise.reject(new Error("sidecar must use loopback HTTP"));
     var request = Object.assign({ method: "GET", cache: "no-store" }, options || {});
+    if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) request.signal = AbortSignal.timeout(SIDECAR_TIMEOUT_MS);
     return fetch(base + path, request).then(function (response) {
       return response.json().catch(function () { return {}; }).then(function (payload) {
         if (!response.ok) throw new Error(payload.error || ("sidecar request failed: " + response.status));
@@ -683,6 +688,9 @@
 
   function sidecarErrorMessage(error) {
     var message = error && error.message ? String(error.message) : "";
+    if ((error && error.name === "TimeoutError") || /timed? ?out/i.test(message)) {
+      return "本機資料服務逾時未回應（" + (SIDECAR_TIMEOUT_MS / 1000) + " 秒）；請確認 TQR 仍在執行後重試。";
+    }
     if (!message || /load failed|failed to fetch|networkerror|network request failed/i.test(message)) {
       return "本機資料服務無法連線；請重新啟動 TQR 後再試。";
     }
@@ -704,6 +712,9 @@
   // model.growth_rate"), so the status line must not reword them.
   function engineErrorMessage(error) {
     var message = error && error.message ? String(error.message) : "";
+    if ((error && error.name === "TimeoutError") || /timed? ?out/i.test(message)) {
+      return "本機資料服務逾時未回應（" + (SIDECAR_TIMEOUT_MS / 1000) + " 秒）；請確認 TQR 仍在執行後重試。";
+    }
     if (!message || /load failed|failed to fetch|networkerror|network request failed/i.test(message)) {
       return "本機資料服務無法連線；請重新啟動 TQR 後再試。";
     }
@@ -1939,13 +1950,13 @@
     var watched = (state.watchlist && state.watchlist.items || []).length;
     var stages = core.buyStageSummary(state);
     return pageHeader("首頁", "今天哪些公司接近我的合理買進價格") +
-      '<section class="system-command-bar" data-testid="system-command-bar"><div><span class="eyebrow">VALUE RESEARCH WORKSPACE</span><strong>投資摘要</strong><span>本機 EOD · 截止 ' + text(view.as_of || "—") + '</span></div><div class="system-command-actions"><button class="btn btn-primary" type="button" data-action="section" data-section="watchlist">開啟 Watchlist</button><button class="btn btn-outline" type="button" data-action="section" data-section="valuation">估值工作表</button></div></section>' +
+      '<section class="system-command-bar" data-testid="system-command-bar"><div><span class="eyebrow">價值研究工作台</span><strong>投資摘要</strong><span>本機 EOD · 截止 ' + text(view.as_of || "—") + '</span></div><div class="system-command-actions"><button class="btn btn-primary" type="button" data-action="section" data-section="watchlist">開啟 Watchlist</button><button class="btn btn-outline" type="button" data-action="section" data-section="valuation">估值工作表</button></div></section>' +
       '<div class="system-metric-strip" data-testid="investment-summary">' +
       summaryTile("追蹤標的", watched, "Watchlist 公司數", "summary-tracked") +
       summaryTile("進入買進區", stages.first, "到達第一階段價", "summary-first-stage") +
       summaryTile("進入甜蜜區", stages.sweet, "到達甜蜜價", "summary-sweet") +
       summaryTile("基本面待確認", stages.pending, "需人工覆核", "summary-pending") +
-      summaryTile("假設失效", stages.invalid, "Thesis 已破壞", "summary-invalid") +
+      summaryTile("假設失效", stages.invalid, "投資假設已破壞", "summary-invalid") +
       '</div>' +
       card("價值機會", "依合理價值折價幅度排序；不使用動能、AI 或情緒分數", opportunityListMarkup(), "") +
       '<div class="row col-8-4"><div>' + card("基本面更新", "只顯示會改變合理價值的變化", fundamentalChangeMarkup(), "") + '</div>' +
@@ -1990,12 +2001,12 @@
   function companyPageMarkup() {
     return pageHeader("公司研究", "公司研究工作區 · Thesis · 財報 · 趨勢 · 價格參考") +
       quoteHeaderMarkup() +
-      card("Thesis 投資假設", "為什麼研究這家公司；什麼情況代表假設失效", thesisMarkup(), "") +
+      card("投資假設", "為什麼研究這家公司；什麼情況代表假設失效", thesisMarkup(), "") +
       card("研究筆記", "支持、反證與下一個檢查點", notesMarkup(), "") +
-      card("Fundamental Snapshot", "已擷取期別的核心財報欄位", fundamentalSnapshotMarkup(), "") +
+      card("基本面快照", "已擷取期別的核心財報欄位", fundamentalSnapshotMarkup(), "") +
       card("研究狀態", "產業、基本面、投資假設與下一個事件；驅動 Watchlist 與 Home", companyStatusMarkup(), "") +
-      card("Trend Table", "最近 8 季與最近 12 個月", trendTableMarkup(), "") +
-      card("Price Reference", "歷史價格位置 · 前高前低 · 回檔幅度；不參與價值判斷", klineMarkup(), "");
+      card("趨勢表", "最近 8 季與最近 12 個月", trendTableMarkup(), "") +
+      card("價格參考", "歷史價格位置 · 前高前低 · 回檔幅度；不參與價值判斷", klineMarkup(), "");
   }
 
   function fundamentalsFor(securityId) {

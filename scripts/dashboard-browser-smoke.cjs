@@ -14,8 +14,8 @@ const ROOT = path.resolve(__dirname, "..");
 const PREVIEW_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "tqr-preview-"));
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
-  home: "5f581dc4ff0523a38c6b4c728ff3b212724d71517cead16403facb52b88768ad",
-  company: "ec1bedc20b748eb42376c32358ab15d0459014faea9f765a68429febb005cd7f",
+  home: "647d66b326c1d597b258b4ff498d8946d24066327b129ffe5ee7333ae0a92f32",
+  company: "a2b885a1bfe69cd573c3200cd5ab402ee8be5c1b5c3e92f2c467972f1b475b36",
   watchlist: "6d090659ecb5d46d35b514adb7f663a8e4a28f622113df52ff879ed0aac00555",
   buyplan: "3e20479616fb8ec73d5abec92349f9ab90d7b7b2c0b6b1249889f7278574badd",
   review: "f18283b9010ba8dbbbfa89e26800e6ad935474de3f188b04120f9ddd57e2303a",
