@@ -20,6 +20,14 @@ const EXPECTED_SCREENSHOTS = {
   buyplan: "1c6db2b33e1345d5215f4f554c87843796ca73eb8ffbd6ea8c6bbea9432fac95",
   review: "39f2dde16ab38678f8e0af39e5051fa3cf9f80eab3fa96651745e92136b7a301",
   valuation: "eda72102b9a4aee1147c3fcc6a98ace68638a345d7c83711db31a9c05a3102d4",
+  // Dark is the primary appearance and carries its own baselines; an empty
+  // value here keeps the gate red until a human has looked at the capture.
+  home_dark: "59a7e13895cf57df819173dbcc67988b8615135f6db13584e1248daa705a8243",
+  watchlist_dark: "07c494a0a228e68a8dfe9e3439928cf028cbdcfe4744297f91edd2f3f565bcf7",
+  company_dark: "2b4425002199406fe262dcc1cb7299586bf9da713f48328e4bfa7adf619eb1d8",
+  valuation_dark: "cf8c3eb4f6871201524641aac6ab5a450b6c26f696d4d0cb010f7bc7f07d8596",
+  buyplan_dark: "41311281b02d2d9c2b8ff516517c0cc4c445f71b64c9ceb848cb4dcdfdd19651",
+  review_dark: "7ebc342c8bad0a330334d6288ecde8cf2658f8ea8829b82f8e2c090b6ce62546",
 };
 
 function freePort() {
@@ -515,6 +523,25 @@ async function main() {
       assert.equal(responsive[responsive.length - 1].scrollWidth <= responsive[responsive.length - 1].innerWidth, true);
     }
     await page.setViewportSize({ width: 1440, height: 900 });
+
+    // Dark is the primary appearance, so it carries its own pixel baseline:
+    // the contrast audit checks colour and cannot see layout breaking.
+    await page.locator('[data-action="section"][data-section="settings"]').first().click();
+    await page.locator('[data-testid="theme-dark"]').click();
+    assert.equal(await page.evaluate(() => document.documentElement.getAttribute("data-theme")), "dark");
+    for (const section of ["home", "watchlist", "company", "valuation", "buyplan", "review"]) {
+      await page.locator(`[data-action="section"][data-section="${section}"]`).first().click();
+      await settle(page);
+      screenshots[`${section}_dark`] = screenshotHash(await page.screenshot({
+        path: path.join(SCREENSHOT_DIR, `${section}-dark.png`),
+        fullPage: true,
+        animations: "disabled",
+      }));
+    }
+    await page.locator('[data-action="section"][data-section="settings"]').first().click();
+    await page.locator('[data-testid="theme-light"]').click();
+    assert.equal(await page.evaluate(() => document.documentElement.getAttribute("data-theme")), null);
+
     assert.deepEqual(browserErrors, []);
     assert.deepEqual(externalRequests, []);
 

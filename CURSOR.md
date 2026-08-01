@@ -1,12 +1,14 @@
 <!-- This file is the single mutable state cursor. History = git log -p CURSOR.md -->
 # Cursor
 
-last_commit: f69aefa
+last_commit: ba68d2a
 branch: feat/top-nav-type-system
-last_stage: UI 重新定義完成並通過全部閘門；風格改版待開始
+last_stage: 視覺風格改版完成——深色轉為主要外觀、資訊分層、趨勢表對齊；三閘全綠、六張基準線已重釘
 status: PARTIAL
-next_action: 開新 session 做視覺風格改版——JY 會把四張參考圖放進 outputs/smoke-inbox/，依【配色】【圖表呈現】【資訊密度】三軸抽出具體色票與版式
+next_action: JY 人為初步判定 app 可用，進入實測打磨。本段改動全部尚未 commit，仍在工作區
 open_questions:
+  - sparkline 已實作但畫不出線：各指標只有 1 期，需累積 2 期以上才會出現（刻意不補值）
+  - 深色只有對比閘，沒有像素基準線；六張 baseline 仍只釘淺色主題
   - 「抓不到股票代碼」原因未明：JY 回報 Mac 端 curl 8767 有跑通，所以不是轉埠問題
   - 免費官方是否存在財報歷史序列來源，或 forward accumulation 是唯一路徑
   - 各 endpoint 公告節奏（需跨月實測，不做推論）
@@ -15,19 +17,27 @@ open_questions:
 
 ---
 
-## 下一段：視覺風格改版（尚未開始）
+## 視覺風格改版（2026-08-01 完成，未 commit）
 
-JY 於 2026-08-01 提供四個 Dribbble 參考，**明確指定用於三個軸**：
-【配色風格】【圖表呈現】【資訊密度】。
+JY 決定：**深色為主要外觀**（不是可選主題），暖中性紙感、不全黑，紫色強調。
+理由是「淺色＋藍色按鈕重複性過高」。參考來源為三張 Dribbble 截圖與他自己的
+zibaldone app。
 
-- https://dribbble.com/shots/23902428-Stakent-Crypto-Dashboard
-- https://dribbble.com/shots/25121521-HR-Management-Dashboard-Design
-- https://dribbble.com/shots/25108413-Smart-Energy-Dashboard-Concept
-- https://dribbble.com/shots/25711559-Call-Monitoring-Dashboard
+### 定案 token（單一來源在 `ui/dashboard/styles.css` 的 `:root` 與 `[data-theme="dark"]`）
 
-**開工前提**：這些是圖片，抓網頁沒有用。JY 會把截圖放進
-`outputs/smoke-inbox/`（已建、已被 .gitignore 涵蓋）。上個 session 的圖片
-讀取被回合預算擋掉，所以刻意不在那裡開始——沒看到圖就做等於腦補。
+深色三層 `#211f1d` / `#2a2724` / `#33302c`，導航 `#171512`；
+文字 `#f0ece6` / `#c4bcb2` / `#a69d92`；
+強調 `--primary #8b7cf6`（填色）／`--primary-dk #b9abff`（面上文字）／
+`--on-primary #1a1714`（按鈕字，因白字壓在此紫上只有 3.3:1）；
+漲跌 `--red #ff7a6b` / `--green #3fc99a`。**沒有 `--blue`**，紫是唯一強調色。
+
+### 這一段學到的三件事
+
+1. **token 改了不代表生效**：`.btn-primary` 在 styles.css 後段被寫死成
+   `#2962ff`，靠 source order 蓋過 token，換色兩輪都沒進去。
+2. **對比閘擋不住「顏色錯但看得清」**：藍底白字對比是過的。這一類只有人眼抓得到。
+3. **hover 不在稽核範圍**：`tr:hover` 寫死近白 `#fbfcfd`，深色下滑過整列會閃白，
+   是改表格時順手看到的，不是閘抓到的。
 
 ### 治理更正（重要）
 

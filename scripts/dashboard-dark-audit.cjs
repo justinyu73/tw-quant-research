@@ -4,6 +4,8 @@
 //   1. light-background leaks — elements whose effective (alpha-blended)
 //      background is lighter than the dark surfaces, i.e. a hardcoded literal
 //      that never flipped with the token layer.
+//   2b. hover states that paint a light fill (HOVER_PROBES) — walking the DOM
+//      cannot see them, so they are driven explicitly.
 //   2. text below WCAG AA against its effective background (4.5:1, or 3:1 for
 //      large text per WCAG: >=24px, or >=18.66px at weight >=700).
 //
@@ -37,6 +39,18 @@ const VIEWS = [
   { id: "review", label: "投資審查" },
   { id: "evidence", label: "資料來源" },
   { id: "settings", label: "設定" },
+];
+
+// Interaction states are not reachable by walking the DOM: :hover has to be
+// driven. Every selector here is verified to render in that view — a probe
+// that matches nothing throws, because a no-op probe reads as a pass.
+const HOVER_PROBES = [
+  { view: "company", selector: "table.table tbody tr" },
+  { view: "company", selector: ".period-button" },
+  { view: "company", selector: ".btn-outline" },
+  { view: "watchlist", selector: ".btn-outline" },
+  { view: "home", selector: ".btn-outline" },
+  { view: "review", selector: ".btn-outline" },
 ];
 
 // { selector, reason } — reason is mandatory and asserted non-empty below.
@@ -207,6 +221,7 @@ async function main() {
   const browser = await playwright.chromium.launch({ headless: true, executablePath, args: ["--no-sandbox"] });
   const browserErrors = [];
   const views = [];
+  const hoverLeaks = [];
 
   try {
     const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 1 });
@@ -238,6 +253,50 @@ async function main() {
       await link.click();
       if (view.ready) await page.locator(view.ready).waitFor({ timeout: 30000 }).catch(() => {});
       await settle(page);
+
+      for (const probe of HOVER_PROBES.filter((item) => item.view === view.id)) {
+        const target = page.locator(probe.selector).first();
+        // A probe that matches nothing is a broken probe, not a pass: silently
+        // skipping is how this gate first went green without testing anything.
+        if (!(await target.count())) throw new Error(`hover probe matched nothing: ${probe.view} ${probe.selector}`);
+        await target.hover().catch(() => {});
+        await page.waitForTimeout(120);
+        const painted = await target.evaluate((el) => {
+          const parse = (value) => {
+            const parts = (value || "").match(/[\d.]+/g);
+            if (!parts) return null;
+            const [r, g, b, a] = parts.map(Number);
+            return { r, g, b, a: a === undefined ? 1 : a };
+          };
+          const over = (fg, bg) => ({
+            r: fg.r * fg.a + bg.r * (1 - fg.a),
+            g: fg.g * fg.a + bg.g * (1 - fg.a),
+            b: fg.b * fg.a + bg.b * (1 - fg.a),
+            a: 1,
+          });
+          let acc = { r: 255, g: 255, b: 255, a: 1 };
+          const chain = [];
+          for (let node = el; node; node = node.parentElement) chain.push(node);
+          for (const node of chain.reverse()) {
+            const bg = parse(getComputedStyle(node).backgroundColor);
+            if (bg && bg.a > 0) acc = over(bg, acc);
+          }
+          const channel = (c) => {
+            const v = c / 255;
+            return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+          };
+          return {
+            background: getComputedStyle(el).backgroundColor,
+            luminance: 0.2126 * channel(acc.r) + 0.7152 * channel(acc.g) + 0.0722 * channel(acc.b),
+          };
+        });
+        if (painted.luminance > 0.45) {
+          hoverLeaks.push({ view: view.id, selector: probe.selector, background: painted.background, luminance: +painted.luminance.toFixed(3) });
+        }
+      }
+      await page.mouse.move(0, 0);
+      await page.waitForTimeout(80);
+
       const result = await page.evaluate(auditInPage, ALLOWED);
       views.push({
         id: view.id,
@@ -254,6 +313,7 @@ async function main() {
   }
 
   const lightBgTotal = views.reduce((sum, v) => sum + (v.lightBgCount || 0), 0);
+  const hoverLeakTotal = hoverLeaks.length;
   const lowContrastTotal = views.reduce((sum, v) => sum + (v.lowContrastCount || 0), 0);
   const report = {
     schema: "tqr-dashboard-dark-audit/v1",
@@ -263,8 +323,10 @@ async function main() {
     standard: "WCAG 2.1 AA — 4.5:1, or 3:1 for large text (>=24px, or >=18.66px at weight >=700)",
     allowed: ALLOWED,
     light_bg_total: lightBgTotal,
+    hover_leak_total: hoverLeakTotal,
+    hover_leaks: hoverLeaks,
     low_contrast_total: lowContrastTotal,
-    pass: lightBgTotal === 0 && lowContrastTotal === 0 && browserErrors.length === 0,
+    pass: lightBgTotal === 0 && lowContrastTotal === 0 && hoverLeakTotal === 0 && browserErrors.length === 0,
     views,
     browser_errors: browserErrors,
   };
