@@ -9,6 +9,16 @@ next_action: 實測打磨。desktop-release 由 tag 觸發，產出是 Draft；�
 open_questions:
   - sparkline 已實作但畫不出線：各指標只有 1 期，需累積 2 期以上才會出現（刻意不補值）
   - :focus 與 disabled 兩種互動態仍無任何閘覆蓋（hover 已納入 dark-audit）
+  - v0.3.0 桌面版人為實測回報四個缺陷（尚未修，尚未定位根因）：
+    1. K 線不隨選股更新——選了新標的圖不動，要再點【期間】才會跳成正確標的。
+       研究工具顯示錯誤標的的線圖是最高風險的一個。
+       非本次改版造成：41518ff 未觸及 renderKlineChart 呼叫點與 kline-search-pick，
+       該路徑最後變動於 920aa05
+    2. 已在自選清單中的股票，在搜尋框輸入代號回「找不到符合的商品」——
+       商品存在，只是已被追蹤，訊息說謊
+    3. 公司研究的 K 線沒有自選清單下拉，只能靠打字搜尋
+    4. 資料尚未下載時跳「本機資料服務無法連線；請重新啟動 TQR」——
+       實際上 sidecar 正常，只是還沒抓資料，訊息指向錯誤的根因
   - .research-module / .terminal-watchlist-row / .analysis-check 是死 CSS，六頁都渲染不出來，本次未刪
   - 「抓不到股票代碼」原因未明：JY 回報 Mac 端 curl 8767 有跑通，所以不是轉埠問題
   - 免費官方是否存在財報歷史序列來源，或 forward accumulation 是唯一路徑
