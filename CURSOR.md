@@ -1,14 +1,15 @@
 <!-- This file is the single mutable state cursor. History = git log -p CURSOR.md -->
 # Cursor
 
-last_commit: ba68d2a
-branch: feat/top-nav-type-system
-last_stage: 視覺風格改版完成——深色轉為主要外觀、資訊分層、趨勢表對齊；三閘全綠、六張基準線已重釘
+last_commit: fecccb5
+branch: main
+last_stage: v0.3.0 已發版——深色轉為主要外觀、資訊分層、趨勢表對齊；PR #24 已 merge，tag v0.3.0 已推
 status: PARTIAL
-next_action: JY 人為初步判定 app 可用，進入實測打磨。本段改動全部尚未 commit，仍在工作區
+next_action: 實測打磨。desktop-release 由 tag 觸發，產出是 Draft；要不要發布由 JY 決定
 open_questions:
   - sparkline 已實作但畫不出線：各指標只有 1 期，需累積 2 期以上才會出現（刻意不補值）
-  - 深色只有對比閘，沒有像素基準線；六張 baseline 仍只釘淺色主題
+  - :focus 與 disabled 兩種互動態仍無任何閘覆蓋（hover 已納入 dark-audit）
+  - .research-module / .terminal-watchlist-row / .analysis-check 是死 CSS，六頁都渲染不出來，本次未刪
   - 「抓不到股票代碼」原因未明：JY 回報 Mac 端 curl 8767 有跑通，所以不是轉埠問題
   - 免費官方是否存在財報歷史序列來源，或 forward accumulation 是唯一路徑
   - 各 endpoint 公告節奏（需跨月實測，不做推論）
@@ -17,7 +18,7 @@ open_questions:
 
 ---
 
-## 視覺風格改版（2026-08-01 完成，未 commit）
+## 視覺風格改版（2026-08-01 完成，v0.3.0）
 
 JY 決定：**深色為主要外觀**（不是可選主題），暖中性紙感、不全黑，紫色強調。
 理由是「淺色＋藍色按鈕重複性過高」。參考來源為三張 Dribbble 截圖與他自己的
