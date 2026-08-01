@@ -1065,3 +1065,7 @@ input, select, textarea, button { font-family: inherit; }
 .company-status-grid textarea { min-height: 76px; padding: var(--space-2); line-height: var(--leading-body); resize: vertical; }
 .company-status-grid .company-status-note { grid-column: 1 / -1; }
 @media (max-width: 720px) { .company-status-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* An unreachable sidecar used to show only an empty symbol search, which reads
+   as "search is broken" rather than "the local data service is down". */
+.topnav-runtime-error { position: absolute; top: calc(100% + 6px); right: 0; z-index: 6; margin: 0; max-width: 320px; padding: var(--space-2) var(--space-3); border: 1px solid rgba(217, 75, 75, 0.5); border-radius: var(--radius-sm); color: #ffd7d7; background: #40222a; font-size: var(--type-helper); line-height: 1.5; }

@@ -78,6 +78,15 @@ badge colors that are not already in the token set.
 
 ## Color principles (de-AI)
 
+> **Provenance, recorded 2026-08-01.** The specific prohibitions below were
+> written by an agent (Codex), not by the owner. What the owner actually stated
+> was a rough verbal picture plus "I don't like AI style", which he himself
+> calls too abstract to act on. Treat this section as an agent-authored working
+> assumption, not a ratified product decision: it must not be quoted back at the
+> owner as his own constraint, and it yields to any direction he gives.
+> Owner-supplied visual references now exist and cover palette, chart
+> presentation, and information density — see `TQR-UIUX-001`.
+
 - Neutral deep blue-gray chrome (top nav `#131722`), light warm-gray body,
   white surfaces, **one** accent blue (`--primary` `#2962ff`).
 - 台股慣例： `.positive` = red (`--red`), `.negative` = green (`--green`) — never

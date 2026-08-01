@@ -1358,7 +1358,7 @@
         requestKlineModel();
         requestWatchlistModels();
       })
-      .catch(function () {
+      .catch(function (error) {
         klineRequestInFlight = false;
         klineInstrumentsAttempts += 1;
         if (klineInstrumentsAttempts < KLINE_INSTRUMENTS_MAX_ATTEMPTS) {
@@ -1366,7 +1366,7 @@
           return;
         }
         klineInstrumentsAttempts = 0;
-        state = core.reduce(state, { type: "KLINE_ERROR" });
+        state = core.reduce(state, { type: "KLINE_ERROR", message: sidecarErrorMessage(error) });
         render();
       });
   }
@@ -2244,7 +2244,10 @@
       '</div>' +
       '<div class="system-topbar-right">' +
       '<div class="system-global-search symbol-search"><label><input type="search" aria-label="搜尋標的" autocomplete="off" placeholder="代號 / 名稱" value="' + escapeHtml(klineSearchQuery || '') + '" data-action="global-search" data-testid="global-search" aria-controls="global-search-results"></label>' +
-      symbolSearchResults(instruments, klineSearchQuery, [], state.selectedKlineInstrumentId, "global-search-results", "global-search-pick") + '</div>' +
+      symbolSearchResults(instruments, klineSearchQuery, [], state.selectedKlineInstrumentId, "global-search-results", "global-search-pick") +
+      (state.klineRuntimeStatus === "error"
+        ? '<p class="topnav-runtime-error" data-testid="topnav-runtime-error">' + text(state.klineRuntimeMessage || "本機資料服務無法連線") + '</p>'
+        : "") + '</div>' +
       '<span class="system-feed-status"><i></i>EOD · 本機</span>' +
       '<span class="read-only-pill">研究唯讀</span>' +
       '<nav class="topnav-utility" aria-label="工具">' +

@@ -91,6 +91,13 @@ The shared visual contract is:
 - Interaction: every input/select keeps focus while typing or choosing; destructive
   actions are explicit and confirmable; deleting a custom watchlist group never
   deletes its instruments from another group or from the global saved watchlist.
+- Visual direction is owner-supplied and currently under revision. Four
+  reference shots were provided on 2026-08-01 covering three axes explicitly:
+  palette, chart presentation, and information density. The earlier "de-AI"
+  prohibitions in `.agents/skills/uiux-review/SKILL.md` were agent-authored and
+  were never ratified by the owner; they do not override these references.
+  The one hard constraint that does not move is the Taiwan convention: red is
+  up, green is down.
 - Palette: neutral paper-like surfaces, dark terminal navigation, blue primary
   action, and restrained red/green/yellow status colors. Avoid gradients and
   dashboard-only decoration on research data blocks.

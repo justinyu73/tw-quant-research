@@ -608,7 +608,10 @@
       return Object.assign({}, current, { klineRuntimeStatus: "loading" });
     }
     if (event.type === "KLINE_ERROR") {
-      return Object.assign({}, current, { klineRuntimeStatus: "error" });
+      return Object.assign({}, current, {
+        klineRuntimeStatus: "error",
+        klineRuntimeMessage: event.message || "本機資料服務無法連線；請重新啟動 TQR 後再試。"
+      });
     }
     if (event.type === "SET_KLINE_INSTRUMENTS") {
       var instruments = Array.isArray(event.instruments) ? clone(event.instruments) : [];
