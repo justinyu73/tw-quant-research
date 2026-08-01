@@ -1,16 +1,44 @@
 <!-- This file is the single mutable state cursor. History = git log -p CURSOR.md -->
 # Cursor
 
-last_commit: 105250c
+last_commit: f69aefa
 branch: feat/top-nav-type-system
-last_stage: UI 重新定義——字級比例、上方導航取代左側導航、全中文化
+last_stage: UI 重新定義完成並通過全部閘門；風格改版待開始
 status: PARTIAL
-next_action: 逐張看過 outputs/dashboard-browser/*.png 確認每個 diff 都是有意的，再更新 smoke 的 EXPECTED_SCREENSHOTS 雜湊並重跑到 pass
+next_action: 開新 session 做視覺風格改版——JY 會把四張參考圖放進 outputs/smoke-inbox/，依【配色】【圖表呈現】【資訊密度】三軸抽出具體色票與版式
 open_questions:
+  - 「抓不到股票代碼」原因未明：JY 回報 Mac 端 curl 8767 有跑通，所以不是轉埠問題
   - 免費官方是否存在財報歷史序列來源，或 forward accumulation 是唯一路徑
   - 各 endpoint 公告節奏（需跨月實測，不做推論）
-  - 轉上市公司是否會同期同時出現在兩邊匯出檔（已設 conflict 防線，需 live 才能退場）
-  - CSS 十個 breakpoint 是否收斂到稽核認得的六個（併錯會改變未受稽核寬度的版面）
+  - 轉上市公司是否會同期同時出現在兩邊匯出檔（首次雙市場擷取 0 conflicts）
+  - CSS 十個 breakpoint 是否收斂到稽核認得的六個（併錯會改動未受稽核寬度）
+
+---
+
+## 下一段：視覺風格改版（尚未開始）
+
+JY 於 2026-08-01 提供四個 Dribbble 參考，**明確指定用於三個軸**：
+【配色風格】【圖表呈現】【資訊密度】。
+
+- https://dribbble.com/shots/23902428-Stakent-Crypto-Dashboard
+- https://dribbble.com/shots/25121521-HR-Management-Dashboard-Design
+- https://dribbble.com/shots/25108413-Smart-Energy-Dashboard-Concept
+- https://dribbble.com/shots/25711559-Call-Monitoring-Dashboard
+
+**開工前提**：這些是圖片，抓網頁沒有用。JY 會把截圖放進
+`outputs/smoke-inbox/`（已建、已被 .gitignore 涵蓋）。上個 session 的圖片
+讀取被回合預算擋掉，所以刻意不在那裡開始——沒看到圖就做等於腦補。
+
+### 治理更正（重要）
+
+`.agents/skills/uiux-review/SKILL.md` 的 `Color principles (de-AI)` 一節
+（禁亮紫／霓虹／漸層／重陰影／大圓角）**是 Codex 寫的，JY 從未提供或批准**。
+他只給過口頭大略描述與「不喜歡 AI 風格」，並自認太抽象。已在該節與
+`TQR-UIUX-001` 標明出處：agent-authored working assumption，遇到 JY 的
+指示就讓位，**不可再當成他自己的約束引用回去**。
+
+唯一不動的硬約束：**台股紅漲綠跌**（市場慣例，非風格偏好）。參考圖多為
+西方綠漲紅跌，不跟。
 
 ---
 
@@ -33,9 +61,32 @@ H1 28 / H2 19 / H3 15 / 導航 15 / 內文與輸入值 14 / label 12 / 徽章 11
 已量測通過：topbar 58px＝`--topnav-h`、首頁摘要 5 磚 1 列、自選清單三欄位
 label 頂端皆 549、六頁 1440 的 scrollWidth 均等於 innerWidth、headless 零 JS 錯誤。
 
-### 未完成（下個 session 從這裡接）
+### 已全部通過（本段收尾狀態）
 
-1. **稽核已通過，且是真的 0**。六頁 × 六斷點 = 36 筆結果全部量到，
+RWD 稽核 8 視圖 × 6 斷點 = 48 格全部量到，failures 0 / ERR 0 / browser_errors 0。
+browser smoke `status: pass`。193 unittest OK。dashboard-core.test.cjs pass。
+lh_preflight / p4_research_closure / open_source_audit --strict 全 pass。
+
+### 人為 smoke 回報並已修（`dd57f5f`、`f69aefa`）
+
+1. 公司研究頁八個欄位擠成一排——`.company-status-grid` 在 CSS 裡**完全沒有規則**。
+   補 auto-fit 後實測 3 列、最窄控件 212px、備註跨滿列。
+2. 三個卡片標題仍英文 → 基本面快照／趨勢表／價格參考。順帶清 Thesis 前綴與
+   VALUE RESEARCH WORKSPACE eyebrow。
+3. **估值永遠停在「計算中…」**：`sidecarRequest` 用沒有逾時的裸 fetch，連線
+   停滯時 promise 永不 settle、in-flight 旗標卡住、無訊息無法重試。加
+   `AbortSignal.timeout(15s)`，並在 `sidecarErrorMessage` 與 `engineErrorMessage`
+   **兩處**都加中文逾時訊息（估值走的是後者，只改前者等於沒修）。
+4. sidecar 不可達時 `loadKlineInstruments` 的 `.catch` 把 error 整個丟棄，
+   介面只是搜尋框空著。改為帶進 `klineRuntimeMessage` 顯示在搜尋框下方。
+
+### 仍未完成
+
+0. **「抓不到股票代碼」未解**。JY 回報 Mac 端 `curl 8767` 有跑通，所以不是
+   轉埠。原因未知，下個 session 要重新查——不要沿用「8767 沒轉」這個已被
+   否證的假設。
+
+1. ~~稽核~~ 已通過（見上）。原始說明：六頁 × 六斷點 = 36 筆結果全部量到，
    `SUM failures = 0`、無 ERR、`browser_errors` 0。改動前的三個缺陷都消失：
    820px `.system-topbar-left` 溢出 15px（topbar 重建）、company@390
    `.kline-chart-wrap` 截斷 8px 與 `.fundamental-metric-grid` 溢出 3px
@@ -48,20 +99,18 @@ label 頂端皆 549、六頁 1440 的 scrollWidth 均等於 innerWidth、headles
    (b) 我為了縮短 topbar 高度加的 sr-only span（`width:1px; overflow:hidden`）
        讓 `scrollWidth(48) > clientWidth(1)`，稽核分不出視覺隱藏與真截斷，
        六頁 × 六斷點各報一個假失敗。改用 `aria-label`，元素不存在就沒有假陽性。
-2. **smoke 截圖基線未更新**，停在 `functional_pass_baseline_required`。
-   依 `uiux-review` 規定必須逐張看過 PNG 確認每個 diff 都是有意的才能更新雜湊。
-   我只看過首頁、估值、自選清單三張，其餘三張未看，所以沒有更新雜湊。
-
-3. **evidence／settings 兩個區塊全站無入口**。`data-section="evidence"`／
-   `"settings"` 在 app.js 出現 0 次，但 SECTIONS 有它們、頁面也渲染得出來。
-   這是既有漂移不是本次造成（舊左側導航也只渲染六個 primary）。
-   `TQR-UIUX-001` 仍寫著它們 "stay reachable from inside a page"。
-   已暫時移出稽核清單並在腳本註解記錄，補上入口後要放回去。
-4. **breakpoint 未收斂**（見 open question）。
+2. ~~smoke 截圖基線未更新~~ 已更新，`status: pass`。**但最後一輪（dd57f5f
+   之後）的視覺確認是用量測代替肉眼**，因為回合預算擋掉圖片讀取；逐張目視
+   仍欠一次。
+3. ~~evidence／settings 無入口~~ 已補（`685eceb`），入口在導航列右側工具區，
+   兩頁已放回稽核清單並通過。
+4. **breakpoint 未收斂**（見 open question）——四件事裡唯一沒做的。
 
 ### 驗證方式
 
-轉埠（VS Code PORTS / ssh -L）一直不通，已放棄該路線。改為 headless 渲染後直接貼圖：
+本 session 大半時間轉埠不通，改用 headless 渲染貼圖。**但 JY 最後回報 Mac 端
+`curl 8767` 有跑通**，所以「轉埠不通」這個假設已被否證，不要再沿用。
+兩種方式都可用：
 
 ```sh
 python3 scripts/serve_dashboard_app.py --data-dir ~/.local/share/io.github.justinyu73.twquantengine
@@ -96,7 +145,7 @@ Canonical spec: `docs/tqr-research-platform-spec.md`（`TQR-IA-003`）
 
 Source contract: `docs/tqr-fundamentals-source-contract.md`（`TQR-FUNDAMENTALS-SOURCE-001`）
 
-本機已擷取 3,174 筆觀測（月營收 1,082 / 損益表 1,046 / 資產負債表 1,046），
+本機已擷取 **5,831** 筆觀測（TWSE 3,174 + TPEx 2,657），
 位置 `~/.local/share/io.github.justinyu73.twquantengine/fundamentals-series.json`
 
 四個實測發現已編碼成不可繞過的行為：
@@ -142,26 +191,22 @@ assets/liabilities/equity/debt_ratio/current_ratio 全是 None。已把「映射
 反向對照做過：把映射改回 `資產總額` 拼法，
 `test_balance_sheet_totals_are_real_numbers_not_silent_nones` 轉紅（assets is None）。
 
-**live capture 未跑**——TPEx 的 row count、distinct periods、drop count 目前
-全部未測，契約沒有宣稱它們。這是這段唯一的缺口。
+**live capture JY 已跑**。本機量得 TPEx 月營收 891 / 損益表 883 /
+資產負債表 883，各只有一個期別，`supersedes` 0、`conflicts` 0。契約已回寫
+（`docs/tqr-fundamentals-source-contract.md`）；`source_rows` 與 `dropped`
+未被擷取過程保留，契約明文不宣稱。
 
-### Op-Demo（要 JY 親自跑）
-
-```sh
-python3 scripts/capture_fundamentals.py --market TPEx --dry-run
-```
-
-看 `captures` 三個 family 的 `source_rows` / `normalized` / `dropped`，
-`dropped` 應為 0、`periods` 各只有一期。確認後拿掉 `--dry-run` 實際寫入，
-再開 App 找一支上櫃股（例如 1240 茂生農經）看負債比／流動比是否有數字。
+仍未由人眼確認：上櫃股（例如 1240 茂生農經）的負債比／流動比是否真的有數字、
+來源是否標成櫃買中心而非證交所。
 
 ## 未完成
 
 ### 續押項目
 
 - **公告節奏 + Watchlist「下一個事件」自動帶入**：需跨月實測發布時間，
-  刻意不做推論，避免產生看似確定實為猜測的欄位
-- **TPEx 基本面**：待 TWSE 正規化契約驗證後再加
+  刻意不做推論。產品邊界禁止常駐 provider 呼叫，只能靠 JY 每月手動跑
+  `scripts/capture_fundamentals.py` 累積——這是操作者任務，不是寫程式能收的。
+- ~~TPEx 基本面~~ 已完成並 live 驗證（PR #23 已合併）。
 
 ## alignment miss 清單（供後續警惕）
 
