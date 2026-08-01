@@ -2,7 +2,7 @@
 
 Authority: [`tqr-research-platform-spec.md`](tqr-research-platform-spec.md)
 Decision: `TQR-FUNDAMENTALS-SOURCE-001`
-Status: `twse_live_proven_tpex_offline_proven_forward_accumulation`
+Status: `twse_and_tpex_live_proven_forward_accumulation`
 Verified: 2026-07-31 (live probe, `scripts/probe_fundamentals_sources.py`)
 
 Machine-readable record:
@@ -120,10 +120,11 @@ keeps the `forward_eps` prohibition intact.
    be scheduled without polling?
 3. ~~Should TPEx be admitted in the same slice as TWSE, or deferred until the
    TWSE normalization contract is proven?~~ Answered 2026-07-31: deferred, then
-   admitted once the TWSE contract was proven by live capture. TPEx is
-   implemented offline-first; no TPEx live capture has been run yet.
+   admitted once the TWSE contract was proven by live capture. TPEx was built
+   offline-first and its first live capture has since been run.
 4. Does a company that moves between TPEx and TWSE ever appear in both exports
-   for the same period? The observation key excludes market so that such a
+   for the same period? Still open, but the first two-market capture produced 0
+   conflicts, so no collision has been observed yet. The observation key excludes market so that such a
    company keeps one continuous series, which makes a same-key/different-market
    pair ambiguous. It is reported as a merge conflict and refused rather than
    guessed; only a live capture across a real listing move can retire this.
@@ -147,14 +148,13 @@ do.
 
 ## Implementation status (2026-07-31)
 
-Both exchanges are mapped. TWSE is proven by live capture; TPEx is implemented
-and covered offline only, and its first live capture is still owed.
+Both exchanges are mapped and both are now proven by live capture.
 
 | Piece | Where |
 | --- | --- |
 | Normalization + forward accumulation | `src/tw_quant_engine/fundamentals.py` |
 | Families implemented | monthly_revenue, income_statement, balance_sheet |
-| Markets implemented | TWSE (live-proven), TPEx (offline-proven) |
+| Markets implemented | TWSE (live-proven), TPEx (live-proven) |
 | Human-run capture | `scripts/capture_fundamentals.py` (`--market`, `--family`) |
 | Read model route | `GET /fundamentals?security_id=` |
 | Offline tests | `tests/test_tqr_fundamentals.py` (28 cases) |
@@ -176,8 +176,23 @@ real numbers rather than the silent `None` the 總額/總計 split would otherwi
 produce. Attribution now follows each observation's own provenance, so TPEx data
 is credited to 證券櫃檯買賣中心 and never to 證交所.
 
-No TPEx live capture has been run. Row counts, distinct periods, and drop counts
-for TPEx therefore remain unmeasured, and this contract does not claim them.
+The first TPEx live capture has been run by the operator. Measured from the
+resulting local series (`fundamentals-series.json`), not inferred:
+
+| TPEx family | Admitted observations | Distinct periods | `available_at` |
+| --- | --- | --- | --- |
+| monthly_revenue | 891 | 1 (`2026-06`) | 2026-07-17 |
+| income_statement | 883 | 1 (`2026Q1`) | 2026-07-31 |
+| balance_sheet | 883 | 1 (`2026Q1`) | 2026-07-31 |
+
+Each family carries exactly one distinct period, so Finding 1 holds for TPEx as
+it does for TWSE. The admitted counts equal the row counts this contract's
+2026-07-30 probe measured (891 / 883 / 883); the capture run's own
+`source_rows` and `dropped` figures were not retained, so this contract states
+the admitted counts it can verify and does not claim a drop count.
+
+Across the whole series the merge recorded 0 `supersedes` and 0 `conflicts`: no
+same-key/different-market collision occurred in practice.
 
 ### Balance sheet (added 2026-07-31)
 

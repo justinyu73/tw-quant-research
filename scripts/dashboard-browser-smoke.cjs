@@ -14,12 +14,20 @@ const ROOT = path.resolve(__dirname, "..");
 const PREVIEW_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "tqr-preview-"));
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
-  home: "07c16dbb6b1411fd529f410541c83b4d1069476262758722125f79eae4edcbbb",
-  company: "5802050e62c15d11a4bd82e674897997adef79eb335fa23d3021e687707a8291",
-  watchlist: "09d0c02d6f94a1cf45c49a8da468b93ec8cea67fe1c1ace9fb7957a6839f1804",
-  buyplan: "5efc6f4a62054c4f3bdf933a31541cf070f7d624687639f3755300e569141a54",
-  review: "cdc1dfeb3b714540946638615b2b0c48703439fcdd4d74f02b63d5a2e26461e8",
-  valuation: "77005bb848f3da2559480e1508b1a3cab5d0405af2fc3f6829cbda7e8ed70439",
+  home: "501188a28a0a7cea992c6d9b8a007f6f4060e90288eec87f92dae2243f15dd9f",
+  company: "6caa7eafaea4d257268c371c87362b3ff12403dcee81fb6781312617aac5d1a7",
+  watchlist: "55118d10f0276bdb25821665c3fac88e7e998588d3b4e76b39d11df677d47027",
+  buyplan: "1c6db2b33e1345d5215f4f554c87843796ca73eb8ffbd6ea8c6bbea9432fac95",
+  review: "39f2dde16ab38678f8e0af39e5051fa3cf9f80eab3fa96651745e92136b7a301",
+  valuation: "eda72102b9a4aee1147c3fcc6a98ace68638a345d7c83711db31a9c05a3102d4",
+  // Dark is the primary appearance and carries its own baselines; an empty
+  // value here keeps the gate red until a human has looked at the capture.
+  home_dark: "59a7e13895cf57df819173dbcc67988b8615135f6db13584e1248daa705a8243",
+  watchlist_dark: "07c494a0a228e68a8dfe9e3439928cf028cbdcfe4744297f91edd2f3f565bcf7",
+  company_dark: "2b4425002199406fe262dcc1cb7299586bf9da713f48328e4bfa7adf619eb1d8",
+  valuation_dark: "cf8c3eb4f6871201524641aac6ab5a450b6c26f696d4d0cb010f7bc7f07d8596",
+  buyplan_dark: "41311281b02d2d9c2b8ff516517c0cc4c445f71b64c9ceb848cb4dcdfdd19651",
+  review_dark: "7ebc342c8bad0a330334d6288ecde8cf2658f8ea8829b82f8e2c090b6ce62546",
 };
 
 function freePort() {
@@ -109,6 +117,11 @@ function screenshotHash(buffer) {
 // Ensure fonts loaded and the canvas/DOM paint has flushed before a pixel capture,
 // so screenshots are deterministic across runs (Lightweight Charts repaints on rAF).
 async function settle(page) {
+  // Assertions on below-the-fold elements leave the page scrolled, and a
+  // fullPage capture then paints the sticky top nav at that scroll offset
+  // instead of the document top: the baseline would encode how far the run
+  // happened to scroll rather than what the page looks like.
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.evaluate(() => document.fonts.ready);
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
@@ -186,21 +199,23 @@ async function main() {
     const response = await page.goto(`${baseUrl}/index.html`, { waitUntil: "networkidle" });
     assert.equal(response.status(), 200);
     assert.equal(await page.locator("#app .app-shell").count(), 1);
-    assert.equal(await page.locator(".sidebar").count(), 1);
+    assert.equal(await page.locator(".topbar .topnav").count(), 1);
+    // The retired left rail must not come back alongside the top nav.
+    assert.equal(await page.locator(".sidebar").count(), 0);
     assert.equal(await page.locator(".card").count() > 0, true);
     assert.equal(await page.locator(".read-only-pill").innerText(), "研究唯讀");
 
     // IA contract: exactly the six primary value-research sections, in order.
-    assert.equal(await page.locator(".sidebar .nav-link").count(), 6);
+    assert.equal(await page.locator(".topnav .nav-link").count(), 6);
     assert.deepEqual(
-      await page.locator(".sidebar .nav-link .nav-text").allInnerTexts(),
-      ["Home", "Watchlist", "Company", "Valuation", "Buy Plan", "Review"],
+      await page.locator(".topnav .nav-link").allInnerTexts(),
+      ["首頁", "自選清單", "公司研究", "估值", "買進計畫", "投資審查"],
     );
     for (const removed of ["research", "backtest", "features", "products", "market", "fundamentals", "stories", "overview"]) {
-      assert.equal(await page.locator(`.sidebar [data-section="${removed}"]`).count(), 0, `retired section still in nav: ${removed}`);
+      assert.equal(await page.locator(`.topnav [data-section="${removed}"]`).count(), 0, `retired section still in nav: ${removed}`);
     }
 
-    assert.equal(await page.locator(".page-title").innerText(), "Home");
+    assert.equal(await page.locator(".page-title").innerText(), "首頁");
     assert.equal(await page.locator('[data-testid="investment-summary"] article').count(), 5);
     assert.match(await page.locator('[data-testid="summary-tracked"]').innerText(), /追蹤標的/);
     assert.equal(await page.locator('[data-testid="opportunity-empty"]').count(), 1);
@@ -218,7 +233,7 @@ async function main() {
     const globalSearch = page.locator('[data-testid="global-search"]');
     await globalSearch.fill("2330");
     await page.locator('[data-testid="global-search-results"] .symbol-search-result').filter({ hasText: "2330" }).first().click();
-    assert.equal(await page.locator(".page-title").innerText(), "Company");
+    assert.equal(await page.locator(".page-title").innerText(), "公司研究");
     await page.locator('[data-testid="kline-chart"]').waitFor();
     assert.equal(await page.locator('[data-testid="kline-period-label"]').innerText(), "1D");
     assert.equal(await page.locator('[data-testid="kline-chart"] canvas').count() > 0, true);
@@ -282,7 +297,7 @@ async function main() {
 
     // Watchlist: the primary work surface.
     await page.locator('[data-action="section"][data-section="watchlist"]').first().click();
-    assert.equal(await page.locator(".page-title").innerText(), "Watchlist");
+    assert.equal(await page.locator(".page-title").innerText(), "自選清單");
     await page.locator('[data-testid="watchlist-toolbar"]').waitFor();
     assert.equal(await page.locator('[data-testid="watchlist-empty"]').count(), 1);
     assert.equal(await page.locator('[data-testid="data-update-panel"]').count(), 1);
@@ -362,7 +377,7 @@ async function main() {
 
     // Valuation is now its own page, not a card buried under the chart.
     await page.locator('[data-action="section"][data-section="valuation"]').first().click();
-    assert.equal(await page.locator(".page-title").innerText(), "Valuation");
+    assert.equal(await page.locator(".page-title").innerText(), "估值");
     await page.locator('[data-testid="valuation-panel"]').waitFor();
     assert.equal(await page.locator('[data-testid="valuation-empty"]').count(), 1);
     // Evaluating before a worksheet exists must say why, not do nothing: this
@@ -428,7 +443,7 @@ async function main() {
     // Buy Plan and Review are declared but not yet built; they must say so
     // rather than render a fake surface.
     await page.locator('[data-action="section"][data-section="buyplan"]').first().click();
-    assert.equal(await page.locator(".page-title").innerText(), "Buy Plan");
+    assert.equal(await page.locator(".page-title").innerText(), "買進計畫");
     await page.locator('[data-testid="buyplan-form"]').waitFor();
     // Tranche prices come from the valuation ladder, not from the market price.
     assert.equal(await page.locator('[data-testid="buyplan-tranche"]').count(), 4);
@@ -451,7 +466,7 @@ async function main() {
       animations: "disabled",
     }));
     await page.locator('[data-action="section"][data-section="review"]').first().click();
-    assert.equal(await page.locator(".page-title").innerText(), "Review");
+    assert.equal(await page.locator(".page-title").innerText(), "投資審查");
     await page.locator('[data-testid="review-form"]').waitFor();
     assert.equal(await page.locator('[data-testid="review-history-empty"]').count(), 1);
     // Every question must be answered before a review can be recorded.
@@ -483,7 +498,7 @@ async function main() {
 
     page.once("dialog", (dialog) => dialog.accept());
     await page.locator('[data-action="reset"]').click();
-    assert.equal(await page.locator(".page-title").innerText(), "Home");
+    assert.equal(await page.locator(".page-title").innerText(), "首頁");
 
     // The watchlist command area owns the responsive contract, so measure it on
     // its own page rather than on Home.
@@ -508,6 +523,25 @@ async function main() {
       assert.equal(responsive[responsive.length - 1].scrollWidth <= responsive[responsive.length - 1].innerWidth, true);
     }
     await page.setViewportSize({ width: 1440, height: 900 });
+
+    // Dark is the primary appearance, so it carries its own pixel baseline:
+    // the contrast audit checks colour and cannot see layout breaking.
+    await page.locator('[data-action="section"][data-section="settings"]').first().click();
+    await page.locator('[data-testid="theme-dark"]').click();
+    assert.equal(await page.evaluate(() => document.documentElement.getAttribute("data-theme")), "dark");
+    for (const section of ["home", "watchlist", "company", "valuation", "buyplan", "review"]) {
+      await page.locator(`[data-action="section"][data-section="${section}"]`).first().click();
+      await settle(page);
+      screenshots[`${section}_dark`] = screenshotHash(await page.screenshot({
+        path: path.join(SCREENSHOT_DIR, `${section}-dark.png`),
+        fullPage: true,
+        animations: "disabled",
+      }));
+    }
+    await page.locator('[data-action="section"][data-section="settings"]').first().click();
+    await page.locator('[data-testid="theme-light"]').click();
+    assert.equal(await page.evaluate(() => document.documentElement.getAttribute("data-theme")), null);
+
     assert.deepEqual(browserErrors, []);
     assert.deepEqual(externalRequests, []);
 

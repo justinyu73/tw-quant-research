@@ -29,19 +29,18 @@ const BREAKPOINTS = [
   { width: 390, height: 844 },
 ];
 
-// Sidebar sections in dashboard-core.js SECTIONS order (user-facing list).
+// Sections in dashboard-core.js SECTIONS order (user-facing list).
 // `title` is the rendered .page-title text; it differs from the nav label for
 // the evidence section (nav 資料來源 → title 資料與證據, see app.js mainMarkup).
 const VIEWS = [
-  { id: "overview", label: "市場首頁" },
-  { id: "market", label: "行情分析", ready: '[data-testid="kline-chart"]' },
-  { id: "products", label: "我的自選" },
-  { id: "features", label: "技術指標" },
-  { id: "research", label: "因子與公式" },
-  { id: "fundamentals", label: "財務追蹤" },
-  { id: "backtest", label: "驗證報告" },
-  { id: "stories", label: "研究筆記" },
-  { id: "evidence", label: "資料來源", title: "資料與證據" },
+  { id: "home", label: "首頁" },
+  { id: "watchlist", label: "自選清單" },
+  { id: "company", label: "公司研究", ready: '[data-testid="kline-chart"]' },
+  { id: "valuation", label: "估值", ready: '[data-testid="valuation-panel"]' },
+  { id: "buyplan", label: "買進計畫" },
+  { id: "review", label: "投資審查" },
+  // Not primary navigation; reached from the top strip's utility cluster.
+  { id: "evidence", label: "資料來源" },
   { id: "settings", label: "設定" },
 ];
 
@@ -251,7 +250,7 @@ async function main() {
         const expectedTitle = view.title || view.label;
         process.stderr.write(`[audit] ${bp.width}px ${view.id}\n`);
         try {
-          await page.locator(`.sidebar-nav [data-action="section"][data-section="${view.id}"]`).first().click();
+          await page.locator(`[data-action="section"][data-section="${view.id}"]`).first().click();
           await page.waitForFunction((title) => {
             const el = document.querySelector(".page-title");
             return el && el.textContent.trim() === title;

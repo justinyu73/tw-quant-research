@@ -3,7 +3,9 @@
   "private": true,
   "description": "Browser smoke tooling for the read-only dashboard preview",
   "scripts": {
-    "dashboard:browser-smoke": "node scripts/dashboard-browser-smoke.cjs"
+    "dashboard:browser-smoke": "node scripts/dashboard-browser-smoke.cjs",
+    "dashboard:dark-audit": "node scripts/dashboard-dark-audit.cjs",
+    "dashboard:rwd-audit": "node scripts/dashboard-rwd-audit.cjs"
   },
   "devDependencies": {
     "playwright-core": "1.60.0"

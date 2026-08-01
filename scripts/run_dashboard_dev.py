@@ -30,7 +30,7 @@ from build_dashboard_preview import build_preview, build_view  # noqa: E402
 
 ASSETS = ("index.html", "dashboard-core.js", "app.js", "styles.css", "lightweight-charts.js", "tqr-logo.svg")
 REQUIRED_APP_MARKUP = (
-    'class="sidebar"',
+    'class="topnav"',
     'class="topbar system-topbar"',
     'class="page-wrapper"',
     'class="card',
@@ -42,7 +42,7 @@ REQUIRED_APP_MARKUP = (
     'data-testid="data-update-panel"',
 )
 REQUIRED_CSS_SELECTORS = (
-    ".sidebar",
+    ".topnav",
     ".topbar",
     ".page-wrapper",
     ".card",

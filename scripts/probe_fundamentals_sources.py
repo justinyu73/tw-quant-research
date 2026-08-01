@@ -65,7 +65,7 @@ PERIOD_KEYS = ["資料年月", "年度", "季別", "Year", "Season"]
 IMPLEMENTATION = {
     "normalization": "src/tw_quant_engine/fundamentals.py",
     "capture": "scripts/capture_fundamentals.py",
-    "markets": {"TWSE": "live_proven", "TPEx": "offline_proven_live_capture_owed"},
+    "markets": {"TWSE": "live_proven", "TPEx": "live_proven"},
     "families": ["monthly_revenue", "income_statement", "balance_sheet"],
     "column_mapping_is_per_family": True,
     "tpex_balance_sheet_totals": {"資產總計": "assets", "負債總計": "liabilities", "權益總計": "equity"},
@@ -168,7 +168,7 @@ def main() -> int:
     records = [probe(*candidate) for candidate in CANDIDATES]
     contract = {
         "schema": "tqr-fundamentals-source-contract/v1",
-        "status": "twse_live_proven_tpex_offline_proven_forward_accumulation",
+        "status": "twse_and_tpex_live_proven_forward_accumulation",
         "purpose": "Record what the candidate endpoints measurably return. Admission and enablement decisions live in the doc this points at.",
         "license": {
             "id": "government-data-open-license-v1",
