@@ -1,11 +1,11 @@
 <!-- This file is the single mutable state cursor. History = git log -p CURSOR.md -->
 # Cursor
 
-last_commit: e108601
+last_commit: b133209
 branch: main
-last_stage: PR #27／#28 已 merge；dev 驗證 11/11；桌面版在 WSL 建置並啟動成功
+last_stage: v0.3.1 已切版並打 tag；#26/#27/#28/#29/#30 全部 merge；dev 驗證 11/11
 status: PARTIAL
-next_action: v0.3.0 Draft 維持不發佈。macOS 桌面版人為複測四個修正（清單見下）
+next_action: 等 desktop-release 產出 v0.3.1 Draft，裝到 Mac 上人為複測四個修正（清單見下）
 open_questions:
   - sparkline 已實作但畫不出線：各指標只有 1 期，需累積 2 期以上才會出現（刻意不補值）
   - :focus 與 disabled 兩種互動態仍無任何閘覆蓋（hover 已納入 dark-audit）
@@ -254,6 +254,28 @@ IA 從六個區段變七個。`PRIMARY_SECTION_IDS` 與 browser-smoke 的「恰�
 3. **sr-only 標籤被 RWD 稽核判成 clipped**（clientWidth 1 / scrollWidth 50）——正是這個
    repo 之前踩過的同一個形狀。標的列有自己一列、有空間，標籤就正常畫出來，不藏。
 
+
+## v0.3.1 切版（2026-08-03）
+
+JY 的桌面版停在 v0.3.0，main 已領先 14 個 commit——desktop-release 只有 push `v*` tag
+才觸發，不開 tag 就沒有新安裝檔。改 `tauri.conf.json` 版本字串（v0.3.0 當初也只改這個
+檔）→ PR #30 → merge → 打 `v0.3.1` tag。
+
+**已知會失敗的一步**：v0.3.0 那次 desktop-release 的 `release` job 是紅的，失敗步驟是
+「Assemble and upload latest.json for the in-app updater」。三個 build job（macOS Intel／
+Apple Silicon／Windows）都綠，Draft 裡的 dmg、app.tar.gz、.sig、SHA256SUMS 都有上傳成功。
+所以**安裝檔拿得到、in-app updater 的 manifest 是壞的**，v0.3.1 預期會重演同一個失敗。
+那是獨立缺陷，尚未處理。
+
+### 桌面版要人為複測的三件事（WSL 驗不到，要 macOS 的 WKWebView）
+
+1. 技術指標頁，搜尋框打 `2317` 按 **Enter** → 圖、標題、輸入框三者要同時變成鴻海
+2. 打了代號**不按 Enter**，直接點【期間】或任何按鈕 → 那一下不能被吃掉
+   （第一版就是壞在這：change 在 mousedown 與 mouseup 之間重繪，click 永遠不成立）
+3. 選一檔沒下載過資料的股票 → 要看到「還沒有已下載的 K 線資料」，
+   不能是「服務無法連線；請重新啟動 TQR」
+
+---
 
 ## Merge 與驗證（2026-08-03）
 
