@@ -1,11 +1,11 @@
 <!-- This file is the single mutable state cursor. History = git log -p CURSOR.md -->
 # Cursor
 
-last_commit: 4cb0b5c
-branch: chore/dead-code-and-interaction-gates
-last_stage: 拆頁完成，並把選股控件收斂成導覽列下方一條共用標的列（每頁都能換股）
+last_commit: e108601
+branch: main
+last_stage: PR #27／#28 已 merge；dev 驗證 11/11；桌面版在 WSL 建置並啟動成功
 status: PARTIAL
-next_action: v0.3.0 Draft 維持不發佈。桌面版複測（新分頁、標的列、研究提醒、估值指標磚）
+next_action: v0.3.0 Draft 維持不發佈。macOS 桌面版人為複測四個修正（清單見下）
 open_questions:
   - sparkline 已實作但畫不出線：各指標只有 1 期，需累積 2 期以上才會出現（刻意不補值）
   - :focus 與 disabled 兩種互動態仍無任何閘覆蓋（hover 已納入 dark-audit）
@@ -253,6 +253,33 @@ IA 從六個區段變七個。`PRIMARY_SECTION_IDS` 與 browser-smoke 的「恰�
    改成 `flex: 1 1 <basis>` ＋ `max-width` ＋ `min-width: 0`。
 3. **sr-only 標籤被 RWD 稽核判成 clipped**（clientWidth 1 / scrollWidth 50）——正是這個
    repo 之前踩過的同一個形狀。標的列有自己一列、有空間，標籤就正常畫出來，不藏。
+
+
+## Merge 與驗證（2026-08-03）
+
+PR #27、#28 都已 merge 到 main（`e108601`）。
+
+**merge #27 時漏掉一個 commit**：`gh pr merge` 取到的 head 停在 `184a9e4`，共用標的列
+那個 commit（本機 `36e0d7f`）沒有進去，雖然它已經 push 且 CI 綠過。事後用
+`git merge-base --is-ancestor` 才發現。重新開 PR #28 補上。**merge 之後要驗最後一個
+commit 真的在 main 上，不能只看 PR 顯示 merged。**
+
+### dev 驗證（5173，合併後的 bundle）11/11
+
+導覽七項順序 ／ 標的列在九個區段都在 ／ 公司財務指標資料在判斷之前 ／ 在該頁換股不被踢走 ／
+缺陷#1 畫布＝標題＝輸入框（360 根/收 2440）／ 期間鍵不踢頁 ／ 缺陷#2 顯示「已在自選清單」／
+缺陷#3 自選下拉可換股 ／ 缺陷#4 訊息正確且只打 1 次請求 ／ 研究提醒建立＋評估觸發事件 ／
+估值指標磚算完有數字（0.975 / 96.67% / 2.74%）。零 page/console 錯誤。
+
+### 桌面版（WSL）
+
+`cargo build` 53 秒完成，直接執行 `target/debug/tw-quant-engine-desktop`：視窗啟動、
+bundled sidecar 起來（`instruments=2300`）、跑滿 30 秒無 panic（log 裡唯一的 error 是
+WSLg 的 MESA/GPU 雜訊）。載入的正是 `outputs/dashboard-preview`，與 5173 驗過的同一份。
+
+**但這不等於複測完成**：WSL 是 WebKitGTK，JY 原始回報來自 macOS 的 WKWebView；而且這裡
+沒有截圖工具、也沒有可用的方式驅動該 webview。四個修正的行為複測仍要在他的 Mac 上做，
+重點是「打字代號按 Enter」與「打字後直接點期間／別的按鈕」這兩個對事件順序有依賴的動作。
 
 ---
 
