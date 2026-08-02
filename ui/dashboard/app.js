@@ -1744,6 +1744,12 @@
       '<div class="alert-toolbar"><button class="btn btn-primary btn-sm" type="button" data-action="valuation-evaluate" data-testid="valuation-evaluate"' + (valuationEvaluateInFlight ? " disabled" : "") + '>' + (valuationEvaluateInFlight ? "計算中…" : "計算合理價值與買進區間") + '</button>' +
       (evaluateBlocker ? '<span class="muted" data-testid="valuation-evaluate-hint">' + text(evaluateBlocker) + '</span>' : "") + '</div>' +
       statusMarkup +
+      // Computed on every evaluate; without this row the round trip happened
+      // and the three numbers were never shown to anyone.
+      '<div class="valuation-indicator-row" data-testid="valuation-indicator-row">' +
+      valuationIndicatorTile("zscore", "價格 Z 分數", "收盤價相對近 N 日均值的標準差距離") +
+      valuationIndicatorTile("price_percentile", "價格分位", "收盤價在近 N 日區間的位置") +
+      valuationIndicatorTile("ma_deviation", "MA 乖離", "收盤價相對 N 日均線的偏離幅度") + '</div>' +
       '<div class="valuation-result-list" data-testid="valuation-result-list">' + results.map(valuationResultCard).join("") + '</div>' +
       '<p class="valuation-note">所有 EPS 與本益比都是使用者假設（draft），不是官方資料、市場共識或法人預估。到價只提示，不給買賣建議；最後決策保留人工。官方基本面欄位仍等待來源准入，不會自動帶入，也不會因股價下跌自動下修 EPS。</p></section>';
   }
@@ -2021,7 +2027,10 @@
       card("基本面快照", "已擷取期別的核心財報欄位", fundamentalSnapshotMarkup(), "") +
       card("研究狀態", "產業、基本面、投資假設與下一個事件；驅動 Watchlist 與 Home", companyStatusMarkup(), "") +
       card("趨勢表", "最近 8 季與最近 12 個月", trendTableMarkup(), "") +
-      card("價格參考", "歷史價格位置 · 前高前低 · 回檔幅度；不參與價值判斷", klineMarkup(), "");
+      card("價格參考", "歷史價格位置 · 前高前低 · 回檔幅度；不參與價值判斷", klineMarkup(), "") +
+      // The alerts panel lost its host when the products page was retired. It
+      // belongs here: the form builds a condition for the selected stock.
+      alertsMarkup();
   }
 
   function fundamentalsFor(securityId) {

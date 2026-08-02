@@ -53,3 +53,5 @@ jobs:
         run: npm run dashboard:dark-audit
       - name: Run responsive audit (6 breakpoints x 8 views)
         run: npm run dashboard:rwd-audit
+      - name: Run alerts / form-feedback smoke
+        run: npm run dashboard:alerts-smoke

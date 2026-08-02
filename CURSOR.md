@@ -3,16 +3,15 @@
 
 last_commit: 4cb0b5c
 branch: chore/dead-code-and-interaction-gates
-last_stage: PR #26 已 merge（四缺陷 + 三者一致閘）；本段清死碼、補 focus/disabled 閘、把兩個稽核接進 CI
+last_stage: 清死碼、補 focus/disabled 閘、四個稽核／smoke 全部接進 CI；兩個孤兒功能接回頁面
 status: PARTIAL
-next_action: v0.3.0 Draft 維持不發佈。alertsMarkup / valuationIndicatorTile 兩個孤兒功能等 JY 決定：刪或接回
+next_action: v0.3.0 Draft 維持不發佈。桌面版複測（含新接回的研究提醒與估值指標）
 open_questions:
   - sparkline 已實作但畫不出線：各指標只有 1 期，需累積 2 期以上才會出現（刻意不補值）
   - :focus 與 disabled 兩種互動態仍無任何閘覆蓋（hover 已納入 dark-audit）
   - 桌面版（WKWebView）尚未複測這四個修正；瀏覽器預覽 5173 已逐項量到
-  - 死碼已清（見下節）。剩兩個「孤兒功能」未決：alertsMarkup（整套 in-app 警示 UI）
-    與 valuationIndicatorTile（價格分位／MA 乖離磚）——狀態、handler、持久化都還活著，
-    只是任何一頁都渲染不出來。刪掉還是接回是產品決定，不是清理決定
+  - 估值引擎的欄位級拒絕訊息，目前沒有從 UI 可達的無效輸入可以觸發（表單先擋掉了），
+    所以「引擎拒絕逐字顯示」這條性質沒有閘覆蓋；alerts smoke 裡那個舊檢查已移除並註明原因
   - styles.css 還有約 100 個沒有 markup 產生的 class 未清（本次只刪掉能證明成對的那些）
   - 「抓不到股票代碼」原因未明：JY 回報 Mac 端 curl 8767 有跑通，所以不是轉埠問題
   - 免費官方是否存在財報歷史序列來源，或 forward accumulation 是唯一路徑
@@ -148,6 +147,53 @@ focus 閘第一次「證明會紅」失敗了：拿掉 outline 之後稽核照�
 兩個稽核都補上 bundle 指紋比對：抓 `styles.css` / `app.js` / `dashboard-core.js`，
 sha256 對不上 repo 來源就直接 throw，並把指紋寫進報告。這跟先前「閘看起來上線了、
 讀它的那一端沒接上」是同一個形狀，只是這次是**閘自己讀錯了對象**。
+
+
+## 孤兒功能接回（`chore/dead-code-and-interaction-gates`）
+
+JY 決定：兩個都接回，不刪。
+
+### 確認方式：直接跑那支從來沒人跑的 smoke
+
+`scripts/dashboard-alerts-smoke.cjs` 卡在 `[data-section="products"]`——IA 改版裁掉的頁面。
+所以警示 UI 不是沒寫完，是**整套寫完了、頁面被刪掉**：JS 16 + 6 個函式、6 個 reducer 事件、
+19 條 CSS、`src-tauri/src/alerts.rs` 172 行與兩個註冊指令、sidecar `/alerts`、
+`tests/test_p6_in_app_alerts.py` 229 行、`dashboard-core.test.cjs` 的 in-app-alerts 段——
+全都活著，只差一個掛的地方。刪要動四層千餘行，接回只要幾行。
+
+- **研究提醒**掛回 `companyPageMarkup()`：表單本來就是對「目前選取的個股」建條件，
+  公司研究頁是它的語意歸屬。不動 IA 的六個主要區段，導覽契約不變。
+- **估值指標磚**（Z 分數／價格分位／MA 乖離）插回 `valuationMarkup()`。這三個值
+  **本來每次按「計算」都在算**，只是算完沒有任何地方顯示——來回跑完整趟然後丟掉。
+
+實測：建立提醒 → 1 筆定義；按「立即評估」→ 觸發 1 筆事件；零 console error。
+
+### alerts smoke 腐爛的四個地方
+
+它從來沒進 CI，所以對著三次產品變更爛了四處：
+
+1. `products` / `market` 兩個已裁掉的區段選擇器 → 改指 `watchlist` / `company` / `valuation`
+2. 自選加入提示「按鈕 disabled 時就要可見」——現行行為是**刻意**改成「使用者碰了搜尋框才顯示」
+   （成功加入後立刻跳警告讀起來像錯誤）。改成斷言兩段：到站時隱藏、碰過搜尋框後出現
+3. `預估 EPS` 的錯誤字串已變成 Bear／Base／Bull 三情境
+4. `terminal-watchlist-add` 檢查的是本段刪掉的死碼 → 移除
+
+`engine_rejection_shown_verbatim` **移除並註明原因**：它 seed 的是股利折現模型
+（discount_rate／growth_rate），估值早就換成情境模型，等於在斷言一個不存在的契約。
+現行 UI 沒有可達的無效輸入能觸發引擎端拒絕（表單先擋掉了），列為 open question，
+不留一個假綠的檢查。
+
+### 這支 smoke 會砸掉 5173 的 dev bundle
+
+它把預覽建進 `outputs/dashboard-preview/`，並把**自己那次的隨機 sidecar 埠**烤進
+index.html。跑完之後 JY 開著的 5173 就指向一個已經關掉的埠，畫面看起來像 sidecar 掛了。
+本段除錯時就中招一次：所有搜尋都回「找不到符合的商品」。改成建進 `mkdtempSync` 暫存目錄——
+`dashboard-browser-smoke.cjs` 早就有這個註解與作法，這支沒跟上。
+
+### 四個瀏覽器閘現在都在 CI
+
+`browser-smoke` / `dark-audit` / `rwd-audit` / `alerts-smoke`。
+company 與 valuation 四張 pixel 基準線因為多了兩塊 UI 而重釘，其餘八張逐位元不變。
 
 ---
 

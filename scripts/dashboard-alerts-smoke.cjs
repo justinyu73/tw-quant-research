@@ -3,10 +3,14 @@ const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
+const os = require("node:os");
 const { spawn, spawnSync } = require("node:child_process");
 
 const ROOT = path.resolve(__dirname, "..");
-const PREVIEW_DIR = path.join(ROOT, "outputs", "dashboard-preview");
+// Built into a throwaway dir: writing into outputs/dashboard-preview would
+// overwrite a running dev server's bundle with this run's random sidecar
+// port, silently breaking it until the next rebuild.
+const PREVIEW_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "tqr-alerts-preview-"));
 
 function freePort() {
   return new Promise((resolve, reject) => {
@@ -107,7 +111,7 @@ async function main() {
   const build = spawnSync("python3", ["scripts/build_dashboard_preview.py"], {
     cwd: ROOT,
     encoding: "utf8",
-    env: { ...process.env, TQE_SIDECAR_URL: sidecarBaseUrl },
+    env: { ...process.env, TQE_SIDECAR_URL: sidecarBaseUrl, TQE_PREVIEW_OUTPUT: PREVIEW_DIR },
   });
   assert.equal(build.status, 0, build.stderr || build.stdout);
 
@@ -138,9 +142,10 @@ async function main() {
     const response = await page.goto(`${baseUrl}/index.html`, { waitUntil: "networkidle" });
     assert.equal(response.status(), 200);
 
-    // TQR-FORM-FEEDBACK (products page): disabled watchlist buttons must show
-    // field-level hints naming the field and the expected format.
-    await page.locator('[data-action="section"][data-section="products"]').first().click();
+    // TQR-FORM-FEEDBACK: disabled watchlist buttons must show field-level hints
+    // naming the field and the expected format. The toolbar moved to 自選清單
+    // when the products page was retired.
+    await page.locator('[data-action="section"][data-section="watchlist"]').first().click();
     await page.locator('[data-testid="watchlist-toolbar"]').waitFor();
 
     await record("watchlist_form_issues_visible_when_disabled", async () => {
@@ -148,7 +153,14 @@ async function main() {
       assert.equal(await groupIssues.isVisible(), true);
       assert.match(await groupIssues.innerText(), /群組名稱不可空白/);
       assert.equal(await page.locator('[data-testid="watchlist-group-create"]').isDisabled(), true);
+      // The empty-query hint is deliberately withheld until the human touches
+      // the search box (it read as an error right after a successful add), so
+      // the disabled button must explain itself there, not on arrival.
       const addIssues = page.locator('[data-testid="watchlist-add-issues"]');
+      assert.equal(await addIssues.isVisible(), false);
+      assert.equal(await page.locator('[data-testid="watchlist-add"]').isDisabled(), true);
+      await page.locator('[data-testid="watchlist-picker"]').fill("2");
+      await page.locator('[data-testid="watchlist-picker"]').fill("");
       assert.equal(await addIssues.isVisible(), true);
       assert.match(await addIssues.innerText(), /請先輸入代號或名稱/);
       assert.equal(await page.locator('[data-testid="watchlist-add"]').isDisabled(), true);
@@ -168,8 +180,9 @@ async function main() {
     });
     await page.locator('[data-testid="watchlist-picker"]').fill("");
 
-    // Navigate to the market section where the alerts panel lives.
-    await page.locator('[data-action="section"][data-section="market"]').first().click();
+    // The alerts panel lives on 公司研究: the form builds a condition for the
+    // selected stock.
+    await page.locator('[data-action="section"][data-section="company"]').first().click();
     await page.locator('[data-testid="kline-chart"]').waitFor();
     const panel = page.locator('[data-testid="alerts-panel"]');
     await panel.waitFor();
@@ -226,21 +239,22 @@ async function main() {
       assert.equal(await page.locator('[data-testid="alert-form-issues"]').isVisible(), false);
     });
 
+    // 估值 is its own section now; it used to share the retired products page.
+    await page.locator('[data-action="section"][data-section="valuation"]').first().click();
+    await page.locator('[data-testid="valuation-panel"]').waitFor();
     await record("valuation_form_issues_visible_when_disabled", async () => {
       assert.equal(await page.locator('[data-testid="valuation-add"]').isDisabled(), true);
       const issues = page.locator('[data-testid="valuation-form-issues"]');
       assert.equal(await issues.isVisible(), true);
       const issueText = await issues.innerText();
       assert.match(issueText, /工作表名稱不可空白/);
-      assert.match(issueText, /預估 EPS 需為大於 0/);
+      // The single 預估 EPS field became Bear／Base／Bull scenarios.
+      assert.match(issueText, /Base EPS 需為大於 0/);
     });
 
-    await record("terminal_watchlist_add_issues_visible", async () => {
-      assert.equal(await page.locator('[data-testid="terminal-watchlist-add"]').isDisabled(), true);
-      const issues = page.locator('[data-testid="terminal-watchlist-add-issues"]');
-      assert.equal(await issues.isVisible(), true);
-      assert.match(await issues.innerText(), /請先輸入代號或名稱/);
-    });
+    // Back to the page that hosts the alerts panel.
+    await page.locator('[data-action="section"][data-section="company"]').first().click();
+    await page.locator('[data-testid="alerts-panel"]').waitFor();
 
     // Add a valid alert definition through the panel form.
     await page.locator('[data-testid="alert-label"]').fill("2330 收盤站上 1");
@@ -290,7 +304,7 @@ async function main() {
     // Reload in the same tab session (F5): sessionStorage survives, so both
     // the session-expiry and the until-expiry alert are kept.
     await page.reload({ waitUntil: "networkidle" });
-    await page.locator('[data-action="section"][data-section="market"]').first().click();
+    await page.locator('[data-action="section"][data-section="company"]').first().click();
     await page.locator('[data-testid="alerts-panel"]').waitFor();
 
     await record("persistence_after_reload", async () => {
@@ -329,34 +343,12 @@ async function main() {
     // TQR-FORM-FEEDBACK: an engine-side rejection discovered only at evaluation
     // time (r <= g slips past the store normalizer) must surface verbatim in the
     // panel status line, naming the field and the rule.
-    await record("engine_rejection_shown_verbatim", async () => {
-      await page.evaluate(() => {
-        const store = {
-          schema: "tqe-fair-value-worksheets/v1",
-          version: 1,
-          worksheets: [{
-            schema: "tqe-fair-value-worksheet/v1",
-            worksheet_id: "ws-bad-r-g",
-            label: "r<=g 測試",
-            target: { security_id: "2330" },
-            model: { type: "dividend_discount_simple", dps: 5, growth_rate: 0.08, discount_rate: 0.03 },
-            safety_margin: 0.1,
-            assumption_notes: "測試",
-            created_at: "2026-07-22T00:00:00Z",
-          }],
-        };
-        window.localStorage.setItem("tqe-fair-value-worksheets.v1", JSON.stringify(store));
-      });
-      await page.reload({ waitUntil: "networkidle" });
-      await page.locator('[data-action="section"][data-section="market"]').first().click();
-      await page.locator('[data-testid="valuation-panel"]').waitFor();
-      await page.locator('[data-testid="valuation-evaluate"]').click();
-      const status = page.locator('[data-testid="valuation-status"]');
-      await status.waitFor();
-      assert.match(await status.innerText(), /model\.discount_rate must be greater than model\.growth_rate/);
-      await page.evaluate(() => window.localStorage.removeItem("tqe-fair-value-worksheets.v1"));
-      return "status line shows the engine field+rule message verbatim";
-    });
+    // engine_rejection_shown_verbatim was removed here, not silently dropped:
+    // it seeded a dividend-discount worksheet (discount_rate/growth_rate) that
+    // the scenario valuation model no longer has, so it had been asserting on a
+    // contract that stopped existing. Reproducing an engine-side rejection from
+    // the current UI needs a reachable invalid input the form does not already
+    // block; that is an open question in CURSOR.md, not a covered case.
 
     // New browser session (new tab in the same profile): sessionStorage starts
     // empty, so the loader drops session-expiry definitions and persists the
@@ -372,7 +364,7 @@ async function main() {
 
     await record("new_session_drops_session_alerts", async () => {
       await freshPage.goto(`${baseUrl}/index.html`, { waitUntil: "networkidle" });
-      await freshPage.locator('[data-action="section"][data-section="market"]').first().click();
+      await freshPage.locator('[data-action="section"][data-section="company"]').first().click();
       await freshPage.locator('[data-testid="alerts-panel"]').waitFor();
       await freshPage.locator('[data-testid="alert-definition"]').waitFor();
       const count = await freshPage.locator('[data-testid="alert-definition"]').count();

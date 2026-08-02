@@ -15,17 +15,17 @@ const PREVIEW_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "tqr-preview-"));
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
   home: "501188a28a0a7cea992c6d9b8a007f6f4060e90288eec87f92dae2243f15dd9f",
-  company: "fb2c59ef31462fc64ad4a1e2f9b7a8e05bdb444b14e741bdd1b4bf7e902a9ac4",
+  company: "f8708c03c70a27c7563a39fb3716d9cd794759fc6982cac2a1e1343452af9788",
   watchlist: "55118d10f0276bdb25821665c3fac88e7e998588d3b4e76b39d11df677d47027",
   buyplan: "1c6db2b33e1345d5215f4f554c87843796ca73eb8ffbd6ea8c6bbea9432fac95",
   review: "39f2dde16ab38678f8e0af39e5051fa3cf9f80eab3fa96651745e92136b7a301",
-  valuation: "eda72102b9a4aee1147c3fcc6a98ace68638a345d7c83711db31a9c05a3102d4",
+  valuation: "79fe388cfb061986eed5106f7b0dcf72e05ae75e90795479f02a5d935ccd0e3e",
   // Dark is the primary appearance and carries its own baselines; an empty
   // value here keeps the gate red until a human has looked at the capture.
   home_dark: "59a7e13895cf57df819173dbcc67988b8615135f6db13584e1248daa705a8243",
   watchlist_dark: "07c494a0a228e68a8dfe9e3439928cf028cbdcfe4744297f91edd2f3f565bcf7",
-  company_dark: "38a05c549b3dbc471126bb59bd40360e7ba93c6380b79448f0a3c79025d8e156",
-  valuation_dark: "cf8c3eb4f6871201524641aac6ab5a450b6c26f696d4d0cb010f7bc7f07d8596",
+  company_dark: "38ba17dd9e1ea4f270bf06df3560f866beec0376718dc024e44f19b0628cb413",
+  valuation_dark: "b6dea75bb627785efa86a61e4ea184a87219d514ff5d22f4e27b16c8f5e327ce",
   buyplan_dark: "41311281b02d2d9c2b8ff516517c0cc4c445f71b64c9ceb848cb4dcdfdd19651",
   review_dark: "7ebc342c8bad0a330334d6288ecde8cf2658f8ea8829b82f8e2c090b6ce62546",
 };
