@@ -14,20 +14,22 @@ const ROOT = path.resolve(__dirname, "..");
 const PREVIEW_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "tqr-preview-"));
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
-  home: "501188a28a0a7cea992c6d9b8a007f6f4060e90288eec87f92dae2243f15dd9f",
-  company: "f8708c03c70a27c7563a39fb3716d9cd794759fc6982cac2a1e1343452af9788",
-  watchlist: "55118d10f0276bdb25821665c3fac88e7e998588d3b4e76b39d11df677d47027",
-  buyplan: "1c6db2b33e1345d5215f4f554c87843796ca73eb8ffbd6ea8c6bbea9432fac95",
-  review: "39f2dde16ab38678f8e0af39e5051fa3cf9f80eab3fa96651745e92136b7a301",
-  valuation: "79fe388cfb061986eed5106f7b0dcf72e05ae75e90795479f02a5d935ccd0e3e",
+  home: "fa9a7321cbcb093326b9dc3628f0ebe63dcdcc76daabaa164d398a7f1e84459d",
+  company: "f17c09efe8b465c798cd77b8c92a01d12ea340a67a146c4b4b658d6d4d6b71fc",
+  technical: "55c04f2b5f2cf21394f1370c8af1f1cbf55260d44dc29969e90638ec895f3d97",
+  watchlist: "53a2b53ebbd30b81e27d71cdfa0785d6ff678f350f21e22f432cbd90aae0700b",
+  buyplan: "4bab958427e2ee554c536acb7020d8305676f6f8e06d06490f43950973fdaefd",
+  review: "f99f438acedd5d1da5a375819fd2b16f053345b7988201347cbeb6337f55428d",
+  valuation: "74a38b2b103629c2f4cfb9d77e4a2378e97646b0d22f20e2c2a0c0a466bf0e49",
   // Dark is the primary appearance and carries its own baselines; an empty
   // value here keeps the gate red until a human has looked at the capture.
-  home_dark: "59a7e13895cf57df819173dbcc67988b8615135f6db13584e1248daa705a8243",
-  watchlist_dark: "07c494a0a228e68a8dfe9e3439928cf028cbdcfe4744297f91edd2f3f565bcf7",
-  company_dark: "38ba17dd9e1ea4f270bf06df3560f866beec0376718dc024e44f19b0628cb413",
-  valuation_dark: "b6dea75bb627785efa86a61e4ea184a87219d514ff5d22f4e27b16c8f5e327ce",
-  buyplan_dark: "41311281b02d2d9c2b8ff516517c0cc4c445f71b64c9ceb848cb4dcdfdd19651",
-  review_dark: "7ebc342c8bad0a330334d6288ecde8cf2658f8ea8829b82f8e2c090b6ce62546",
+  home_dark: "dd34b5b8ea81fe08ada57a9f62fa67ff75d43b978e96ec32361d2f1f9af34c95",
+  watchlist_dark: "dbc6ab39cd7425161aa146c5de53783f97b25c64c1c4932c480d19a338917c60",
+  company_dark: "bddeed52f10b53dd554e0ec24441088441b529735f9d044011383a1a59b2a1a8",
+  technical_dark: "a503f5de95f2d9ccac9d799c7a08650216540c4cbdcb3b161cc5332e22cd0fc1",
+  valuation_dark: "27e58be4a46777e1c3525dc0003f70711de15d0e6be36038afd1d23a0dc8b607",
+  buyplan_dark: "bfeec1636d404529dc572813cc749e6dfe48d0001af88ee1ae16ce337ee59d9d",
+  review_dark: "be8dc7e51b9b6412e9252055922634b9d3aae107003fe7c61a1b42fc5bff67ba",
 };
 
 function freePort() {
@@ -286,11 +288,11 @@ async function main() {
     assert.equal(await page.locator(".card").count() > 0, true);
     assert.equal(await page.locator(".read-only-pill").innerText(), "研究唯讀");
 
-    // IA contract: exactly the six primary value-research sections, in order.
-    assert.equal(await page.locator(".topnav .nav-link").count(), 6);
+    // IA contract: exactly the seven primary value-research sections, in order.
+    assert.equal(await page.locator(".topnav .nav-link").count(), 7);
     assert.deepEqual(
       await page.locator(".topnav .nav-link").allInnerTexts(),
-      ["首頁", "自選清單", "公司研究", "估值", "買進計畫", "投資審查"],
+      ["首頁", "自選清單", "公司財務指標", "技術指標", "估值", "買進計畫", "投資審查"],
     );
     for (const removed of ["research", "backtest", "features", "products", "market", "fundamentals", "stories", "overview"]) {
       assert.equal(await page.locator(`.topnav [data-section="${removed}"]`).count(), 0, `retired section still in nav: ${removed}`);
@@ -310,15 +312,19 @@ async function main() {
       animations: "disabled",
     }));
 
-    // Company: quote, thesis, fundamental snapshot, trend table, price reference.
+    // 公司財務指標: quote, the company's own numbers, then the judgements built
+    // on them. The chart and the alerts panel are on 技術指標.
     const globalSearch = page.locator('[data-testid="global-search"]');
     await globalSearch.fill("2330");
     await page.locator('[data-testid="global-search-results"] .symbol-search-result').filter({ hasText: "2330" }).first().click();
-    assert.equal(await page.locator(".page-title").innerText(), "公司研究");
-    await page.locator('[data-testid="kline-chart"]').waitFor();
-    assert.equal(await page.locator('[data-testid="kline-period-label"]').innerText(), "1D");
-    assert.equal(await page.locator('[data-testid="kline-chart"] canvas').count() > 0, true);
-    assert.equal(await page.locator('[data-testid="kline-instrument"]').inputValue(), "TWSE:2330");
+    assert.equal(await page.locator(".page-title").innerText(), "公司財務指標");
+    // Reading order is the point of the split: data before judgement.
+    assert.deepEqual(
+      (await page.locator(".page-wrapper .card > header h2").allInnerTexts()).slice(0, 5),
+      ["基本面快照", "研究狀態", "趨勢表", "投資假設", "研究筆記"],
+    );
+    assert.equal(await page.locator('[data-testid="kline-chart"]').count(), 0);
+    assert.equal(await page.locator('[data-testid="alerts-panel"]').count(), 0);
     assert.equal(await page.locator('[data-testid="quote-bar"] .terminal-quote-price strong').innerText(), "2,440");
     assert.equal(await page.locator('[data-testid="note-composer"]').count(), 1);
     assert.equal(await page.locator('[data-testid="thesis-form"]').count(), 1);
@@ -345,12 +351,21 @@ async function main() {
     assert.equal(await page.locator('[data-testid="trend-quarter-row"]').count(), 1);
     // Only captured periods appear; the table must not pad to 12 rows.
     assert.equal(await page.locator('[data-testid="trend-month-row"]').count(), 2);
+
+    // 技術指標: chart, technical readings, alerts.
+    await page.locator('[data-action="section"][data-section="technical"]').first().click();
+    assert.equal(await page.locator(".page-title").innerText(), "技術指標");
+    await page.locator('[data-testid="kline-chart"]').waitFor();
+    assert.equal(await page.locator('[data-testid="kline-period-label"]').innerText(), "1D");
+    assert.equal(await page.locator('[data-testid="kline-chart"] canvas').count() > 0, true);
+    assert.equal(await page.locator('[data-testid="kline-instrument"]').inputValue(), "TWSE:2330");
+    assert.equal(await page.locator('[data-testid="alerts-panel"]').count(), 1);
     assert.match(await page.locator('[data-testid="kline-coverage"]').innerText(), /360 \/ 交易日 360/);
 
     // Instrument switching: canvas == title == search box, after every commit
     // path. A research tool drawing the previous stock under the new stock's
     // name is the worst failure mode this UI has.
-    await assertChartIdentity(page, sidecarBaseUrl, catalog.instruments, "TWSE:2330", "opening the company page");
+    await assertChartIdentity(page, sidecarBaseUrl, catalog.instruments, "TWSE:2330", "opening the technical page");
 
     // Keyboard commit. Typing a code and pressing Enter used to change nothing
     // but the box, which then kept claiming 2317 over 2330's chart.
@@ -389,7 +404,15 @@ async function main() {
     // The curated watchlist has to be reachable from the chart, not only by
     // typing a code from memory.
     assert.equal(await page.locator('[data-testid="kline-watchlist-select"]').count(), 1);
+    await settle(page);
+    screenshots.technical = screenshotHash(await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, "technical.png"),
+      fullPage: true,
+      animations: "disabled",
+    }));
 
+    await page.locator('[data-action="section"][data-section="company"]').first().click();
+    await page.locator('[data-testid="note-composer"]').waitFor();
     await page.locator('[data-testid="note-title"]').fill("2330 研究觀察");
     await page.locator('[data-testid="note-body"]').fill("價格與技術線先記錄，等待下一次財報核對。");
     await page.locator('[data-testid="note-submit"]').click();
@@ -630,9 +653,12 @@ async function main() {
     // No trading, ranking, or factor-mining affordance may survive. Checked on
     // actionable controls only: a disclaimer that names 下單 is the opposite of
     // an affordance and must not fail this gate.
+    // 技術指標 was on this list and is not any more: JY named a read-only page
+    // that shows K 線 and technical readings. The prohibitions that remain are
+    // the ones about acting on a signal, not about displaying one.
     const controlLabels = await page.locator("#app button, #app a").allInnerTexts();
     for (const label of controlLabels) {
-      assert.doesNotMatch(label, /下單|送單|回測|因子|驗證報告|技術指標|AI 信心|強力買進|建議立即買進/, `retired affordance: ${label}`);
+      assert.doesNotMatch(label, /下單|送單|回測|因子|驗證報告|AI 信心|強力買進|建議立即買進/, `retired affordance: ${label}`);
     }
 
     page.once("dialog", (dialog) => dialog.accept());
@@ -668,7 +694,7 @@ async function main() {
     await page.locator('[data-action="section"][data-section="settings"]').first().click();
     await page.locator('[data-testid="theme-dark"]').click();
     assert.equal(await page.evaluate(() => document.documentElement.getAttribute("data-theme")), "dark");
-    for (const section of ["home", "watchlist", "company", "valuation", "buyplan", "review"]) {
+    for (const section of ["home", "watchlist", "company", "technical", "valuation", "buyplan", "review"]) {
       await page.locator(`[data-action="section"][data-section="${section}"]`).first().click();
       await settle(page);
       screenshots[`${section}_dark`] = screenshotHash(await page.screenshot({
@@ -687,7 +713,7 @@ async function main() {
     const errorsBeforeDataGap = browserErrors.length;
     await page.route(`${sidecarBaseUrl}/kline?instrument=${encodeURIComponent("TWSE:2317")}*`, (route) =>
       route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "kline_not_found" }) }));
-    await page.locator('[data-action="section"][data-section="company"]').first().click();
+    await page.locator('[data-action="section"][data-section="technical"]').first().click();
     await page.locator('[data-testid="kline-instrument"]').fill("2317");
     await page.locator('[data-testid="kline-instrument"]').press("Enter");
     await page.waitForFunction(() => document.querySelector('[data-testid="kline-empty"]') !== null);

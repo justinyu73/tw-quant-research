@@ -3,9 +3,9 @@
 
 last_commit: 4cb0b5c
 branch: chore/dead-code-and-interaction-gates
-last_stage: 清死碼、補 focus/disabled 閘、四個稽核／smoke 全部接進 CI；兩個孤兒功能接回頁面
+last_stage: 公司研究拆成「公司財務指標」與「技術指標」兩個分頁；主導覽七個區段
 status: PARTIAL
-next_action: v0.3.0 Draft 維持不發佈。桌面版複測（含新接回的研究提醒與估值指標）
+next_action: v0.3.0 Draft 維持不發佈。桌面版複測（新分頁、研究提醒、估值指標磚）
 open_questions:
   - sparkline 已實作但畫不出線：各指標只有 1 期，需累積 2 期以上才會出現（刻意不補值）
   - :focus 與 disabled 兩種互動態仍無任何閘覆蓋（hover 已納入 dark-audit）
@@ -194,6 +194,41 @@ index.html。跑完之後 JY 開著的 5173 就指向一個已經關掉的埠，
 
 `browser-smoke` / `dark-audit` / `rwd-audit` / `alerts-smoke`。
 company 與 valuation 四張 pixel 基準線因為多了兩塊 UI 而重釘，其餘八張逐位元不變。
+
+
+## 公司研究拆頁（JY 指定）
+
+### 動線
+
+原本順序是投資假設 → 研究筆記 → 基本面快照 → 研究狀態 → 趨勢表，**判斷排在資料前面**。
+JY 指定倒過來：先看公司自己的數字，再看建立在上面的判斷。
+
+- **公司財務指標**（原公司研究，改名）：報價列 → 基本面快照 → 研究狀態 → 趨勢表 →
+  投資假設 → 研究筆記
+- **技術指標**（新增，第 7 個主導覽區段）：報價列 → 價格參考（K 線）→ 研究提醒
+
+IA 從六個區段變七個。`PRIMARY_SECTION_IDS` 與 browser-smoke 的「恰好六個、順序固定」
+斷言同步改成七個。
+
+### 拆頁暴露出來的三個問題
+
+1. **換股票會把你踢出圖表頁**。`SELECT_KLINE_INSTRUMENT` 寫死 `activeSection: "company"`，
+   拆頁之後在技術指標頁按 Enter 換股，畫面會跳回公司財務指標、圖表消失。改成
+   「本來就在技術指標就留著，其他地方進來才落在公司財務指標」。
+2. **一個死條件被我改活之後變成無限重試**。`ensureKlineRuntime` 裡的
+   `activeSection === "market" || "features"` 指的是早就裁掉的區段，永遠不成立；
+   我把它改成 `"technical"` 之後，`/kline` 404 → `KLINE_DATA_MISSING` → render →
+   ensureKlineRuntime → 再打一次，實測 3 秒內打了 290 次。`requestKlineModel` 補上
+   「已標記為沒有資料的選擇不再重打」。**改活一個死條件跟新增一條路徑一樣要驗**。
+3. **`技術指標` 這五個字原本在退場清單裡**。browser-smoke 禁止任何按鈕／連結文字出現
+   `下單|送單|回測|因子|驗證報告|技術指標|AI 信心|強力買進|建議立即`。JY 指定的頁名撞到它，
+   已把 `技術指標` 從清單移除並註明：留下的禁令是關於「照訊號行動」，不是關於「顯示訊號」。
+   其餘八個詞不動。
+
+### 基準線
+
+十四張 pixel 基準線**全部**重釘——導覽多一個項目，每一頁的頁首都變了。這次的重釘沒有
+「其餘逐位元不變」可以當佐證，只能靠 RWD 54/54、dark-audit 0 洩漏、以及人眼。
 
 ---
 

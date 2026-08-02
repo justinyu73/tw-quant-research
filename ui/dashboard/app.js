@@ -1248,6 +1248,10 @@
     var selectedId = state.selectedKlineInstrumentId;
     var selectedPeriod = state.selectedKlinePeriod;
     if (core.selectedKline(state)) return;
+    // A selection already reported as having nothing downloaded must not be
+    // re-requested on every render; ensureKlineRuntime calls back in here after
+    // each one, which turns a single 404 into a spin.
+    if (state.klineSelectionMessage) return;
     var requestKey = selectedId + "\n" + selectedPeriod;
     if (klineRequestKey === requestKey) return;
     klineRequestKey = requestKey;
@@ -1286,7 +1290,7 @@
       return;
     }
     if (state.klineRuntimeStatus === "ready") {
-      if (state.activeSection === "market" || state.activeSection === "features") requestKlineModel();
+      if (state.activeSection === "technical") requestKlineModel();
       requestWatchlistModels();
     }
   }
@@ -2019,17 +2023,24 @@
       dataUpdateMarkup() + watchlistMarkup();
   }
 
+  // Reading order: the company's own numbers first, then the judgements built
+  // on top of them. Thesis and notes above the data had it backwards.
   function companyPageMarkup() {
-    return pageHeader("公司研究", "公司研究工作區 · Thesis · 財報 · 趨勢 · 價格參考") +
+    return pageHeader("公司財務指標", "基本面 · 研究狀態 · 趨勢 · 投資假設與筆記") +
       quoteHeaderMarkup() +
-      card("投資假設", "為什麼研究這家公司；什麼情況代表假設失效", thesisMarkup(), "") +
-      card("研究筆記", "支持、反證與下一個檢查點", notesMarkup(), "") +
       card("基本面快照", "已擷取期別的核心財報欄位", fundamentalSnapshotMarkup(), "") +
       card("研究狀態", "產業、基本面、投資假設與下一個事件；驅動 Watchlist 與 Home", companyStatusMarkup(), "") +
       card("趨勢表", "最近 8 季與最近 12 個月", trendTableMarkup(), "") +
+      card("投資假設", "為什麼研究這家公司；什麼情況代表假設失效", thesisMarkup(), "") +
+      card("研究筆記", "支持、反證與下一個檢查點", notesMarkup(), "");
+  }
+
+  function technicalPageMarkup() {
+    return pageHeader("技術指標", "K 線 · 技術讀值 · 研究提醒；不參與價值判斷") +
+      quoteHeaderMarkup() +
       card("價格參考", "歷史價格位置 · 前高前低 · 回檔幅度；不參與價值判斷", klineMarkup(), "") +
-      // The alerts panel lost its host when the products page was retired. It
-      // belongs here: the form builds a condition for the selected stock.
+      // The alert form builds a condition for the selected stock, so it belongs
+      // beside the chart the condition is read off.
       alertsMarkup();
   }
 
@@ -2277,6 +2288,7 @@
     var section = state.activeSection;
     if (section === "watchlist") return watchlistPageMarkup();
     if (section === "company") return companyPageMarkup();
+    if (section === "technical") return technicalPageMarkup();
     if (section === "valuation") return valuationPageMarkup();
     if (section === "buyplan") return buyPlanPageMarkup();
     if (section === "review") return reviewPageMarkup();

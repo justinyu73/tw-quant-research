@@ -41,7 +41,8 @@ const VIEWPORT = { width: 1440, height: 900 };
 const VIEWS = [
   { id: "home", label: "首頁" },
   { id: "watchlist", label: "自選清單" },
-  { id: "company", label: "公司研究", ready: '[data-testid="kline-chart"]' },
+  { id: "company", label: "公司財務指標", ready: '[data-testid="fundamental-snapshot"]' },
+  { id: "technical", label: "技術指標", ready: '[data-testid="kline-chart"]' },
   { id: "valuation", label: "估值", ready: '[data-testid="valuation-panel"]' },
   { id: "buyplan", label: "買進計畫" },
   { id: "review", label: "投資審查" },
@@ -54,7 +55,7 @@ const VIEWS = [
 // that matches nothing throws, because a no-op probe reads as a pass.
 const HOVER_PROBES = [
   { view: "company", selector: "table.table tbody tr" },
-  { view: "company", selector: ".period-button" },
+  { view: "technical", selector: ".period-button" },
   { view: "company", selector: ".btn-outline" },
   { view: "watchlist", selector: ".btn-outline" },
   { view: "home", selector: ".btn-outline" },
@@ -67,8 +68,8 @@ const HOVER_PROBES = [
 const DISABLED_PROBES = [
   { view: "watchlist", selector: '[data-testid="watchlist-save"]' },
   { view: "watchlist", selector: '[data-testid="watchlist-clear"]' },
-  { view: "company", selector: '[data-testid="kline-watchlist-select"]' },
-  { view: "company", selector: '[data-testid="kline-drawing-clear"]' },
+  { view: "technical", selector: '[data-testid="kline-watchlist-select"]' },
+  { view: "technical", selector: '[data-testid="kline-drawing-clear"]' },
 ];
 
 // How many Tab presses to walk per view. The top nav alone eats ~11, so this

@@ -180,9 +180,9 @@ async function main() {
     });
     await page.locator('[data-testid="watchlist-picker"]').fill("");
 
-    // The alerts panel lives on 公司研究: the form builds a condition for the
-    // selected stock.
-    await page.locator('[data-action="section"][data-section="company"]').first().click();
+    // The alerts panel lives on 技術指標, beside the chart its condition is read
+    // off.
+    await page.locator('[data-action="section"][data-section="technical"]').first().click();
     await page.locator('[data-testid="kline-chart"]').waitFor();
     const panel = page.locator('[data-testid="alerts-panel"]');
     await panel.waitFor();
@@ -253,7 +253,7 @@ async function main() {
     });
 
     // Back to the page that hosts the alerts panel.
-    await page.locator('[data-action="section"][data-section="company"]').first().click();
+    await page.locator('[data-action="section"][data-section="technical"]').first().click();
     await page.locator('[data-testid="alerts-panel"]').waitFor();
 
     // Add a valid alert definition through the panel form.
@@ -304,7 +304,7 @@ async function main() {
     // Reload in the same tab session (F5): sessionStorage survives, so both
     // the session-expiry and the until-expiry alert are kept.
     await page.reload({ waitUntil: "networkidle" });
-    await page.locator('[data-action="section"][data-section="company"]').first().click();
+    await page.locator('[data-action="section"][data-section="technical"]').first().click();
     await page.locator('[data-testid="alerts-panel"]').waitFor();
 
     await record("persistence_after_reload", async () => {
@@ -364,7 +364,7 @@ async function main() {
 
     await record("new_session_drops_session_alerts", async () => {
       await freshPage.goto(`${baseUrl}/index.html`, { waitUntil: "networkidle" });
-      await freshPage.locator('[data-action="section"][data-section="company"]').first().click();
+      await freshPage.locator('[data-action="section"][data-section="technical"]').first().click();
       await freshPage.locator('[data-testid="alerts-panel"]').waitFor();
       await freshPage.locator('[data-testid="alert-definition"]').waitFor();
       const count = await freshPage.locator('[data-testid="alert-definition"]').count();

@@ -36,7 +36,8 @@ const BREAKPOINTS = [
 const VIEWS = [
   { id: "home", label: "首頁" },
   { id: "watchlist", label: "自選清單" },
-  { id: "company", label: "公司研究", ready: '[data-testid="kline-chart"]' },
+  { id: "company", label: "公司財務指標", ready: '[data-testid="fundamental-snapshot"]' },
+  { id: "technical", label: "技術指標", ready: '[data-testid="kline-chart"]' },
   { id: "valuation", label: "估值", ready: '[data-testid="valuation-panel"]' },
   { id: "buyplan", label: "買進計畫" },
   { id: "review", label: "投資審查" },
@@ -252,10 +253,12 @@ async function main() {
     if (!response || response.status() !== 200) throw new Error(`dashboard did not load: ${response && response.status()}`);
     await page.locator("#app .app-shell").waitFor();
 
-    // Select TWSE:2330 once at desktop width so 行情分析 renders chart + side panels
-    // at every breakpoint (selection persists in SPA state across section switches).
+    // Select TWSE:2330 once at desktop width so every page renders with data at
+    // every breakpoint (selection persists in SPA state across section switches).
+    // Picking a stock lands on 公司財務指標; the chart lives on 技術指標.
     await page.locator('[data-testid="global-search"]').fill("2330");
     await page.locator('[data-testid="global-search-results"] .symbol-search-result').filter({ hasText: "2330" }).first().click();
+    await page.locator('[data-action="section"][data-section="technical"]').first().click();
     await page.locator('[data-testid="kline-chart"]').waitFor();
 
     const results = [];
