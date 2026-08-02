@@ -3,9 +3,9 @@
 
 last_commit: 4cb0b5c
 branch: chore/dead-code-and-interaction-gates
-last_stage: 公司研究拆成「公司財務指標」與「技術指標」兩個分頁；主導覽七個區段
+last_stage: 拆頁完成，並把選股控件收斂成導覽列下方一條共用標的列（每頁都能換股）
 status: PARTIAL
-next_action: v0.3.0 Draft 維持不發佈。桌面版複測（新分頁、研究提醒、估值指標磚）
+next_action: v0.3.0 Draft 維持不發佈。桌面版複測（新分頁、標的列、研究提醒、估值指標磚）
 open_questions:
   - sparkline 已實作但畫不出線：各指標只有 1 期，需累積 2 期以上才會出現（刻意不補值）
   - :focus 與 disabled 兩種互動態仍無任何閘覆蓋（hover 已納入 dark-audit）
@@ -229,6 +229,30 @@ IA 從六個區段變七個。`PRIMARY_SECTION_IDS` 與 browser-smoke 的「恰�
 
 十四張 pixel 基準線**全部**重釘——導覽多一個項目，每一頁的頁首都變了。這次的重釘沒有
 「其餘逐位元不變」可以當佐證，只能靠 RWD 54/54、dark-audit 0 洩漏、以及人眼。
+
+
+## 共用標的列（每頁都能換股）
+
+拆頁之後選股控件只在技術指標頁的 K 線工具列裡，公司財務指標頁換不了股票。JY 指定
+「加在導航列，每個分頁共用一個選單模組」。
+
+- `instrumentPickerMarkup()` 抽成單一模組（搜尋框＋自選下拉），K 線工具列與 topbar 的
+  `global-search` 兩份平行實作合併成它一份。`global-search` / `global-search-pick`
+  相關的 action、handler、testid 全部刪除，三個閘同步改指 `kline-instrument`。
+- 位置**不是**塞進導覽列那一排，而是導覽列**下方自己一列**。實測：1440 下把它塞進
+  topbar，七個 nav 項目會被壓掉 106px（navScroll 582 / width 476），「投資審查」整個
+  不見。自己一列之後 navScroll 582 = width 582，沒有裁切。
+- 列上同時顯示目前標的（`instrument-bar-current`），從任何頁都看得到在看哪一檔。
+
+### 途中三個坑
+
+1. **`systemTopbarMarkup()` 多一個 `</div>`**（2 個 open、3 個 close），一直在提早關掉
+   `.app-shell`——所以 `<main>` 從來就不在 shell 裡面。新插的標的列因此被丟到 shell
+   外面、y=472。這是既有 bug，順手修掉，現在 shell 依序包含 header／標的列／main。
+2. **固定寬度在六個斷點全部溢出**：`.kline-control` clientWidth 126、scrollWidth 200。
+   改成 `flex: 1 1 <basis>` ＋ `max-width` ＋ `min-width: 0`。
+3. **sr-only 標籤被 RWD 稽核判成 clipped**（clientWidth 1 / scrollWidth 50）——正是這個
+   repo 之前踩過的同一個形狀。標的列有自己一列、有空間，標籤就正常畫出來，不藏。
 
 ---
 

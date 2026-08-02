@@ -14,22 +14,22 @@ const ROOT = path.resolve(__dirname, "..");
 const PREVIEW_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "tqr-preview-"));
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
-  home: "fa9a7321cbcb093326b9dc3628f0ebe63dcdcc76daabaa164d398a7f1e84459d",
-  company: "f17c09efe8b465c798cd77b8c92a01d12ea340a67a146c4b4b658d6d4d6b71fc",
-  technical: "55c04f2b5f2cf21394f1370c8af1f1cbf55260d44dc29969e90638ec895f3d97",
-  watchlist: "53a2b53ebbd30b81e27d71cdfa0785d6ff678f350f21e22f432cbd90aae0700b",
-  buyplan: "4bab958427e2ee554c536acb7020d8305676f6f8e06d06490f43950973fdaefd",
-  review: "f99f438acedd5d1da5a375819fd2b16f053345b7988201347cbeb6337f55428d",
-  valuation: "74a38b2b103629c2f4cfb9d77e4a2378e97646b0d22f20e2c2a0c0a466bf0e49",
+  home: "d12325a029de0038d22c0152efde557c5ace47561b757bd825d615d73bc4f407",
+  company: "e7e43c56636042c33254c13706662a91ab1b65d343c6f91e89cd6e7f5c963f15",
+  technical: "4f810a213fef4a463b3c47e63bb2ed1519ca859882f26b7ae071079b6927db82",
+  watchlist: "2ab44beae44c25ead3d6744a8dcfa2f3b71da386885fad66d3e80f1dcbd2f5bc",
+  buyplan: "94915f62eaa13ed0b3c619dc314c13d68d13b2bd3db10a8f6292a8773dfd5a96",
+  review: "abab9cb0446cb5a839252dd8cb7bd241c59e9cb97c63f5de3985a1867e0b99ce",
+  valuation: "e0b0f512f45614b18a2e45f9d8c6716ae9c776acd669c6ff10660fb73ce958df",
   // Dark is the primary appearance and carries its own baselines; an empty
   // value here keeps the gate red until a human has looked at the capture.
-  home_dark: "dd34b5b8ea81fe08ada57a9f62fa67ff75d43b978e96ec32361d2f1f9af34c95",
-  watchlist_dark: "dbc6ab39cd7425161aa146c5de53783f97b25c64c1c4932c480d19a338917c60",
-  company_dark: "bddeed52f10b53dd554e0ec24441088441b529735f9d044011383a1a59b2a1a8",
-  technical_dark: "a503f5de95f2d9ccac9d799c7a08650216540c4cbdcb3b161cc5332e22cd0fc1",
-  valuation_dark: "27e58be4a46777e1c3525dc0003f70711de15d0e6be36038afd1d23a0dc8b607",
-  buyplan_dark: "bfeec1636d404529dc572813cc749e6dfe48d0001af88ee1ae16ce337ee59d9d",
-  review_dark: "be8dc7e51b9b6412e9252055922634b9d3aae107003fe7c61a1b42fc5bff67ba",
+  home_dark: "e674d860fbcefd6827a7fa5c571c8f44b41172147094c7bf4bb38631e152c6ba",
+  watchlist_dark: "86d76ed915163e7a63c2ee32d05e13298598d872a19f37c370b1f90e72e13aa2",
+  company_dark: "672af1d6df5350f72a4349d5a302f013150d21240d5869aa4a934fcb8a3b9d1d",
+  technical_dark: "3a5289fb47fb132fe9212dc6db741f40c7d5f2babeb59f250b17dd3f6310c105",
+  valuation_dark: "5cdc6e49b3a16e645f4d7cf13092f25a192508746f90a2de6acb262b581715ab",
+  buyplan_dark: "b7f9b5c23340f591af48dd0f34c9a5e2133d5cfaadea1c4b1d5e8e8213177aee",
+  review_dark: "cfcc3c65ee3f11691316e0e784935e1e64e04f010522ca23da5294bf2e2f7fbb",
 };
 
 function freePort() {
@@ -314,9 +314,9 @@ async function main() {
 
     // 公司財務指標: quote, the company's own numbers, then the judgements built
     // on them. The chart and the alerts panel are on 技術指標.
-    const globalSearch = page.locator('[data-testid="global-search"]');
-    await globalSearch.fill("2330");
-    await page.locator('[data-testid="global-search-results"] .symbol-search-result').filter({ hasText: "2330" }).first().click();
+    const instrumentSearch = page.locator('[data-testid="kline-instrument"]');
+    await instrumentSearch.fill("2330");
+    await page.locator('[data-testid="kline-symbol-results"] .symbol-search-result').filter({ hasText: "2330" }).first().click();
     assert.equal(await page.locator(".page-title").innerText(), "公司財務指標");
     // Reading order is the point of the split: data before judgement.
     assert.deepEqual(
@@ -325,6 +325,18 @@ async function main() {
     );
     assert.equal(await page.locator('[data-testid="kline-chart"]').count(), 0);
     assert.equal(await page.locator('[data-testid="alerts-panel"]').count(), 0);
+    // One shared picker in the shell, so every page can switch stock.
+    assert.equal(await page.locator('[data-testid="instrument-picker"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="instrument-picker"] [data-testid="kline-instrument"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="instrument-picker"] [data-testid="kline-watchlist-select"]').count(), 1);
+    assert.match(await page.locator('[data-testid="instrument-bar-current"]').innerText(), /台積電/);
+    await page.locator('[data-testid="kline-instrument"]').fill("2317");
+    await page.locator('[data-testid="kline-instrument"]').press("Enter");
+    await page.waitForFunction(() => document.querySelector('[data-testid="quote-bar"]').textContent.includes("鴻海"));
+    assert.equal(await page.locator(".page-title").innerText(), "公司財務指標");
+    await page.locator('[data-testid="kline-instrument"]').fill("2330");
+    await page.locator('[data-testid="kline-instrument"]').press("Enter");
+    await page.waitForFunction(() => document.querySelector('[data-testid="quote-bar"]').textContent.includes("台積電"));
     assert.equal(await page.locator('[data-testid="quote-bar"] .terminal-quote-price strong').innerText(), "2,440");
     assert.equal(await page.locator('[data-testid="note-composer"]').count(), 1);
     assert.equal(await page.locator('[data-testid="thesis-form"]').count(), 1);
