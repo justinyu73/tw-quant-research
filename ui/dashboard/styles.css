@@ -1058,3 +1058,25 @@ table.table-trend { width: auto; table-layout: fixed; }
 /* An unreachable sidecar used to show only an empty symbol search, which reads
    as "search is broken" rather than "the local data service is down". */
 .topnav-runtime-error { position: absolute; top: calc(100% + 6px); right: 0; z-index: 6; margin: 0; max-width: 320px; padding: var(--space-2) var(--space-3); border: 1px solid rgba(217, 75, 75, 0.5); border-radius: var(--radius-sm); color: #ffd7d7; background: #40222a; font-size: var(--type-helper); line-height: 1.5; }
+
+/* One instrument picker for every page. It sits on its own row: at 1440 the
+   seven nav items lose 106px if it shares the top bar. Widths are flexible —
+   fixed ones overflowed .kline-control at every breakpoint. */
+.instrument-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+  padding: 8px 24px;
+  border-bottom: 1px solid var(--border-light);
+  background: var(--surface-secondary);
+}
+/* The labels stay drawn. Hiding them sr-only style (width:1px; overflow:hidden)
+   is what the RWD audit reads as clipped content — the same false positive this
+   repo hit once before. The bar has its own row, so there is space for them. */
+.instrument-bar .kline-control { min-width: 0; gap: 4px; }
+.instrument-bar .symbol-search { flex: 1 1 180px; min-width: 0; max-width: 260px; }
+.instrument-bar .symbol-search input { width: 100%; min-width: 0; }
+.instrument-bar .kline-control:has(.kline-watchlist-select) { flex: 1 1 160px; min-width: 0; max-width: 220px; }
+.instrument-bar .kline-watchlist-select { width: 100%; min-width: 0; }
+.instrument-bar-current { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: var(--type-helper); font-weight: 700; }

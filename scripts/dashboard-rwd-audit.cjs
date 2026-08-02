@@ -259,8 +259,8 @@ async function main() {
     // Select TWSE:2330 once at desktop width so every page renders with data at
     // every breakpoint (selection persists in SPA state across section switches).
     // Picking a stock lands on 公司財務指標; the chart lives on 技術指標.
-    await page.locator('[data-testid="global-search"]').fill("2330");
-    await page.locator('[data-testid="global-search-results"] .symbol-search-result').filter({ hasText: "2330" }).first().click();
+    await page.locator('[data-testid="kline-instrument"]').fill("2330");
+    await page.locator('[data-testid="kline-symbol-results"] .symbol-search-result').filter({ hasText: "2330" }).first().click();
     await page.locator('[data-action="section"][data-section="technical"]').first().click();
     await page.locator('[data-testid="kline-chart"]').waitFor();
 
