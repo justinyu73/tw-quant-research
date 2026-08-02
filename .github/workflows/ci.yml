@@ -46,3 +46,10 @@ jobs:
             exit 0
           fi
           exit "${code:-0}"
+      # These two audits existed but nothing ever read them, so hover, focus,
+      # disabled and every breakpoint were only checked when a human remembered
+      # to run them by hand. Both spawn their own server and exit 1 when red.
+      - name: Run dark-theme contrast audit (hover / focus / disabled states)
+        run: npm run dashboard:dark-audit
+      - name: Run responsive audit (6 breakpoints x 8 views)
+        run: npm run dashboard:rwd-audit

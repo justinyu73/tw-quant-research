@@ -12,6 +12,7 @@
 // `python3 scripts/serve_dashboard_app.py --port 5199 --sidecar-port 8770`.
 const fs = require("node:fs");
 const path = require("node:path");
+const crypto = require("node:crypto");
 const { spawn } = require("node:child_process");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -225,6 +226,20 @@ async function main() {
     await waitForServer(baseUrl);
   }
 
+  // Reusing a dev server means grading whatever bundle it is serving; a stale
+  // one measures old code and still reports zero failures.
+  const servedBundle = [];
+  for (const name of ["styles.css", "app.js", "dashboard-core.js"]) {
+    const response = await fetch(`${baseUrl}/${name}`, { cache: "no-store" });
+    if (!response.ok) throw new Error(`served bundle is missing ${name}`);
+    const servedHash = crypto.createHash("sha256").update(Buffer.from(await response.arrayBuffer())).digest("hex");
+    const sourceHash = crypto.createHash("sha256").update(fs.readFileSync(path.join(ROOT, "ui", "dashboard", name))).digest("hex");
+    servedBundle.push({ name, served: servedHash.slice(0, 12), source: sourceHash.slice(0, 12) });
+    if (servedHash !== sourceHash) {
+      throw new Error(`${baseUrl} serves a stale ${name} (${servedHash.slice(0, 12)} != source ${sourceHash.slice(0, 12)}); run python3 scripts/build_dashboard_preview.py`);
+    }
+  }
+
   const playwright = require("playwright-core");
   const executablePath = findChromium(playwright);
   if (!executablePath) throw new Error("Chromium executable not found; set CHROMIUM_EXECUTABLE_PATH");
@@ -301,6 +316,7 @@ async function main() {
       generated_at: new Date().toISOString(),
       base_url: baseUrl,
       server: serverMode,
+      served_bundle: servedBundle,
       browser: await browser.version(),
       breakpoints: BREAKPOINTS.map((b) => b.width),
       views: VIEWS,
@@ -309,9 +325,18 @@ async function main() {
       worst_top10: worst.slice(0, 10),
       browser_errors: browserErrors,
     };
+    // Measured-nothing reads as pass unless the cell count is checked too.
+    const expectedCells = VIEWS.length * BREAKPOINTS.length;
+    const measured = results.filter((r) => !r.error).length;
+    const failureTotal = results.reduce((sum, r) => sum + (r.failureCount || 0), 0);
+    report.measured_cells = measured;
+    report.expected_cells = expectedCells;
+    report.failure_total = failureTotal;
+    report.pass = measured === expectedCells && failureTotal === 0 && browserErrors.length === 0;
     fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });
     fs.writeFileSync(OUT_FILE, JSON.stringify(report, null, 2));
     console.log(JSON.stringify(report, null, 2));
+    if (!report.pass) process.exitCode = 1;
   } finally {
     await browser.close();
     if (serverProc) serverProc.kill();

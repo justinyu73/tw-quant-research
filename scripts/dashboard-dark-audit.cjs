@@ -6,10 +6,17 @@
 //      that never flipped with the token layer.
 //   2b. hover states that paint a light fill (HOVER_PROBES) — walking the DOM
 //      cannot see them, so they are driven explicitly.
+//   2c. focus states, driven with real Tab presses because :focus-visible does
+//      not match programmatic focus on buttons. Two failures: a light fill, and
+//      a focused control with no visible indicator at all — a keyboard user
+//      cannot see where they are, and nothing else in this repo checks it.
+//   2d. disabled controls (DISABLED_PROBES) for light fills only. Their
+//      contrast is exempt; a hardcoded light background is not.
 //   2. text below WCAG AA against its effective background (4.5:1, or 3:1 for
 //      large text per WCAG: >=24px, or >=18.66px at weight >=700).
 //
-// Disabled controls are exempt (WCAG 1.4.3 exempts inactive UI components).
+// Disabled controls are exempt from contrast (WCAG 1.4.3 exempts inactive UI
+// components).
 // Anything else that must stay below threshold goes in ALLOWED with a reason;
 // an empty reason is not accepted.
 //
@@ -19,6 +26,7 @@
 // `python3 scripts/serve_dashboard_app.py --port 5200 --sidecar-port 8771`.
 const fs = require("node:fs");
 const path = require("node:path");
+const crypto = require("node:crypto");
 const { spawn } = require("node:child_process");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -52,6 +60,20 @@ const HOVER_PROBES = [
   { view: "home", selector: ".btn-outline" },
   { view: "review", selector: ".btn-outline" },
 ];
+
+// Disabled controls only render in the state the audit's own flow produces:
+// the watchlist is empty here, so save/clear and the K-line watchlist picker
+// are all disabled. A probe matching an enabled element is a broken probe.
+const DISABLED_PROBES = [
+  { view: "watchlist", selector: '[data-testid="watchlist-save"]' },
+  { view: "watchlist", selector: '[data-testid="watchlist-clear"]' },
+  { view: "company", selector: '[data-testid="kline-watchlist-select"]' },
+  { view: "company", selector: '[data-testid="kline-drawing-clear"]' },
+];
+
+// How many Tab presses to walk per view. The top nav alone eats ~11, so this
+// has to be well past it or only the nav ever gets measured.
+const FOCUS_TAB_STEPS = 40;
 
 // { selector, reason } — reason is mandatory and asserted non-empty below.
 const ALLOWED = [
@@ -196,6 +218,46 @@ function auditInPage(allowed) {
   return { lightBg, lowContrast };
 }
 
+// One alpha-blended background reader for every interaction probe; a second
+// copy would drift from the one the DOM walk already uses.
+function paintedState(el) {
+  const parse = (value) => {
+    const parts = (value || "").match(/[\d.]+/g);
+    if (!parts) return null;
+    const [r, g, b, a] = parts.map(Number);
+    return { r, g, b, a: a === undefined ? 1 : a };
+  };
+  const over = (fg, bg) => ({
+    r: fg.r * fg.a + bg.r * (1 - fg.a),
+    g: fg.g * fg.a + bg.g * (1 - fg.a),
+    b: fg.b * fg.a + bg.b * (1 - fg.a),
+    a: 1,
+  });
+  let acc = { r: 255, g: 255, b: 255, a: 1 };
+  const chain = [];
+  for (let node = el; node; node = node.parentElement) chain.push(node);
+  for (const node of chain.reverse()) {
+    const bg = parse(getComputedStyle(node).backgroundColor);
+    if (bg && bg.a > 0) acc = over(bg, acc);
+  }
+  const channel = (c) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  };
+  const style = getComputedStyle(el);
+  return {
+    background: style.backgroundColor,
+    luminance: 0.2126 * channel(acc.r) + 0.7152 * channel(acc.g) + 0.0722 * channel(acc.b),
+    outlineStyle: style.outlineStyle,
+    outlineWidth: style.outlineWidth,
+    boxShadow: style.boxShadow,
+    tag: el.tagName.toLowerCase(),
+    testid: el.getAttribute("data-testid") || "",
+    label: (el.textContent || "").trim().slice(0, 24),
+    isBody: el === document.body || el === document.documentElement,
+  };
+}
+
 async function main() {
   for (const rule of ALLOWED) {
     if (!rule.reason || !rule.reason.trim()) throw new Error(`ALLOWED entry without a reason: ${rule.selector}`);
@@ -215,6 +277,21 @@ async function main() {
     await waitForServer(baseUrl);
   }
 
+  // Reusing a dev server means grading whatever bundle it happens to be
+  // serving. A stale one turns every check into a measurement of old code and
+  // still reports pass, so refuse to grade it.
+  const servedBundle = [];
+  for (const name of ["styles.css", "app.js", "dashboard-core.js"]) {
+    const response = await fetch(`${baseUrl}/${name}`, { cache: "no-store" });
+    if (!response.ok) throw new Error(`served bundle is missing ${name}`);
+    const servedHash = crypto.createHash("sha256").update(Buffer.from(await response.arrayBuffer())).digest("hex");
+    const sourceHash = crypto.createHash("sha256").update(fs.readFileSync(path.join(ROOT, "ui", "dashboard", name))).digest("hex");
+    servedBundle.push({ name, served: servedHash.slice(0, 12), source: sourceHash.slice(0, 12) });
+    if (servedHash !== sourceHash) {
+      throw new Error(`${baseUrl} serves a stale ${name} (${servedHash.slice(0, 12)} != source ${sourceHash.slice(0, 12)}); run python3 scripts/build_dashboard_preview.py`);
+    }
+  }
+
   const playwright = require("playwright-core");
   const executablePath = findChromium(playwright);
   if (!executablePath) throw new Error("Chromium executable not found; set CHROMIUM_EXECUTABLE_PATH");
@@ -222,6 +299,10 @@ async function main() {
   const browserErrors = [];
   const views = [];
   const hoverLeaks = [];
+  const focusLeaks = [];
+  const focusInvisible = [];
+  const disabledLeaks = [];
+  const focusVisited = [];
 
   try {
     const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 1 });
@@ -261,41 +342,51 @@ async function main() {
         if (!(await target.count())) throw new Error(`hover probe matched nothing: ${probe.view} ${probe.selector}`);
         await target.hover().catch(() => {});
         await page.waitForTimeout(120);
-        const painted = await target.evaluate((el) => {
-          const parse = (value) => {
-            const parts = (value || "").match(/[\d.]+/g);
-            if (!parts) return null;
-            const [r, g, b, a] = parts.map(Number);
-            return { r, g, b, a: a === undefined ? 1 : a };
-          };
-          const over = (fg, bg) => ({
-            r: fg.r * fg.a + bg.r * (1 - fg.a),
-            g: fg.g * fg.a + bg.g * (1 - fg.a),
-            b: fg.b * fg.a + bg.b * (1 - fg.a),
-            a: 1,
-          });
-          let acc = { r: 255, g: 255, b: 255, a: 1 };
-          const chain = [];
-          for (let node = el; node; node = node.parentElement) chain.push(node);
-          for (const node of chain.reverse()) {
-            const bg = parse(getComputedStyle(node).backgroundColor);
-            if (bg && bg.a > 0) acc = over(bg, acc);
-          }
-          const channel = (c) => {
-            const v = c / 255;
-            return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-          };
-          return {
-            background: getComputedStyle(el).backgroundColor,
-            luminance: 0.2126 * channel(acc.r) + 0.7152 * channel(acc.g) + 0.0722 * channel(acc.b),
-          };
-        });
+        const painted = await target.evaluate(paintedState);
         if (painted.luminance > 0.45) {
           hoverLeaks.push({ view: view.id, selector: probe.selector, background: painted.background, luminance: +painted.luminance.toFixed(3) });
         }
       }
       await page.mouse.move(0, 0);
       await page.waitForTimeout(80);
+
+      for (const probe of DISABLED_PROBES.filter((item) => item.view === view.id)) {
+        const target = page.locator(probe.selector).first();
+        if (!(await target.count())) throw new Error(`disabled probe matched nothing: ${probe.view} ${probe.selector}`);
+        if (!(await target.isDisabled())) throw new Error(`disabled probe is not disabled: ${probe.view} ${probe.selector}`);
+        const painted = await target.evaluate(paintedState);
+        if (painted.luminance > 0.45) {
+          disabledLeaks.push({ view: view.id, selector: probe.selector, background: painted.background, luminance: +painted.luminance.toFixed(3) });
+        }
+      }
+
+      // Real Tab presses: :focus-visible does not match programmatic focus on
+      // buttons, so page.focus() would measure a ring the user never sees.
+      await page.evaluate(() => document.body.focus());
+      const seen = new Set();
+      for (let step = 0; step < FOCUS_TAB_STEPS; step += 1) {
+        await page.keyboard.press("Tab");
+        const handle = await page.evaluateHandle(() => document.activeElement);
+        const painted = await handle.evaluate(paintedState);
+        await handle.dispose();
+        if (painted.isBody) break;
+        const key = `${view.id}|${painted.tag}|${painted.testid}|${painted.label}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        focusVisited.push({ view: view.id, tag: painted.tag, testid: painted.testid, label: painted.label });
+        const ringed = (painted.outlineStyle !== "none" && parseFloat(painted.outlineWidth) > 0) || painted.boxShadow !== "none";
+        if (!ringed) {
+          focusInvisible.push({ view: view.id, tag: painted.tag, testid: painted.testid, label: painted.label });
+        }
+        if (painted.luminance > 0.45) {
+          focusLeaks.push({ view: view.id, tag: painted.tag, testid: painted.testid, background: painted.background, luminance: +painted.luminance.toFixed(3) });
+        }
+      }
+      // Zero findings from zero measurements is the failure this repo keeps
+      // hitting; a view whose tab walk reached nothing is a broken walk.
+      if (!focusVisited.some((item) => item.view === view.id)) {
+        throw new Error(`focus walk reached no control on view: ${view.id}`);
+      }
 
       const result = await page.evaluate(auditInPage, ALLOWED);
       views.push({
@@ -318,6 +409,7 @@ async function main() {
   const report = {
     schema: "tqr-dashboard-dark-audit/v1",
     server_mode: serverMode,
+    served_bundle: servedBundle,
     base_url: baseUrl,
     viewport: VIEWPORT,
     standard: "WCAG 2.1 AA — 4.5:1, or 3:1 for large text (>=24px, or >=18.66px at weight >=700)",
@@ -325,8 +417,18 @@ async function main() {
     light_bg_total: lightBgTotal,
     hover_leak_total: hoverLeakTotal,
     hover_leaks: hoverLeaks,
+    focus_visited_total: focusVisited.length,
+    focus_visited: focusVisited,
+    focus_leak_total: focusLeaks.length,
+    focus_leaks: focusLeaks,
+    focus_invisible_total: focusInvisible.length,
+    focus_invisible: focusInvisible,
+    disabled_leak_total: disabledLeaks.length,
+    disabled_leaks: disabledLeaks,
     low_contrast_total: lowContrastTotal,
-    pass: lightBgTotal === 0 && lowContrastTotal === 0 && hoverLeakTotal === 0 && browserErrors.length === 0,
+    pass: lightBgTotal === 0 && lowContrastTotal === 0 && hoverLeakTotal === 0
+      && focusLeaks.length === 0 && focusInvisible.length === 0 && disabledLeaks.length === 0
+      && browserErrors.length === 0,
     views,
     browser_errors: browserErrors,
   };

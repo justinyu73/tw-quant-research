@@ -176,17 +176,6 @@
     return { totalBudget: "", allocFirst: "20", allocSecond: "25", allocSweet: "30", allocReserve: "25", maxPositionPct: "" };
   }
 
-  function buyPlanDraftFrom(plan) {
-    return {
-      totalBudget: plan.total_budget ? String(plan.total_budget) : "",
-      allocFirst: String(plan.allocations.first),
-      allocSecond: String(plan.allocations.second),
-      allocSweet: String(plan.allocations.sweet),
-      allocReserve: String(plan.allocations.reserve),
-      maxPositionPct: plan.max_position_pct ? String(plan.max_position_pct) : ""
-    };
-  }
-
   function loadBuyPlans() {
     if (buyPlansLoaded) return;
     buyPlansLoaded = true;
@@ -345,31 +334,6 @@
 
 
 
-  function loadPrototypeDraft(key, defaults) {
-    try {
-      if (!window.localStorage) return defaults;
-      var raw = window.localStorage.getItem(key);
-      var parsed = raw ? JSON.parse(raw) : null;
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return defaults;
-      return Object.keys(defaults).reduce(function (next, field) {
-        next[field] = typeof parsed[field] === "string" ? parsed[field] : defaults[field];
-        return next;
-      }, {});
-    } catch (error) {
-      return defaults;
-    }
-  }
-
-  function savePrototypeDraft(key, draft) {
-    try {
-      if (!window.localStorage) return false;
-      window.localStorage.setItem(key, JSON.stringify(draft));
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-
   function loadPrototypeDrafts() {
   }
 
@@ -394,64 +358,6 @@
       '<span class="meta-chip">公式版本<strong>' + text(versions) + "</strong></span>" +
       "</div></div></header>";
   }
-
-  function qualityCards() {
-    var summary = core.summary(view);
-    return '<div class="row col-4 quality-row" aria-label="資料品質摘要">' +
-      [['admitted', summary.admitted, "已納入資料筆數", "teal"],
-       ['unadmitted', summary.unadmitted, "未納入資料筆數", "yellow"],
-       ['invalid', summary.invalid, "無效資料筆數", "red"],
-       ['backtest', summary.backtestStatus, "回測狀態", "blue"]].map(function (item) {
-        return '<article class="card stat stat-' + item[0] + '">' +
-          '<span class="stat-icon ' + item[3] + '" aria-hidden="true">' +
-          (item[0] === "backtest" ? "↗" : item[0] === "admitted" ? "✓" : item[0] === "invalid" ? "!" : "~") +
-          '</span><div class="stat-content"><div class="stat-label">' + item[2] +
-          '</div><div class="stat-value">' + text(item[1]) + "</div></div></article>";
-      }).join("") + "</div>";
-  }
-
-  function latestAdmittedPriceRow() {
-    var rows = Array.isArray(view.products) ? view.products.filter(function (row) {
-      return row && row.record_type === "price_bar" && row.quality && row.quality.admission_status === "admitted" && row.bar && row.bar.close_raw !== null && row.bar.close_raw !== undefined;
-    }) : [];
-    rows.sort(function (left, right) {
-      return String((right.bar || {}).trading_date || "").localeCompare(String((left.bar || {}).trading_date || ""));
-    });
-    return rows[0] || null;
-  }
-
-  function stockQuoteMarkup() {
-    var row = latestAdmittedPriceRow();
-    var instrument = row && row.instrument || { security_id: "2330", market: "TWSE" };
-    var bar = row && row.bar || {};
-    var dailyReturn = bar.daily_return_1d;
-    var kline = core.selectedKline(state);
-    var klineBars = kline && Array.isArray(kline.bars) ? kline.bars : [];
-    var klineBar = klineBars.length ? klineBars[klineBars.length - 1] : null;
-    if (klineBar) {
-      instrument = kline.instrument || instrument;
-      bar = { close_raw: klineBar.close, trading_date: klineBar.trading_date, volume_shares: klineBar.volume };
-      dailyReturn = null;
-      row = { instrument: instrument, bar: bar, quality: { admission_status: kline.quality && kline.quality.status || "unavailable" }, provenance: { source_id: kline.source } };
-    }
-    var symbol = instrument.security_id || instrument.symbol || "2330";
-    return '<div class="stock-quote" data-testid="stock-quote"><div class="stock-quote-symbol"><span class="eyebrow">目前選取</span><strong>' + text(instrument.market + ":" + symbol) + '</strong><span>' + text(row ? "台積電 · 本地資料" : "尚未選取有效行情") + '</span></div>' +
-      '<div class="stock-quote-price"><strong>' + core.formatNumber(bar.close_raw) + '</strong><span class="' + (dailyReturn >= 0 ? "positive" : "negative") + '">' + (dailyReturn === null || dailyReturn === undefined ? "—" : core.formatPercent(dailyReturn)) + '</span></div>' +
-      '<dl class="quote-grid"><div><dt>交易日</dt><dd>' + text(bar.trading_date) + '</dd></div><div><dt>成交量</dt><dd>' + core.formatNumber(bar.volume_shares) + '</dd></div><div><dt>資料品質</dt><dd>' + statusBadge(row && row.quality && row.quality.admission_status || "unavailable") + '</dd></div><div><dt>資料來源</dt><dd class="mono">' + text(row && row.provenance && row.provenance.source_id) + '</dd></div></dl></div>';
-  }
-
-  function storyTrackerMarkup() {
-    var links = Array.isArray(view.evidence_links) ? view.evidence_links : [];
-    var stories = [
-      ["財報", "營收、EPS、現金流與期間", "等待免費官方來源", "unavailable"],
-      ["事件", "公告、除權息、產業變化", "人工建立證據", "draft"],
-      ["假說", "支持、反證、下次檢查日", "尚未建立", "idle"]
-    ];
-    return card("故事追蹤", "XQ 式研究欄位與人工筆記", '<div class="story-list" data-testid="story-tracker">' + stories.map(function (item) {
-      return '<article class="story-item"><span class="story-kind">' + text(item[0]) + '</span><div><strong>' + text(item[1]) + '</strong><small>' + text(item[2]) + '</small></div>' + statusBadge(item[3]) + '</article>';
-    }).join("") + '</div><div class="story-footer"><span>' + links.length + ' 個可追溯證據連結</span><button class="btn btn-outline btn-sm" type="button" data-action="section" data-section="company">開啟追蹤</button></div>', "");
-  }
-
 
 
   function companyStatusMarkup() {
@@ -1314,7 +1220,6 @@
     });
     var visible = visibleWatchlistAddIssues(issues);
     refreshFormIssues("watchlist-add-issues", visible);
-    refreshFormIssues("terminal-watchlist-add-issues", visible);
   }
 
   function requestWatchlistModels() {
@@ -1502,25 +1407,6 @@
     return '<section class="terminal-quote-bar" data-testid="quote-bar"><div class="terminal-quote-identity"><span class="terminal-market-tag">' + text(instrument.market || "TWSE") + '</span><div><h2>' + text(instrument.symbol || selectedId || "2330") + ' <small>' + text(instrument.display_name || "台積電") + '</small></h2><span class="mono">' + text(selectedId) + ' · ' + text((instrument.currency || "TWD")) + '</span></div></div><div class="terminal-quote-price"><strong>' + core.formatNumber(latest.close) + '</strong><span class="' + tone + '">' + (quote.change === null ? "—" : (quote.change >= 0 ? "+" : "") + core.formatNumber(quote.change) + " (" + core.formatPercent(quote.changePct) + ")") + '</span></div><dl class="terminal-ohlc"><div><dt>開</dt><dd>' + core.formatNumber(latest.open) + '</dd></div><div><dt>高</dt><dd>' + core.formatNumber(latest.high) + '</dd></div><div><dt>低</dt><dd>' + core.formatNumber(latest.low) + '</dd></div><div><dt>量</dt><dd>' + core.formatNumber(latest.volume) + '</dd></div></dl><div class="terminal-quote-actions"><button class="btn ' + (isWatched ? "btn-outline" : "btn-primary") + '" type="button" data-action="watchlist-toggle" data-testid="quote-watchlist-toggle">' + (isWatched ? "已在自選" : "加入自選") + '</button><button class="btn btn-outline" type="button" data-action="section" data-section="company">記研究筆記</button></div></section>';
   }
 
-  function compactWatchlistMarkup() {
-    var instruments = core.klineInstruments(state.view);
-    var items = core.watchlistItemsForActiveGroup(state);
-    var groups = Array.isArray(state.watchlistGroups) ? state.watchlistGroups : [];
-    var activeGroup = groups.find(function (group) { return group.id === state.activeWatchlistGroupId; }) || groups[0];
-    var canDeleteGroup = activeGroup && activeGroup.id !== "default";
-    var selected = instrumentForId(watchlistSearchSelection) || resolveSearchSelection(instruments, watchlistSearchQuery);
-    var terminalAddIssues = core.watchlistAddIssues({ query: watchlistSearchQuery, selected: selected, items: items });
-    return '<section class="terminal-watchlist" data-testid="terminal-watchlist"><header class="terminal-panel-heading"><div><span class="eyebrow">我的行情</span><h2>自選清單</h2></div><span class="terminal-count">' + items.length + '</span></header><div class="terminal-watchlist-controls"><div class="symbol-search"><label><span>搜尋代號／名稱</span><input type="search" autocomplete="off" placeholder="例如 2330" value="' + escapeHtml(watchlistSearchQuery) + '" data-action="watchlist-search" data-testid="terminal-watchlist-picker" aria-controls="terminal-watchlist-results"></label>' + symbolSearchResults(instruments, watchlistSearchQuery, items, watchlistSearchSelection, "terminal-watchlist-results", "watchlist-search-pick") + '</div><button class="btn btn-primary btn-sm" type="button" data-action="watchlist-add" data-testid="terminal-watchlist-add"' + (terminalAddIssues.length ? " disabled" : "") + '>加入</button>' + formIssuesMarkup(visibleWatchlistAddIssues(terminalAddIssues), "terminal-watchlist-add-issues") + '</div><div class="terminal-watchlist-group"><label><span>目前群組</span><select data-action="watchlist-group-select" data-testid="terminal-watchlist-group-select">' + groups.map(function (group) { return '<option value="' + escapeHtml(group.id) + '"' + (group.id === state.activeWatchlistGroupId ? ' selected' : '') + '>' + text(group.name) + '</option>'; }).join("") + '</select></label><button class="btn btn-outline btn-sm" type="button" data-action="watchlist-group-delete" data-group-id="' + escapeHtml(activeGroup && activeGroup.id || "default") + '" data-testid="terminal-watchlist-group-delete"' + (canDeleteGroup ? '' : ' disabled') + '>刪除群組</button></div><div class="terminal-watchlist-list">' + (items.length ? items.map(function (instrumentId) {
-      var instrument = instrumentForId(instrumentId) || { instrument_id: instrumentId, symbol: instrumentId, display_name: "未在商品清單" };
-      var model = core.klineModel(state.view, instrumentId, "1D");
-      var bars = model && Array.isArray(model.bars) ? model.bars : [];
-      var latest = bars.length ? bars[bars.length - 1] : null;
-      var previous = bars.length > 1 ? bars[bars.length - 2] : null;
-      var delta = latest && previous ? latest.close - previous.close : null;
-      return '<div class="terminal-watchlist-row-wrap"><button class="terminal-watchlist-row' + (instrumentId === state.selectedKlineInstrumentId ? ' active' : '') + '" type="button" data-action="kline-search-pick" data-instrument-id="' + escapeHtml(instrumentId) + '"><span><strong>' + text(instrument.symbol || instrumentId) + '</strong><small>' + text(instrument.display_name) + '</small></span><span class="terminal-watchlist-price"><strong>' + core.formatNumber(latest && latest.close) + '</strong><small class="' + (delta === null ? "" : delta >= 0 ? "positive" : "negative") + '">' + (delta === null ? "—" : (delta >= 0 ? "+" : "") + core.formatNumber(delta)) + '</small></button><button class="terminal-watchlist-remove" type="button" data-action="watchlist-remove" data-instrument-id="' + escapeHtml(instrumentId) + '" aria-label="移除 ' + escapeHtml(instrument.symbol || instrumentId) + '">×</button></div>';
-    }).join("") : '<div class="terminal-watchlist-empty"><strong>還沒有自選標的</strong><span>搜尋 2330，加入後就能在右側快速切換。</span></div>') + '</div><footer class="terminal-watchlist-footer"><span>' + text(noteStatus()) + '</span><button class="btn btn-outline btn-sm" type="button" data-action="section" data-section="watchlist">管理自選</button></footer></section>';
-  }
-
   function dataUpdateMarkup() {
     var update = state.dataUpdate || { scope: "watchlist", years: 1, status: "idle", message: "", results: [] };
     var instrument = selectedKlineInstrument();
@@ -1536,10 +1422,6 @@
       : targetIds.length === 0 ? (isWatchlist ? "請先加入自選標的" : "請先選取個股")
       : update.status === "idle" ? "尚未更新；只下載目前範圍的個股" : (update.message || STATUS_LABELS[update.status] || update.status);
     return '<section class="data-update-panel" data-testid="data-update-panel"><div class="data-update-heading"><div><span class="eyebrow">官方免費來源 → 本機保存</span><h2>更新台股資料</h2><p>更新範圍：' + text(targetLabel) + '</p></div><span class="data-update-status status-' + escapeHtml(update.status) + '" data-testid="data-update-status">' + text(statusText) + '</span></div><div class="data-update-controls"><label><span>更新範圍</span><select data-action="data-update-scope" data-testid="data-update-scope"><option value="watchlist"' + (isWatchlist ? ' selected' : '') + '>全部自選（' + targetIds.length + ' 檔）</option><option value="selected"' + (isWatchlist ? '' : ' selected') + '>目前個股</option></select></label><label><span>歷史範圍</span><select data-action="data-update-years" data-testid="data-update-years"><option value="1"' + (update.years === 1 ? ' selected' : '') + '>近 1 年</option><option value="2"' + (update.years === 2 ? ' selected' : '') + '>近 2 年</option><option value="3"' + (update.years === 3 ? ' selected' : '') + '>近 3 年</option></select></label><button class="btn btn-primary" type="button" data-action="data-update" data-testid="data-update-button"' + (enabled ? '' : ' disabled') + '>' + (dataUpdateInFlight ? '更新中…' : (isWatchlist ? '下載並更新自選資料' : '下載並更新目前個股')) + '</button></div><small class="data-update-note">目前提供 TWSE 上市個股；只處理目前範圍，不下載全市場。資料保存於本機 raw 與 K 線快照，不是即時行情；瀏覽器預覽僅展示介面。</small>' + dataUpdateResultMarkup(update.results) + '</section>';
-  }
-
-  function pct(value) {
-    return value === null || value === undefined ? "—" : core.formatPercent(value);
   }
 
   // Price above fair value is a premium, not a discount. Rendering +205% under a
@@ -2620,7 +2502,6 @@
       watchlistSearchFocused = true;
       var watchlistResults = symbolSearchResults(core.klineInstruments(state.view), watchlistSearchQuery, core.watchlistItemsForActiveGroup(state), null, "watchlist-symbol-results", "watchlist-search-pick");
       refreshSearchResults("watchlist-symbol-results", watchlistResults);
-      refreshSearchResults("terminal-watchlist-results", symbolSearchResults(core.klineInstruments(state.view), watchlistSearchQuery, core.watchlistItemsForActiveGroup(state), null, "terminal-watchlist-results", "watchlist-search-pick"));
       refreshWatchlistAddButtons();
       return;
     }

@@ -1,16 +1,19 @@
 <!-- This file is the single mutable state cursor. History = git log -p CURSOR.md -->
 # Cursor
 
-last_commit: bcb04de
-branch: fix/kline-instrument-truth
-last_stage: v0.3.0 桌面版實測回報的四個缺陷全部修完，並補上「畫布＝標題＝輸入框」三者一致閘
+last_commit: 4cb0b5c
+branch: chore/dead-code-and-interaction-gates
+last_stage: PR #26 已 merge（四缺陷 + 三者一致閘）；本段清死碼、補 focus/disabled 閘、把兩個稽核接進 CI
 status: PARTIAL
-next_action: v0.3.0 Draft 維持不發佈（JY 決定：還有缺口）。等 PR merge 後，缺口清單見 open_questions
+next_action: v0.3.0 Draft 維持不發佈。alertsMarkup / valuationIndicatorTile 兩個孤兒功能等 JY 決定：刪或接回
 open_questions:
   - sparkline 已實作但畫不出線：各指標只有 1 期，需累積 2 期以上才會出現（刻意不補值）
   - :focus 與 disabled 兩種互動態仍無任何閘覆蓋（hover 已納入 dark-audit）
   - 桌面版（WKWebView）尚未複測這四個修正；瀏覽器預覽 5173 已逐項量到
-  - .research-module / .terminal-watchlist-row / .analysis-check 是死 CSS，六頁都渲染不出來，本次未刪
+  - 死碼已清（見下節）。剩兩個「孤兒功能」未決：alertsMarkup（整套 in-app 警示 UI）
+    與 valuationIndicatorTile（價格分位／MA 乖離磚）——狀態、handler、持久化都還活著，
+    只是任何一頁都渲染不出來。刪掉還是接回是產品決定，不是清理決定
+  - styles.css 還有約 100 個沒有 markup 產生的 class 未清（本次只刪掉能證明成對的那些）
   - 「抓不到股票代碼」原因未明：JY 回報 Mac 端 curl 8767 有跑通，所以不是轉埠問題
   - 免費官方是否存在財報歷史序列來源，或 forward accumulation 是唯一路徑
   - 各 endpoint 公告節奏（需跨月實測，不做推論）
@@ -90,6 +93,61 @@ message**，於是套用預設字串「本機資料服務無法連線；請重�
 UMD 匯出的屬性是 non-writable，sloppy mode 下對繼承屬性賦值不報錯也不生效，於是
 hook 一筆都沒錄到、圖卻照畫，看起來像「圖表根本沒重繪」。全部改走
 `Object.defineProperty` 才錄得到。
+
+
+## 死碼清除與互動態閘（branch `chore/dead-code-and-interaction-gates`）
+
+### 刪了什麼，怎麼證明是死的
+
+app.js 掃「定義了但全檔只出現一次」的函式，逐輪迭代（刪掉之後會冒出新的孤兒）：
+
+`buyPlanDraftFrom` / `loadPrototypeDraft` / `savePrototypeDraft` / `qualityCards` /
+`stockQuoteMarkup` / `storyTrackerMarkup` / `compactWatchlistMarkup` / `pct` /
+`latestAdmittedPriceRow`，共 9 個；連帶兩行指向已消失元素的 `refreshSearchResults`
+／`refreshFormIssues`；styles.css 少 76 行。
+
+**證明**：browser-smoke 的十二張 pixel 基準線全部逐位元不變。刪的是死碼。
+
+### CSS 沒有全清，而且不該全清
+
+用「class 沒出現在任何 markup 來源」掃出 137 個候選，但其中 `status-admitted` /
+`status-error` / `status-loading` …這一整族是 **執行期組出來的**
+（`"status status-" + safe`），照掃描結果刪會刪掉活的樣式。所以本次只刪「產生它的
+函式剛好也一起刪掉」的那幾族，其餘留在 open_questions。
+
+### focus / disabled 閘（dark-audit）
+
+- **focus** 用真的 Tab 走訪，不是 `element.focus()`——`:focus-visible` 對按鈕的
+  程式化 focus 不成立，用 `.focus()` 量到的是使用者看不到的 ring。每個 view 走 40 步、
+  跨 8 頁共量到 176 個控件。兩種失敗：亮色填底、以及**焦點完全看不見**
+  （outline 與 box-shadow 都沒有），後者是鍵盤使用者的實際障礙，全 repo 之前沒人檢查。
+- **disabled** 只查亮色填底，不查對比——WCAG 1.4.3 本來就豁免停用控件的對比，這一點
+  稽核檔頭原本就寫了。四個探針各自斷言「有比對到」且「真的是 disabled」。
+- 加 `focus_visited_total`：**零發現配零量測就是假綠**，任何一頁 Tab 走訪碰不到控件就 throw。
+
+**已證明會紅**：把 `:focus-visible` 的 outline 拿掉並重建 → 176 個裡有 170 個被抓，
+`pass: false`，exit 1。
+
+### 兩個稽核之前根本沒有人在讀
+
+`dashboard:dark-audit` 與 `dashboard:rwd-audit` **都不在 CI 裡**，只有人手動跑才會執行。
+更糟的是 rwd-audit **從來不設 exit code**——48 格全爆它也 exit 0。
+
+- rwd-audit 補 `pass` 與 exit 1，並加 `measured_cells` / `expected_cells`：量到的格數
+  不足 48 也算失敗（沿用上次「SUM failures = 0 其實是什麼都沒量到」的教訓）
+- 兩個稽核都進 `ci.yml` 的 dashboard-browser job
+
+**已證明會紅**：塞一條 `.kline-toolbar { min-width: 2400px }` 重建 → failures 146，exit 1。
+
+### 稽核在讀舊 bundle
+
+focus 閘第一次「證明會紅」失敗了：拿掉 outline 之後稽核照樣 pass。原因是兩個稽核
+**沿用 5173 上跑著的 dev server**，而它服務的是 `outputs/dashboard-preview/`——我改的是
+`ui/dashboard/`，沒重建。稽核量的是舊碼。
+
+兩個稽核都補上 bundle 指紋比對：抓 `styles.css` / `app.js` / `dashboard-core.js`，
+sha256 對不上 repo 來源就直接 throw，並把指紋寫進報告。這跟先前「閘看起來上線了、
+讀它的那一端沒接上」是同一個形狀，只是這次是**閘自己讀錯了對象**。
 
 ---
 
