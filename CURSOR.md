@@ -1,16 +1,18 @@
 <!-- This file is the single mutable state cursor. History = git log -p CURSOR.md -->
 # Cursor
 
-last_commit: bcb04de
-branch: fix/kline-instrument-truth
-last_stage: v0.3.0 桌面版實測回報的四個缺陷全部修完，並補上「畫布＝標題＝輸入框」三者一致閘
+last_commit: 4cb0b5c
+branch: chore/dead-code-and-interaction-gates
+last_stage: 公司研究拆成「公司財務指標」與「技術指標」兩個分頁；主導覽七個區段
 status: PARTIAL
-next_action: v0.3.0 Draft 維持不發佈（JY 決定：還有缺口）。等 PR merge 後，缺口清單見 open_questions
+next_action: v0.3.0 Draft 維持不發佈。桌面版複測（新分頁、研究提醒、估值指標磚）
 open_questions:
   - sparkline 已實作但畫不出線：各指標只有 1 期，需累積 2 期以上才會出現（刻意不補值）
   - :focus 與 disabled 兩種互動態仍無任何閘覆蓋（hover 已納入 dark-audit）
   - 桌面版（WKWebView）尚未複測這四個修正；瀏覽器預覽 5173 已逐項量到
-  - .research-module / .terminal-watchlist-row / .analysis-check 是死 CSS，六頁都渲染不出來，本次未刪
+  - 估值引擎的欄位級拒絕訊息，目前沒有從 UI 可達的無效輸入可以觸發（表單先擋掉了），
+    所以「引擎拒絕逐字顯示」這條性質沒有閘覆蓋；alerts smoke 裡那個舊檢查已移除並註明原因
+  - styles.css 還有約 100 個沒有 markup 產生的 class 未清（本次只刪掉能證明成對的那些）
   - 「抓不到股票代碼」原因未明：JY 回報 Mac 端 curl 8767 有跑通，所以不是轉埠問題
   - 免費官方是否存在財報歷史序列來源，或 forward accumulation 是唯一路徑
   - 各 endpoint 公告節奏（需跨月實測，不做推論）
@@ -90,6 +92,143 @@ message**，於是套用預設字串「本機資料服務無法連線；請重�
 UMD 匯出的屬性是 non-writable，sloppy mode 下對繼承屬性賦值不報錯也不生效，於是
 hook 一筆都沒錄到、圖卻照畫，看起來像「圖表根本沒重繪」。全部改走
 `Object.defineProperty` 才錄得到。
+
+
+## 死碼清除與互動態閘（branch `chore/dead-code-and-interaction-gates`）
+
+### 刪了什麼，怎麼證明是死的
+
+app.js 掃「定義了但全檔只出現一次」的函式，逐輪迭代（刪掉之後會冒出新的孤兒）：
+
+`buyPlanDraftFrom` / `loadPrototypeDraft` / `savePrototypeDraft` / `qualityCards` /
+`stockQuoteMarkup` / `storyTrackerMarkup` / `compactWatchlistMarkup` / `pct` /
+`latestAdmittedPriceRow`，共 9 個；連帶兩行指向已消失元素的 `refreshSearchResults`
+／`refreshFormIssues`；styles.css 少 76 行。
+
+**證明**：browser-smoke 的十二張 pixel 基準線全部逐位元不變。刪的是死碼。
+
+### CSS 沒有全清，而且不該全清
+
+用「class 沒出現在任何 markup 來源」掃出 137 個候選，但其中 `status-admitted` /
+`status-error` / `status-loading` …這一整族是 **執行期組出來的**
+（`"status status-" + safe`），照掃描結果刪會刪掉活的樣式。所以本次只刪「產生它的
+函式剛好也一起刪掉」的那幾族，其餘留在 open_questions。
+
+### focus / disabled 閘（dark-audit）
+
+- **focus** 用真的 Tab 走訪，不是 `element.focus()`——`:focus-visible` 對按鈕的
+  程式化 focus 不成立，用 `.focus()` 量到的是使用者看不到的 ring。每個 view 走 40 步、
+  跨 8 頁共量到 176 個控件。兩種失敗：亮色填底、以及**焦點完全看不見**
+  （outline 與 box-shadow 都沒有），後者是鍵盤使用者的實際障礙，全 repo 之前沒人檢查。
+- **disabled** 只查亮色填底，不查對比——WCAG 1.4.3 本來就豁免停用控件的對比，這一點
+  稽核檔頭原本就寫了。四個探針各自斷言「有比對到」且「真的是 disabled」。
+- 加 `focus_visited_total`：**零發現配零量測就是假綠**，任何一頁 Tab 走訪碰不到控件就 throw。
+
+**已證明會紅**：把 `:focus-visible` 的 outline 拿掉並重建 → 176 個裡有 170 個被抓，
+`pass: false`，exit 1。
+
+### 兩個稽核之前根本沒有人在讀
+
+`dashboard:dark-audit` 與 `dashboard:rwd-audit` **都不在 CI 裡**，只有人手動跑才會執行。
+更糟的是 rwd-audit **從來不設 exit code**——48 格全爆它也 exit 0。
+
+- rwd-audit 補 `pass` 與 exit 1，並加 `measured_cells` / `expected_cells`：量到的格數
+  不足 48 也算失敗（沿用上次「SUM failures = 0 其實是什麼都沒量到」的教訓）
+- 兩個稽核都進 `ci.yml` 的 dashboard-browser job
+
+**已證明會紅**：塞一條 `.kline-toolbar { min-width: 2400px }` 重建 → failures 146，exit 1。
+
+### 稽核在讀舊 bundle
+
+focus 閘第一次「證明會紅」失敗了：拿掉 outline 之後稽核照樣 pass。原因是兩個稽核
+**沿用 5173 上跑著的 dev server**，而它服務的是 `outputs/dashboard-preview/`——我改的是
+`ui/dashboard/`，沒重建。稽核量的是舊碼。
+
+兩個稽核都補上 bundle 指紋比對：抓 `styles.css` / `app.js` / `dashboard-core.js`，
+sha256 對不上 repo 來源就直接 throw，並把指紋寫進報告。這跟先前「閘看起來上線了、
+讀它的那一端沒接上」是同一個形狀，只是這次是**閘自己讀錯了對象**。
+
+
+## 孤兒功能接回（`chore/dead-code-and-interaction-gates`）
+
+JY 決定：兩個都接回，不刪。
+
+### 確認方式：直接跑那支從來沒人跑的 smoke
+
+`scripts/dashboard-alerts-smoke.cjs` 卡在 `[data-section="products"]`——IA 改版裁掉的頁面。
+所以警示 UI 不是沒寫完，是**整套寫完了、頁面被刪掉**：JS 16 + 6 個函式、6 個 reducer 事件、
+19 條 CSS、`src-tauri/src/alerts.rs` 172 行與兩個註冊指令、sidecar `/alerts`、
+`tests/test_p6_in_app_alerts.py` 229 行、`dashboard-core.test.cjs` 的 in-app-alerts 段——
+全都活著，只差一個掛的地方。刪要動四層千餘行，接回只要幾行。
+
+- **研究提醒**掛回 `companyPageMarkup()`：表單本來就是對「目前選取的個股」建條件，
+  公司研究頁是它的語意歸屬。不動 IA 的六個主要區段，導覽契約不變。
+- **估值指標磚**（Z 分數／價格分位／MA 乖離）插回 `valuationMarkup()`。這三個值
+  **本來每次按「計算」都在算**，只是算完沒有任何地方顯示——來回跑完整趟然後丟掉。
+
+實測：建立提醒 → 1 筆定義；按「立即評估」→ 觸發 1 筆事件；零 console error。
+
+### alerts smoke 腐爛的四個地方
+
+它從來沒進 CI，所以對著三次產品變更爛了四處：
+
+1. `products` / `market` 兩個已裁掉的區段選擇器 → 改指 `watchlist` / `company` / `valuation`
+2. 自選加入提示「按鈕 disabled 時就要可見」——現行行為是**刻意**改成「使用者碰了搜尋框才顯示」
+   （成功加入後立刻跳警告讀起來像錯誤）。改成斷言兩段：到站時隱藏、碰過搜尋框後出現
+3. `預估 EPS` 的錯誤字串已變成 Bear／Base／Bull 三情境
+4. `terminal-watchlist-add` 檢查的是本段刪掉的死碼 → 移除
+
+`engine_rejection_shown_verbatim` **移除並註明原因**：它 seed 的是股利折現模型
+（discount_rate／growth_rate），估值早就換成情境模型，等於在斷言一個不存在的契約。
+現行 UI 沒有可達的無效輸入能觸發引擎端拒絕（表單先擋掉了），列為 open question，
+不留一個假綠的檢查。
+
+### 這支 smoke 會砸掉 5173 的 dev bundle
+
+它把預覽建進 `outputs/dashboard-preview/`，並把**自己那次的隨機 sidecar 埠**烤進
+index.html。跑完之後 JY 開著的 5173 就指向一個已經關掉的埠，畫面看起來像 sidecar 掛了。
+本段除錯時就中招一次：所有搜尋都回「找不到符合的商品」。改成建進 `mkdtempSync` 暫存目錄——
+`dashboard-browser-smoke.cjs` 早就有這個註解與作法，這支沒跟上。
+
+### 四個瀏覽器閘現在都在 CI
+
+`browser-smoke` / `dark-audit` / `rwd-audit` / `alerts-smoke`。
+company 與 valuation 四張 pixel 基準線因為多了兩塊 UI 而重釘，其餘八張逐位元不變。
+
+
+## 公司研究拆頁（JY 指定）
+
+### 動線
+
+原本順序是投資假設 → 研究筆記 → 基本面快照 → 研究狀態 → 趨勢表，**判斷排在資料前面**。
+JY 指定倒過來：先看公司自己的數字，再看建立在上面的判斷。
+
+- **公司財務指標**（原公司研究，改名）：報價列 → 基本面快照 → 研究狀態 → 趨勢表 →
+  投資假設 → 研究筆記
+- **技術指標**（新增，第 7 個主導覽區段）：報價列 → 價格參考（K 線）→ 研究提醒
+
+IA 從六個區段變七個。`PRIMARY_SECTION_IDS` 與 browser-smoke 的「恰好六個、順序固定」
+斷言同步改成七個。
+
+### 拆頁暴露出來的三個問題
+
+1. **換股票會把你踢出圖表頁**。`SELECT_KLINE_INSTRUMENT` 寫死 `activeSection: "company"`，
+   拆頁之後在技術指標頁按 Enter 換股，畫面會跳回公司財務指標、圖表消失。改成
+   「本來就在技術指標就留著，其他地方進來才落在公司財務指標」。
+2. **一個死條件被我改活之後變成無限重試**。`ensureKlineRuntime` 裡的
+   `activeSection === "market" || "features"` 指的是早就裁掉的區段，永遠不成立；
+   我把它改成 `"technical"` 之後，`/kline` 404 → `KLINE_DATA_MISSING` → render →
+   ensureKlineRuntime → 再打一次，實測 3 秒內打了 290 次。`requestKlineModel` 補上
+   「已標記為沒有資料的選擇不再重打」。**改活一個死條件跟新增一條路徑一樣要驗**。
+3. **`技術指標` 這五個字原本在退場清單裡**。browser-smoke 禁止任何按鈕／連結文字出現
+   `下單|送單|回測|因子|驗證報告|技術指標|AI 信心|強力買進|建議立即`。JY 指定的頁名撞到它，
+   已把 `技術指標` 從清單移除並註明：留下的禁令是關於「照訊號行動」，不是關於「顯示訊號」。
+   其餘八個詞不動。
+
+### 基準線
+
+十四張 pixel 基準線**全部**重釘——導覽多一個項目，每一頁的頁首都變了。這次的重釘沒有
+「其餘逐位元不變」可以當佐證，只能靠 RWD 54/54、dark-audit 0 洩漏、以及人眼。
 
 ---
 

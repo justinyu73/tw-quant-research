@@ -10,7 +10,8 @@
   var SECTIONS = Object.freeze([
     { id: "home", label: "首頁" },
     { id: "watchlist", label: "自選清單" },
-    { id: "company", label: "公司研究" },
+    { id: "company", label: "公司財務指標" },
+    { id: "technical", label: "技術指標" },
     { id: "valuation", label: "估值" },
     { id: "buyplan", label: "買進計畫" },
     { id: "review", label: "投資審查" },
@@ -19,7 +20,7 @@
   ]);
   // Only the first six are primary navigation; evidence/settings stay reachable
   // from inside a page so provenance is never lost.
-  var PRIMARY_SECTION_IDS = Object.freeze(["home", "watchlist", "company", "valuation", "buyplan", "review"]);
+  var PRIMARY_SECTION_IDS = Object.freeze(["home", "watchlist", "company", "technical", "valuation", "buyplan", "review"]);
 
   var WATCHLIST_SCHEMA = "tw-quant-engine-watchlist/v1";
   var ALERT_STORE_SCHEMA = "tqe-in-app-alerts/v1";
@@ -338,7 +339,9 @@
       if (instrumentPeriods.length) {
         var periodExists = instrumentPeriods.indexOf(current.selectedKlinePeriod) >= 0;
         return Object.assign({}, current, {
-          activeSection: "company",
+          // Changing instrument from the chart page must not throw the user off
+          // it; anywhere else lands on the company's numbers first.
+          activeSection: current.activeSection === "technical" ? "technical" : "company",
           selectedKlineInstrumentId: event.instrumentId,
           selectedKlinePeriod: periodExists ? current.selectedKlinePeriod : instrumentPeriods[0],
           klineSelectionMessage: null
@@ -347,11 +350,11 @@
     }
     if (event.type === "SELECT_KLINE_PERIOD") {
       if (klinePeriods(current.view, current.selectedKlineInstrumentId).indexOf(event.period) >= 0) {
-        return Object.assign({}, current, { activeSection: "company", selectedKlinePeriod: event.period, klineSelectionMessage: null });
+        return Object.assign({}, current, { activeSection: "technical", selectedKlinePeriod: event.period, klineSelectionMessage: null });
       }
     }
     if (event.type === "TOGGLE_KLINE_INDICATOR" && ["ma", "ema", "rsi", "macd", "kd", "atr", "volume"].indexOf(event.indicator) >= 0) {
-      return Object.assign({}, current, { activeSection: "company", activeKlineIndicator: event.indicator });
+      return Object.assign({}, current, { activeSection: "technical", activeKlineIndicator: event.indicator });
     }
     if (event.type === "SET_NOTE_DRAFT" && ["title", "body", "tags"].indexOf(event.field) >= 0) {
       return Object.assign({}, current, {

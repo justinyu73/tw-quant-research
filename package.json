@@ -5,7 +5,8 @@
   "scripts": {
     "dashboard:browser-smoke": "node scripts/dashboard-browser-smoke.cjs",
     "dashboard:dark-audit": "node scripts/dashboard-dark-audit.cjs",
-    "dashboard:rwd-audit": "node scripts/dashboard-rwd-audit.cjs"
+    "dashboard:rwd-audit": "node scripts/dashboard-rwd-audit.cjs",
+    "dashboard:alerts-smoke": "node scripts/dashboard-alerts-smoke.cjs"
   },
   "devDependencies": {
     "playwright-core": "1.60.0"
