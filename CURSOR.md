@@ -1,11 +1,11 @@
 <!-- This file is the single mutable state cursor. History = git log -p CURSOR.md -->
 # Cursor
 
-last_commit: b133209
+last_commit: e1b9d83
 branch: main
-last_stage: v0.3.1 已切版並打 tag；#26/#27/#28/#29/#30 全部 merge；dev 驗證 11/11
+last_stage: v0.3.1 桌面版實測：MSI 裝得起來，抓到「下載並更新自選資料」15 秒逾時的缺陷並修掉
 status: PARTIAL
-next_action: 等 desktop-release 產出 v0.3.1 Draft，裝到 Mac 上人為複測四個修正（清單見下）
+next_action: NSIS .exe 安裝到一半失敗尚未修（見下）；桌面版剩餘三個動作仍待複測
 open_questions:
   - sparkline 已實作但畫不出線：各指標只有 1 期，需累積 2 期以上才會出現（刻意不補值）
   - :focus 與 disabled 兩種互動態仍無任何閘覆蓋（hover 已納入 dark-audit）
@@ -254,6 +254,43 @@ IA 從六個區段變七個。`PRIMARY_SECTION_IDS` 與 browser-smoke 的「恰�
 3. **sr-only 標籤被 RWD 稽核判成 clipped**（clientWidth 1 / scrollWidth 50）——正是這個
    repo 之前踩過的同一個形狀。標的列有自己一列、有空間，標籤就正常畫出來，不藏。
 
+
+## v0.3.1 桌面版實測（2026-08-03，Windows）
+
+### NSIS `.exe` 安裝到一半失敗（未修）
+
+JY 回報 `TQR-Windows-x64-setup.exe` 安裝到一半失敗，並指出做 zibaldone 時也一樣。
+兩個 app 的共同點：都是 Tauri＋PyInstaller sidecar（`externalBin`），而且**兩邊都沒設
+`bundle.windows.webviewInstallMode`**，等於用預設的 `downloadBootstrapper`——安裝到一半
+會去微軟伺服器下載 WebView2 runtime。另一個共同嫌疑是 PyInstaller 打包的 sidecar exe
+被防毒攔。TQR 還多一個差異：沒設 `installMode`，預設 perMachine 需要 UAC；zibaldone 是
+`currentUser`。
+
+**`.msi` 可以正常安裝**，所以問題在 NSIS 那條路，不是建置壞掉。release 上的 MSI 我下載
+驗過：magic bytes、WiX 3.14、SHA256 與 SHA256SUMS.txt 一致。
+
+尚未修，因為還沒拿到 NSIS 的實際失敗訊息（NSIS 不出 log）。候選解法：
+`webviewInstallMode: offlineInstaller`（安裝檔變大但不依賴網路）或 `embedBootstrapper`，
+以及 `installMode: currentUser`。
+
+### 「下載並更新自選資料」15 秒就逾時（已修）
+
+按下去顯示「本機資料服務逾時未回應（15 秒）；請確認 TQR 仍在執行後重試」。
+
+根因：`sidecarRequest` 對**每一個**請求套 `AbortSignal.timeout(15000)`，而
+`/data/update` 是去 TWSE 抓整年歷史，本來就要幾分鐘。那個 15 秒是當初為了修「估值卡在
+計算中…」加的讀取上限，被無差別套到長時間下載上。訊息還把原因指向服務沒回應——跟缺陷#4
+同一個形狀。
+
+修法：`sidecarRequest` 接受 `timeoutMs` 覆寫，`/data/update` 用 10 分鐘；逾時訊息改成
+「下載超過 10 分鐘仍未完成；請縮小範圍（改成『目前個股』或減少年數）後重試。」
+
+**閘**：browser-smoke 開一個帶 Tauri stub 的獨立分頁（下載鈕是桌面限定，在預覽頁上永遠
+disabled——第一版的閘就是這樣被靜靜跳過、照樣綠），把 `/data/update` 的回應壓住 17 秒，
+斷言 16.5 秒時仍在「正在下載」。**第一版閘斷言的是錯誤訊息字串，還原修正後照樣綠**
+（訊息換了措辭就抓不到）；改成斷言行為才紅得起來。
+
+---
 
 ## v0.3.1 切版（2026-08-03）
 
