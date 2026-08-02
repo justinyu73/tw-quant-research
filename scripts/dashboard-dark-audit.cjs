@@ -41,7 +41,10 @@ const VIEWPORT = { width: 1440, height: 900 };
 const VIEWS = [
   { id: "home", label: "首頁" },
   { id: "watchlist", label: "自選清單" },
-  { id: "company", label: "公司財務指標", ready: '[data-testid="fundamental-snapshot"]' },
+  // fundamental-snapshot only renders when fundamentals were captured, so it is
+  // absent wherever the sidecar runs without a data dir. company-status always
+  // renders.
+  { id: "company", label: "公司財務指標", ready: '[data-testid="company-status"]' },
   { id: "technical", label: "技術指標", ready: '[data-testid="kline-chart"]' },
   { id: "valuation", label: "估值", ready: '[data-testid="valuation-panel"]' },
   { id: "buyplan", label: "買進計畫" },
