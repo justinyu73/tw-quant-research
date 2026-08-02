@@ -1551,6 +1551,16 @@
       }).join("") + '</div><p class="technical-snapshot-note">若顯示「—」，代表該期間沒有足夠歷史窗口，不以填值或插值掩蓋資料不足。</p></section>';
   }
 
+  // Both per-instrument pages need to switch stock; a second implementation
+  // would drift from this one the first time either changes.
+  function instrumentPickerMarkup(instruments, selectedId) {
+    return '<div class="kline-control symbol-search' + (klineSearchFocused ? " search-open" : "") +
+      '"><label><span>搜尋商品</span><input type="search" autocomplete="off" placeholder="代號、名稱或市場" value="' +
+      escapeHtml(klineSearchQuery || selectedId || "") + '" data-action="kline-search" data-testid="kline-instrument" aria-controls="kline-symbol-results"></label>' +
+      symbolSearchResults(instruments, klineSearchQuery || selectedId || "", [], selectedId, "kline-symbol-results", "kline-search-pick") + '</div>' +
+      klineWatchlistPickerMarkup(selectedId);
+  }
+
   // Typing a code was the only way to change instrument; the watchlist the user
   // already curated was unreachable from the chart.
   function klineWatchlistPickerMarkup(selectedId) {
@@ -1612,9 +1622,6 @@
         text(state.klineSelectionMessage || "此商品與期間沒有已納入的 K 線；不替換成其他期間。") + '</span></div>';
     var indicatorSummary = model && model.indicators && model.indicators[state.activeKlineIndicator];
     return card("行情與 K 線", "收盤資料 · 截止日快照 · 唯讀分析", '<div class="kline-toolbar" data-testid="kline-toolbar">' +
-      '<div class="kline-control symbol-search' + (klineSearchFocused ? " search-open" : "") + '"><label><span>搜尋商品</span><input type="search" autocomplete="off" placeholder="代號、名稱或市場" value="' + escapeHtml(klineSearchQuery || selectedId || "") + '" data-action="kline-search" data-testid="kline-instrument" aria-controls="kline-symbol-results"></label>' +
-      symbolSearchResults(instruments, klineSearchQuery || selectedId || "", [], selectedId, "kline-symbol-results", "kline-search-pick") + '</div>' +
-      klineWatchlistPickerMarkup(selectedId) +
       '<div class="kline-control"><span>期間</span><div class="period-buttons">' + periodButtons + '</div></div>' +
       '<div class="kline-control"><span>指標</span><div class="indicator-buttons">' + indicatorButtons + '</div></div>' +
       '<div class="kline-control chart-tools"><span>圖表工具</span><div class="chart-tool-buttons">' +
@@ -2297,6 +2304,15 @@
     return homePageMarkup();
   }
 
+  function instrumentBarMarkup() {
+    var instrument = selectedKlineInstrument();
+    return '<div class="instrument-bar" data-testid="instrument-picker">' +
+      instrumentPickerMarkup(core.klineInstruments(state.view), state.selectedKlineInstrumentId) +
+      '<span class="instrument-bar-current" data-testid="instrument-bar-current">' +
+      text(instrument ? (instrument.symbol || instrument.instrument_id) + " · " + (instrument.display_name || "") : "尚未選擇商品") +
+      '</span></div>';
+  }
+
   function systemTopbarMarkup() {
     var instruments = core.klineInstruments(state.view);
     return '<header class="topbar system-topbar">' +
@@ -2305,8 +2321,6 @@
       '<nav class="topnav" aria-label="主導覽">' + navMarkup() + '</nav>' +
       '</div>' +
       '<div class="system-topbar-right">' +
-      '<div class="system-global-search symbol-search"><label><input type="search" aria-label="搜尋標的" autocomplete="off" placeholder="代號 / 名稱" value="' + escapeHtml(klineSearchQuery || '') + '" data-action="global-search" data-testid="global-search" aria-controls="global-search-results"></label>' +
-      symbolSearchResults(instruments, klineSearchQuery, [], state.selectedKlineInstrumentId, "global-search-results", "global-search-pick") +
       (state.klineRuntimeStatus === "error"
         ? '<p class="topnav-runtime-error" data-testid="topnav-runtime-error">' + text(state.klineRuntimeMessage || "本機資料服務無法連線") + '</p>'
         : "") + '</div>' +
@@ -2321,11 +2335,13 @@
           '" aria-current="' + (active ? 'page' : 'false') + '">' + text(item && item.label) + '</button>';
       }).join('') + '</nav>' +
       '<button class="btn btn-outline btn-sm" type="button" data-action="reset">重設視圖</button>' +
-      '</div></header>';
+      // One stray </div> here used to close .app-shell, leaving <main> outside
+      // the shell entirely.
+      '</header>';
   }
 
   function render() {
-    root.innerHTML = '<div class="app-shell">' + systemTopbarMarkup() + '<main class="main"><div class="page-wrapper" id="main-content" tabindex="-1">' + mainMarkup() + '</div><footer class="footer"><span>資料格式 ' + text(view.schema) + '</span><span>本機資料 · 人工估值 · 最後決策保留人工</span></footer></main></div>' + detailDialog();
+    root.innerHTML = '<div class="app-shell">' + systemTopbarMarkup() + instrumentBarMarkup() + '<main class="main"><div class="page-wrapper" id="main-content" tabindex="-1">' + mainMarkup() + '</div><footer class="footer"><span>資料格式 ' + text(view.schema) + '</span><span>本機資料 · 人工估值 · 最後決策保留人工</span></footer></main></div>' + detailDialog();
     renderKlineChart();
     ensureKlineRuntime();
     ensureFundamentals();
@@ -2425,7 +2441,7 @@
       watchlistSearchQuery = watchlistSearchSelection;
       watchlistSearchFocused = false;
     }
-    if (action === "kline-search-pick" || action === "global-search-pick") {
+    if (action === "kline-search-pick") {
       selectKlineInstrument(target.getAttribute("data-instrument-id"));
       return;
     }
@@ -2482,7 +2498,7 @@
   root.addEventListener("change", function (event) {
     var target = event.target;
     if (!target) return;
-    if (target.getAttribute("data-action") === "kline-search" || target.getAttribute("data-action") === "global-search") {
+    if (target.getAttribute("data-action") === "kline-search") {
       commitKlineSearch(target);
       return;
     }
@@ -2538,11 +2554,6 @@
       klineSearchQuery = target.value;
       klineSearchFocused = true;
       refreshSearchResults("kline-symbol-results", symbolSearchResults(core.klineInstruments(state.view), klineSearchQuery, [], state.selectedKlineInstrumentId, "kline-symbol-results", "kline-search-pick"));
-      return;
-    }
-    if (target.getAttribute("data-action") === "global-search") {
-      klineSearchQuery = target.value;
-      refreshSearchResults("global-search-results", symbolSearchResults(core.klineInstruments(state.view), klineSearchQuery, [], state.selectedKlineInstrumentId, "global-search-results", "global-search-pick"));
       return;
     }
     if (target.getAttribute("data-action") === "company-record") {

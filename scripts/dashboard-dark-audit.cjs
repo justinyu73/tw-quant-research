@@ -326,8 +326,8 @@ async function main() {
 
     // Select TWSE:2330 once so company/valuation/buyplan render with data
     // rather than their empty states, which would hide most of the surface.
-    await page.locator('[data-testid="global-search"]').fill("2330");
-    await page.locator('[data-testid="global-search-results"] .symbol-search-result').filter({ hasText: "2330" }).first().click();
+    await page.locator('[data-testid="kline-instrument"]').fill("2330");
+    await page.locator('[data-testid="kline-symbol-results"] .symbol-search-result').filter({ hasText: "2330" }).first().click();
 
     for (const view of VIEWS) {
       const link = page.locator(`[data-action="section"][data-section="${view.id}"]`).first();
