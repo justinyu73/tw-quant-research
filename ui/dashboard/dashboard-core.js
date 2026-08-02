@@ -51,6 +51,7 @@
       selectedKlinePeriod: kline.default_period || "1D",
       activeKlineIndicator: "ma",
       klineRuntimeStatus: kline.runtime_fetch ? "idle" : "ready",
+      klineSelectionMessage: null,
       watchlist: {
         items: [],
         status: "idle",
@@ -339,13 +340,14 @@
         return Object.assign({}, current, {
           activeSection: "company",
           selectedKlineInstrumentId: event.instrumentId,
-          selectedKlinePeriod: periodExists ? current.selectedKlinePeriod : instrumentPeriods[0]
+          selectedKlinePeriod: periodExists ? current.selectedKlinePeriod : instrumentPeriods[0],
+          klineSelectionMessage: null
         });
       }
     }
     if (event.type === "SELECT_KLINE_PERIOD") {
       if (klinePeriods(current.view, current.selectedKlineInstrumentId).indexOf(event.period) >= 0) {
-        return Object.assign({}, current, { activeSection: "company", selectedKlinePeriod: event.period });
+        return Object.assign({}, current, { activeSection: "company", selectedKlinePeriod: event.period, klineSelectionMessage: null });
       }
     }
     if (event.type === "TOGGLE_KLINE_INDICATOR" && ["ma", "ema", "rsi", "macd", "kd", "atr", "volume"].indexOf(event.indicator) >= 0) {
@@ -605,12 +607,21 @@
       return reset;
     }
     if (event.type === "KLINE_LOADING") {
-      return Object.assign({}, current, { klineRuntimeStatus: "loading" });
+      return Object.assign({}, current, { klineRuntimeStatus: "loading", klineSelectionMessage: null });
     }
     if (event.type === "KLINE_ERROR") {
       return Object.assign({}, current, {
         klineRuntimeStatus: "error",
         klineRuntimeMessage: event.message || "本機資料服務無法連線；請重新啟動 TQR 後再試。"
+      });
+    }
+    // One instrument with nothing downloaded says nothing about the service,
+    // so the runtime stays ready and only this selection reports the gap.
+    if (event.type === "KLINE_DATA_MISSING") {
+      return Object.assign({}, current, {
+        klineRuntimeStatus: "ready",
+        klineRuntimeMessage: null,
+        klineSelectionMessage: event.message || "這個標的與期間還沒有已下載的 K 線資料。"
       });
     }
     if (event.type === "SET_KLINE_INSTRUMENTS") {
@@ -647,7 +658,8 @@
       });
       return Object.assign({}, current, {
         view: Object.assign({}, current.view, { kline: Object.assign({}, current.view.kline, { models: existingModels }) }),
-        klineRuntimeStatus: "ready"
+        klineRuntimeStatus: "ready",
+        klineSelectionMessage: null
       });
     }
     return current;

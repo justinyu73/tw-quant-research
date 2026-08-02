@@ -15,7 +15,7 @@ const PREVIEW_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "tqr-preview-"));
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
   home: "501188a28a0a7cea992c6d9b8a007f6f4060e90288eec87f92dae2243f15dd9f",
-  company: "6caa7eafaea4d257268c371c87362b3ff12403dcee81fb6781312617aac5d1a7",
+  company: "fb2c59ef31462fc64ad4a1e2f9b7a8e05bdb444b14e741bdd1b4bf7e902a9ac4",
   watchlist: "55118d10f0276bdb25821665c3fac88e7e998588d3b4e76b39d11df677d47027",
   buyplan: "1c6db2b33e1345d5215f4f554c87843796ca73eb8ffbd6ea8c6bbea9432fac95",
   review: "39f2dde16ab38678f8e0af39e5051fa3cf9f80eab3fa96651745e92136b7a301",
@@ -24,7 +24,7 @@ const EXPECTED_SCREENSHOTS = {
   // value here keeps the gate red until a human has looked at the capture.
   home_dark: "59a7e13895cf57df819173dbcc67988b8615135f6db13584e1248daa705a8243",
   watchlist_dark: "07c494a0a228e68a8dfe9e3439928cf028cbdcfe4744297f91edd2f3f565bcf7",
-  company_dark: "2b4425002199406fe262dcc1cb7299586bf9da713f48328e4bfa7adf619eb1d8",
+  company_dark: "38a05c549b3dbc471126bb59bd40360e7ba93c6380b79448f0a3c79025d8e156",
   valuation_dark: "cf8c3eb4f6871201524641aac6ab5a450b6c26f696d4d0cb010f7bc7f07d8596",
   buyplan_dark: "41311281b02d2d9c2b8ff516517c0cc4c445f71b64c9ceb848cb4dcdfdd19651",
   review_dark: "7ebc342c8bad0a330334d6288ecde8cf2658f8ea8829b82f8e2c090b6ce62546",
@@ -56,6 +56,86 @@ async function waitForSidecar(baseUrl) {
 
 function assertOk(condition, message) {
   assert.equal(Boolean(condition), true, message);
+}
+
+// The chart is a canvas: no DOM query can say which instrument it is drawing,
+// so the box could claim one stock while the chart drew another and every
+// existing check still passed. Recording the series handed to
+// lightweight-charts is the only ground truth available to the gate.
+const CHART_PAINT_HOOK = `
+window.__chartPaint = [];
+(function () {
+  var real = null;
+  function define(target, name, value) {
+    Object.defineProperty(target, name, { value: value, writable: true, configurable: true, enumerable: true });
+  }
+  function wrapPane(pane, api) {
+    if (!pane || pane.__paintWrapped) return pane;
+    var origAdd = pane.addSeries.bind(pane);
+    define(pane, "addSeries", function (definition, options) {
+      var series = origAdd(definition, options);
+      var kind = definition === api.CandlestickSeries ? "candles" : definition === api.HistogramSeries ? "volume" : "line";
+      var origSet = series.setData.bind(series);
+      define(series, "setData", function (data) {
+        window.__chartPaint.push({ kind: kind, count: data.length, last: data[data.length - 1] || null });
+        return origSet(data);
+      });
+      return series;
+    });
+    define(pane, "__paintWrapped", true);
+    return pane;
+  }
+  function wrap(api) {
+    if (!api || api.__paintWrapped) return api;
+    // The library's exports are non-writable, so a plain assignment on a
+    // derived object fails silently and the hook records nothing.
+    var proxy = Object.create(api);
+    define(proxy, "__paintWrapped", true);
+    define(proxy, "createChart", function (container, options) {
+      var chart = api.createChart(container, options);
+      var origPanes = chart.panes.bind(chart);
+      var origAddPane = chart.addPane.bind(chart);
+      define(chart, "panes", function () { return origPanes().map(function (pane) { return wrapPane(pane, api); }); });
+      define(chart, "addPane", function () { return wrapPane(origAddPane(), api); });
+      return chart;
+    });
+    return proxy;
+  }
+  Object.defineProperty(window, "LightweightCharts", {
+    configurable: true,
+    get: function () { return real; },
+    set: function (value) { real = wrap(value); }
+  });
+})();
+`;
+
+// The chart, the title and the search box must all name the same instrument.
+async function assertChartIdentity(page, sidecarBaseUrl, instruments, expectedId, label) {
+  // Callers clear the recording before acting, so this also fails the switch
+  // that changes the state and never repaints.
+  await page.waitForFunction(() => (window.__chartPaint || []).some((entry) => entry.kind === "candles"));
+  const period = await page.locator('[data-testid="kline-period-label"]').innerText();
+  const response = await fetch(`${sidecarBaseUrl}/kline?instrument=${encodeURIComponent(expectedId)}&period=${encodeURIComponent(period)}`);
+  assertOk(response.ok, `${label}: sidecar has no ${expectedId}/${period} model to compare against`);
+  const bars = (await response.json()).data.bars;
+  const expectedBar = bars[bars.length - 1];
+  const instrument = instruments.find((item) => item.instrument_id === expectedId);
+  assertOk(instrument, `${label}: ${expectedId} missing from the instrument catalog`);
+
+  const painted = await page.evaluate(() => {
+    const candles = (window.__chartPaint || []).filter((entry) => entry.kind === "candles");
+    return candles.length ? candles[candles.length - 1] : null;
+  });
+  assertOk(painted, `${label}: nothing was painted onto the chart canvas`);
+  assert.equal(painted.count, bars.length, `${label}: canvas is drawing ${painted.count} bars, ${expectedId} has ${bars.length}`);
+  assert.equal(painted.last.time, expectedBar.trading_date, `${label}: canvas last date does not belong to ${expectedId}`);
+  assert.equal(painted.last.close, expectedBar.close, `${label}: canvas last close does not belong to ${expectedId}`);
+  assert.equal(await page.locator('[data-testid="kline-instrument"]').inputValue(), expectedId, `${label}: search box names a different instrument than the canvas`);
+  assert.match(
+    await page.locator('[data-testid="kline-instrument-label"]').innerText(),
+    new RegExp(instrument.display_name),
+    `${label}: chart title names a different instrument than the canvas`,
+  );
 }
 
 function findChromium(playwright) {
@@ -160,7 +240,7 @@ async function main() {
     stdio: ["ignore", "pipe", "pipe"],
   });
   process.on("exit", () => sidecar.kill());
-  await waitForSidecar(sidecarBaseUrl);
+  const catalog = await waitForSidecar(sidecarBaseUrl);
   const build = spawnSync("python3", ["scripts/build_dashboard_preview.py"], {
     cwd: ROOT,
     encoding: "utf8",
@@ -186,6 +266,7 @@ async function main() {
   // Valuation date and thesis last-checked default to today, so an unpinned
   // clock would drift the pixel baselines every calendar day.
   await page.clock.setFixedTime(new Date("2026-07-22T04:00:00Z"));
+  await page.addInitScript(CHART_PAINT_HOOK);
   page.on("pageerror", (error) => browserErrors.push(`pageerror: ${error.message}`));
   page.on("console", (message) => {
     if (message.type() === "error") browserErrors.push(`console: ${message.text()}`);
@@ -266,6 +347,49 @@ async function main() {
     assert.equal(await page.locator('[data-testid="trend-month-row"]').count(), 2);
     assert.match(await page.locator('[data-testid="kline-coverage"]').innerText(), /360 \/ 交易日 360/);
 
+    // Instrument switching: canvas == title == search box, after every commit
+    // path. A research tool drawing the previous stock under the new stock's
+    // name is the worst failure mode this UI has.
+    await assertChartIdentity(page, sidecarBaseUrl, catalog.instruments, "TWSE:2330", "opening the company page");
+
+    // Keyboard commit. Typing a code and pressing Enter used to change nothing
+    // but the box, which then kept claiming 2317 over 2330's chart.
+    await page.evaluate(() => { window.__chartPaint = []; });
+    await page.locator('[data-testid="kline-instrument"]').fill("2317");
+    await page.locator('[data-testid="kline-instrument"]').press("Enter");
+    await page.locator('[data-testid="kline-chart"]').waitFor();
+    await settle(page);
+    await assertChartIdentity(page, sidecarBaseUrl, catalog.instruments, "TWSE:2317", "after committing 2317 with Enter");
+
+    // Result-list commit, from a query that does not resolve on its own: the
+    // blur handler must not repaint the list out from under the click.
+    await page.evaluate(() => { window.__chartPaint = []; });
+    await page.locator('[data-testid="kline-instrument"]').fill("台積");
+    await page.locator('[data-testid="kline-symbol-results"] button[data-instrument-id="TWSE:2330"]').click();
+    await page.locator('[data-testid="kline-chart"]').waitFor();
+    await settle(page);
+    await assertChartIdentity(page, sidecarBaseUrl, catalog.instruments, "TWSE:2330", "after picking 2330 from the result list");
+
+    // An uncommitted query may differ from the chart while the user types, but
+    // it must not survive the next interaction as a claim about the chart.
+    await page.locator('[data-testid="kline-instrument"]').fill("2317");
+    await page.locator('[data-testid="kline-period-1W"]').click();
+    await page.waitForFunction(() => document.querySelector('[data-testid="kline-period-label"]').textContent === "1W");
+    assert.equal(await page.locator('[data-testid="kline-instrument"]').inputValue(), "TWSE:2317");
+
+    // Leave the page on the instrument the rest of the smoke expects.
+    await page.evaluate(() => { window.__chartPaint = []; });
+    await page.locator('[data-testid="kline-instrument"]').fill("2330");
+    await page.locator('[data-testid="kline-instrument"]').press("Enter");
+    await page.locator('[data-testid="kline-period-1D"]').click();
+    await page.locator('[data-testid="kline-chart"]').waitFor();
+    await settle(page);
+    await assertChartIdentity(page, sidecarBaseUrl, catalog.instruments, "TWSE:2330", "after returning to 2330");
+
+    // The curated watchlist has to be reachable from the chart, not only by
+    // typing a code from memory.
+    assert.equal(await page.locator('[data-testid="kline-watchlist-select"]').count(), 1);
+
     await page.locator('[data-testid="note-title"]').fill("2330 研究觀察");
     await page.locator('[data-testid="note-body"]').fill("價格與技術線先記錄，等待下一次財報核對。");
     await page.locator('[data-testid="note-submit"]').click();
@@ -322,6 +446,21 @@ async function main() {
     // No valuation yet: value-derived columns must be em dashes, never inferred.
     assert.equal(await page.locator('[data-testid="watchlist-base-value"]').first().innerText(), "—");
     assert.equal(await page.locator('[data-testid="watchlist-discount"]').first().innerText(), "—");
+    // A stock that is already tracked exists; answering "找不到符合的商品" for
+    // it is the box lying about the catalog. It stays in the results, marked,
+    // and the add button carries the real reason.
+    await watchlistPicker.fill("2330");
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="watchlist-symbol-results"] .symbol-search-result').length > 0);
+    assert.equal(await page.locator('[data-testid="watchlist-symbol-results"] .symbol-search-empty').count(), 0);
+    const trackedResult = page.locator('[data-testid="watchlist-symbol-results"] .symbol-search-result[data-instrument-id="TWSE:2330"]');
+    assert.equal(await trackedResult.count(), 1);
+    assert.equal(await trackedResult.isDisabled(), true);
+    assert.match(await trackedResult.innerText(), /已在自選清單/);
+    assert.match(await page.locator('[data-testid="watchlist-add-issues"]').innerText(), /此商品已在目前群組/);
+    // A code that really is absent still says so.
+    await watchlistPicker.fill("999999");
+    await page.waitForFunction(() => document.querySelector('[data-testid="watchlist-symbol-results"] .symbol-search-empty') !== null);
+
     await watchlistPicker.fill("2308");
     assert.equal(await page.locator('[data-testid="watchlist-add"]').isDisabled(), false);
     await page.locator('[data-testid="watchlist-add"]').click();
@@ -541,6 +680,27 @@ async function main() {
     await page.locator('[data-action="section"][data-section="settings"]').first().click();
     await page.locator('[data-testid="theme-light"]').click();
     assert.equal(await page.evaluate(() => document.documentElement.getAttribute("data-theme")), null);
+
+    // A stock with nothing downloaded yet must not be reported as a dead
+    // sidecar: that message sent the user off to restart a service that was
+    // running fine. Runs last so the served bundle is untouched beforehand.
+    const errorsBeforeDataGap = browserErrors.length;
+    await page.route(`${sidecarBaseUrl}/kline?instrument=${encodeURIComponent("TWSE:2317")}*`, (route) =>
+      route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "kline_not_found" }) }));
+    await page.locator('[data-action="section"][data-section="company"]').first().click();
+    await page.locator('[data-testid="kline-instrument"]').fill("2317");
+    await page.locator('[data-testid="kline-instrument"]').press("Enter");
+    await page.waitForFunction(() => document.querySelector('[data-testid="kline-empty"]') !== null);
+    assert.match(await page.locator('[data-testid="kline-empty"]').innerText(), /還沒有已下載的 K 線資料/);
+    assert.equal(await page.locator('[data-testid="topnav-runtime-error"]').count(), 0);
+    await page.unroute(`${sidecarBaseUrl}/kline?instrument=${encodeURIComponent("TWSE:2317")}*`);
+    // The simulated 404 is the subject of this check, not a defect in the page.
+    const dataGapNoise = browserErrors.splice(errorsBeforeDataGap);
+    assert.equal(
+      dataGapNoise.every((entry) => entry.includes("404")),
+      true,
+      `unexpected browser errors during the data-gap check: ${JSON.stringify(dataGapNoise)}`,
+    );
 
     assert.deepEqual(browserErrors, []);
     assert.deepEqual(externalRequests, []);
