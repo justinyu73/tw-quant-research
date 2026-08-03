@@ -81,6 +81,27 @@ assert.equal(state.activeSection, "home");
 assert.equal(state.view.read_only, true);
 assert.deepEqual(state.watchlist.items, ["TWSE:2330", "TAIFEX:TX:202608", "TPEx:006201"]);
 
+const pickerView = {
+  kline: {
+    default_instrument_id: "TWSE:2330",
+    default_period: "1D",
+    instruments: [
+      { instrument_id: "TWSE:2330", market: "TWSE", symbol: "2330", display_name: "台積電", periods: ["1D"] }
+    ],
+    models: []
+  }
+};
+let pickerState = core.createInitialState(pickerView);
+pickerState = core.reduce(pickerState, { type: "SELECT_SECTION", section: "watchlist" });
+pickerState = core.reduce(pickerState, { type: "SELECT_KLINE_INSTRUMENT", instrumentId: "TWSE:2330" });
+assert.equal(pickerState.activeSection, "watchlist");
+pickerState = core.reduce(pickerState, { type: "SELECT_KLINE_INSTRUMENT", instrumentId: "TPEx:5289" });
+assert.equal(pickerState.activeSection, "watchlist");
+assert.equal(pickerState.selectedKlineInstrumentId, "TPEx:5289");
+pickerState = core.reduce(pickerState, { type: "SELECT_SECTION", section: "home" });
+pickerState = core.reduce(pickerState, { type: "SELECT_KLINE_INSTRUMENT", instrumentId: "TWSE:2330" });
+assert.equal(pickerState.activeSection, "company");
+
 // P6 in-app alerts: session-local definitions, flat store payload, in-app events only
 const alertDef = {
   schema: "tqe-in-app-alert/v1",

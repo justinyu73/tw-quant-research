@@ -18,6 +18,7 @@ from tw_quant_engine.desktop_sidecar import (  # noqa: E402
     SIDECAR_INSTRUMENTS_SCHEMA,
     SIDECAR_KLINE_SCHEMA,
     SidecarContractError,
+    _update_instrument,
     create_server,
     load_catalog,
     validate_loopback_host,
@@ -25,6 +26,13 @@ from tw_quant_engine.desktop_sidecar import (  # noqa: E402
 
 
 class DesktopSidecarTests(unittest.TestCase):
+    def test_update_resolves_a_new_tpex_instrument_without_local_kline(self) -> None:
+        instrument = _update_instrument(self.catalog, "TPEx:5289")
+        self.assertIsNotNone(instrument)
+        self.assertEqual(instrument["instrument_id"], "TPEx:5289")
+        self.assertEqual(instrument["market"], "TPEx")
+        self.assertEqual(instrument["symbol"], "5289")
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.catalog = load_catalog(ROOT / "tests" / "fixtures")

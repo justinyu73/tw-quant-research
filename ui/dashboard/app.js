@@ -25,9 +25,6 @@
   var KLINE_INSTRUMENTS_RETRY_MS = 500;
   var notesLoadStarted = false;
   var notesPersistenceAvailable = null;
-  var watchlistSearchQuery = "";
-  var watchlistSearchSelection = null;
-  var watchlistSearchFocused = false;
   var watchlistGroupNameQuery = "";
   var klineSearchQuery = state.selectedKlineInstrumentId || "";
   var klineSearchFocused = false;
@@ -502,9 +499,21 @@
 
 
   function selectedKlineInstrument() {
-    return core.klineInstruments(state.view).find(function (instrument) {
+    var existing = core.klineInstruments(state.view).find(function (instrument) {
       return instrument.instrument_id === state.selectedKlineInstrumentId;
-    }) || null;
+    });
+    if (existing) return existing;
+    var match = /^(TWSE|TPEX):([1-9][0-9]{3})$/i.exec(String(state.selectedKlineInstrumentId || "").trim());
+    if (!match) return null;
+    var market = match[1].toUpperCase() === "TWSE" ? "TWSE" : "TPEx";
+    return {
+      instrument_id: market + ":" + match[2],
+      market: market,
+      symbol: match[2],
+      display_name: "尚未下載",
+      asset_class: "equity",
+      currency: "TWD"
+    };
   }
 
   function klineLabel(model, instrument) {
@@ -1211,26 +1220,6 @@
     if (current) current.outerHTML = markup;
   }
 
-  // The empty-query guidance doubles as the add-button gate, but showing it
-  // as a warning right after a successful add reads like an error. Only
-  // surface it while the user is interacting with the search box.
-  function visibleWatchlistAddIssues(issues) {
-    if (String(watchlistSearchQuery || "").trim() || watchlistSearchFocused) return issues;
-    return issues.filter(function (item) { return item.field !== "query"; });
-  }
-
-  function refreshWatchlistAddButtons() {
-    var instruments = core.klineInstruments(state.view);
-    var items = core.watchlistItemsForActiveGroup(state);
-    var selected = instrumentForId(watchlistSearchSelection) || resolveSearchSelection(instruments, watchlistSearchQuery);
-    var issues = core.watchlistAddIssues({ query: watchlistSearchQuery, selected: selected, items: items });
-    root.querySelectorAll('[data-action="watchlist-add"]').forEach(function (button) {
-      button.disabled = issues.length > 0;
-    });
-    var visible = visibleWatchlistAddIssues(issues);
-    refreshFormIssues("watchlist-add-issues", visible);
-  }
-
   function requestWatchlistModels() {
     if (state.klineRuntimeStatus !== "ready") return;
     (state.watchlist && state.watchlist.items || []).forEach(function (instrumentId) {
@@ -1350,11 +1339,11 @@
 
   function dataUpdateResultMarkup(results) {
     if (!Array.isArray(results) || !results.length) return "";
-    var labels = { success: "完成", partial: "部分完成", error: "失敗", unsupported: "未支援" };
+    var labels = { pass: "PASS", success: "完成", partial: "部分完成", error: "失敗", unsupported: "未支援" };
     return '<div class="data-update-results" data-testid="data-update-results">' + results.map(function (result) {
       var instrument = instrumentForId(result.instrument_id) || {};
       var name = instrument.symbol || result.symbol || result.instrument_id || "未指定標的";
-      var detail = result.bars_downloaded ? "K 線 " + result.bars_downloaded + " 筆" : (result.errors && result.errors[0] && (result.errors[0].error || result.errors[0].message)) || "沒有新增資料";
+      var detail = result.message || (result.bars_downloaded ? "K 線 " + result.bars_downloaded + " 筆" : (result.errors && result.errors[0] && (result.errors[0].error || result.errors[0].message)) || "沒有新增資料");
       return '<div class="data-update-result"><span><strong>' + text(name) + '</strong><small>' + text(instrument.display_name || result.display_name || result.instrument_id) + '</small></span><span class="data-update-result-status status-' + escapeHtml(result.status || "error") + '">' + text(labels[result.status] || result.status || "失敗") + '</span><small class="data-update-result-detail">' + text(detail) + '</small></div>';
     }).join("") + '</div>';
   }
@@ -1382,7 +1371,7 @@
     }).then(function (payload) {
       var result = payload && payload.data || {};
       var message = update.scope === "watchlist"
-        ? "自選更新：" + (result.updated_count || 0) + "/" + (result.requested_count || instrumentIds.length) + " 檔，K 線 " + (result.bars_downloaded || 0) + " 筆"
+        ? "自選更新：" + ((result.updated_count || 0) + (result.passed_count || 0)) + "/" + (result.requested_count || instrumentIds.length) + " 檔就緒（新增 " + (result.updated_count || 0) + "，PASS " + (result.passed_count || 0) + "），K 線 " + (result.bars_downloaded || 0) + " 筆"
         : "目前個股：K 線 " + (result.bars_downloaded || 0) + " 筆";
       state = core.reduce(state, { type: "DATA_UPDATE_SUCCESS", status: result.status || "success", message: message, results: result.results || [result] });
       if (Array.isArray(payload.instruments)) {
@@ -1503,24 +1492,19 @@
   }
 
   function watchlistMarkup() {
-    var instruments = core.klineInstruments(state.view);
     var items = core.watchlistItemsForActiveGroup(state);
     var groups = Array.isArray(state.watchlistGroups) ? state.watchlistGroups : [{ id: "default", name: "我的自選", items: items }];
-    var selected = instrumentForId(watchlistSearchSelection) || resolveSearchSelection(instruments, watchlistSearchQuery);
     var saving = state.watchlist && state.watchlist.status === "saving";
     var canSave = state.watchlist && state.watchlist.dirty && !saving && watchlistPersistenceAvailable !== false;
     var activeGroup = groups.find(function (group) { return group.id === state.activeWatchlistGroupId; }) || groups[0];
     var canDeleteGroup = activeGroup && activeGroup.id !== "default";
     var groupNameIssues = core.watchlistGroupNameIssues(watchlistGroupNameQuery);
-    var watchlistAddIssueList = core.watchlistAddIssues({ query: watchlistSearchQuery, selected: selected, items: items });
     return card("自選清單", "本機保存 · 明確儲存 · 資料唯讀", '<div class="watchlist-toolbar-shell"><div class="watchlist-toolbar" data-testid="watchlist-toolbar">' +
       '<section class="watchlist-toolbar-grouping" aria-label="自選群組管理"><div class="watchlist-group-control"><label class="watchlist-group-picker"><span>目前群組</span><select data-action="watchlist-group-select" data-testid="watchlist-group-select">' + groups.map(function (group) {
         return '<option value="' + escapeHtml(group.id) + '"' + (group.id === state.activeWatchlistGroupId ? ' selected' : '') + '>' + text(group.name) + ' · ' + group.items.length + '</option>';
       }).join("") + '</select></label><button class="btn btn-outline btn-sm watchlist-group-delete" type="button" data-action="watchlist-group-delete" data-group-id="' + escapeHtml(activeGroup && activeGroup.id || "default") + '" data-testid="watchlist-group-delete"' + (canDeleteGroup ? '' : ' disabled') + '>刪除群組</button></div>' +
       '<div class="watchlist-group-new-control"><label class="watchlist-group-new"><span>新增群組</span><input type="text" maxlength="32" placeholder="例如 半導體" value="' + escapeHtml(watchlistGroupNameQuery) + '" data-action="watchlist-group-name" data-testid="watchlist-group-name"></label>' +
       '<button class="btn btn-outline" type="button" data-action="watchlist-group-create" data-testid="watchlist-group-create"' + (groupNameIssues.length ? ' disabled' : '') + '>建立群組</button>' + formIssuesMarkup(groupNameIssues, "watchlist-group-issues") + '</div></section>' +
-      '<section class="watchlist-toolbar-search" aria-label="搜尋並加入商品"><div class="watchlist-picker symbol-search' + (watchlistSearchFocused ? " search-open" : "") + '"><label><span>搜尋商品</span><input type="search" autocomplete="off" placeholder="代號、名稱或市場，例如 2330 / 台積電" value="' + escapeHtml(watchlistSearchQuery) + '" data-action="watchlist-search" data-testid="watchlist-picker" aria-controls="watchlist-symbol-results"></label>' +
-      symbolSearchResults(instruments, watchlistSearchQuery, items, watchlistSearchSelection, "watchlist-symbol-results", "watchlist-search-pick") + '</div><button class="btn btn-primary" type="button" data-action="watchlist-add" data-testid="watchlist-add"' + (watchlistAddIssueList.length ? ' disabled' : '') + '>加入自選</button>' + formIssuesMarkup(visibleWatchlistAddIssues(watchlistAddIssueList), "watchlist-add-issues") + '</section>' +
       '<section class="watchlist-toolbar-actions" aria-label="自選清單操作"><button class="btn btn-outline" type="button" data-action="watchlist-clear" data-testid="watchlist-clear"' + (items.length ? '' : ' disabled') + '>清除草稿</button>' +
       '<button class="btn btn-primary" type="button" data-action="watchlist-save" data-testid="watchlist-save"' + (canSave ? '' : ' disabled') + '>儲存自選清單</button></section>' +
       '<span class="watchlist-state" data-testid="watchlist-state">' + text(watchlistStatus()) + '</span></div></div>' +
@@ -2316,11 +2300,20 @@
 
   function instrumentBarMarkup() {
     var instrument = selectedKlineInstrument();
+    var selectedId = state.selectedKlineInstrumentId;
+    var quickAdd = "";
+    if (state.activeSection === "watchlist") {
+      var items = core.watchlistItemsForActiveGroup(state);
+      var activeGroup = (state.watchlistGroups || []).find(function (group) { return group.id === state.activeWatchlistGroupId; });
+      var alreadyInGroup = Boolean(selectedId && items.indexOf(selectedId) >= 0);
+      var addLabel = alreadyInGroup ? "已在目前群組" : "加入目前群組";
+      quickAdd = '<div class="instrument-bar-action"><span>目前群組：' + text(activeGroup ? activeGroup.name : "我的自選") + '</span><button class="btn ' + (alreadyInGroup ? "btn-outline" : "btn-primary") + ' btn-sm" type="button" data-action="watchlist-add-selected" data-testid="instrument-add-to-watchlist"' + (!instrument || alreadyInGroup ? " disabled" : "") + '>' + addLabel + '</button></div>';
+    }
     return '<div class="instrument-bar" data-testid="instrument-picker">' +
       instrumentPickerMarkup(core.klineInstruments(state.view), state.selectedKlineInstrumentId) +
       '<span class="instrument-bar-current" data-testid="instrument-bar-current">' +
       text(instrument ? (instrument.symbol || instrument.instrument_id) + " · " + (instrument.display_name || "") : "尚未選擇商品") +
-      '</span></div>';
+      '</span>' + quickAdd + '</div>';
   }
 
   function systemTopbarMarkup() {
@@ -2446,11 +2439,6 @@
     if (action === "product") state = core.reduce(state, { type: "OPEN_PRODUCT_DETAIL", index: Number(target.getAttribute("data-index")) });
     if (action === "kline-period") state = core.reduce(state, { type: "SELECT_KLINE_PERIOD", period: target.getAttribute("data-period") });
     if (action === "kline-indicator") state = core.reduce(state, { type: "TOGGLE_KLINE_INDICATOR", indicator: target.getAttribute("data-indicator") });
-    if (action === "watchlist-search-pick") {
-      watchlistSearchSelection = target.getAttribute("data-instrument-id");
-      watchlistSearchQuery = watchlistSearchSelection;
-      watchlistSearchFocused = false;
-    }
     if (action === "kline-search-pick") {
       selectKlineInstrument(target.getAttribute("data-instrument-id"));
       return;
@@ -2462,23 +2450,14 @@
       chartDrawingMode = false;
       state = core.reduce(state, { type: "TOGGLE_KLINE_INDICATOR", indicator: chartTemplateName === "research" ? "ma" : "ema" });
     }
-    if (action === "watchlist-add") {
-      var exactSelection = resolveSearchSelection(core.klineInstruments(state.view), watchlistSearchQuery);
-      var addInstrumentId = watchlistSearchSelection || (exactSelection && exactSelection.instrument_id);
-      if (addInstrumentId) {
-        state = core.reduce(state, { type: "TOGGLE_WATCHLIST", instrumentId: addInstrumentId });
-        watchlistSearchSelection = null;
-        watchlistSearchQuery = "";
-        watchlistSearchFocused = false;
-      }
+    if (action === "watchlist-add-selected" && state.selectedKlineInstrumentId) {
+      state = core.reduce(state, { type: "TOGGLE_WATCHLIST", instrumentId: state.selectedKlineInstrumentId });
     }
     if (action === "watchlist-toggle" && state.selectedKlineInstrumentId) {
       state = core.reduce(state, { type: "TOGGLE_WATCHLIST", instrumentId: state.selectedKlineInstrumentId });
     }
     if (action === "watchlist-remove") {
       state = core.reduce(state, { type: "REMOVE_WATCHLIST", instrumentId: target.getAttribute("data-instrument-id") });
-      if (watchlistSearchSelection === target.getAttribute("data-instrument-id")) watchlistSearchSelection = null;
-      watchlistSearchFocused = false;
     }
     if (action === "watchlist-clear") {
       if (window.confirm("確定清除目前自選草稿？要同步到本機 JSON，仍需再按「儲存自選清單」。")) {
@@ -2489,9 +2468,6 @@
     if (action === "reset") {
       if (!state.watchlist || !state.watchlist.dirty || window.confirm("目前自選草稿尚未儲存；確定只重設視圖、不清除本機自選清單？")) {
         state = core.reduce(state, { type: "RESET" });
-        watchlistSearchSelection = null;
-        watchlistSearchQuery = "";
-        watchlistSearchFocused = false;
         klineSearchQuery = state.selectedKlineInstrumentId || "";
         klineSearchFocused = false;
         chartDrawingMode = false;
@@ -2502,7 +2478,7 @@
     }
     render();
     if (action === "kline-period") requestKlineModel();
-    if (action === "watchlist-add" || action === "watchlist-toggle") requestWatchlistModels();
+    if (action === "watchlist-add-selected" || action === "watchlist-toggle") requestWatchlistModels();
   });
 
   root.addEventListener("change", function (event) {
@@ -2543,15 +2519,6 @@
   root.addEventListener("input", function (event) {
     var target = event.target;
     if (!target) return;
-    if (target.getAttribute("data-action") === "watchlist-search") {
-      watchlistSearchQuery = target.value;
-      watchlistSearchSelection = null;
-      watchlistSearchFocused = true;
-      var watchlistResults = symbolSearchResults(core.klineInstruments(state.view), watchlistSearchQuery, core.watchlistItemsForActiveGroup(state), null, "watchlist-symbol-results", "watchlist-search-pick");
-      refreshSearchResults("watchlist-symbol-results", watchlistResults);
-      refreshWatchlistAddButtons();
-      return;
-    }
     if (target.getAttribute("data-action") === "watchlist-group-name") {
       watchlistGroupNameQuery = target.value;
       var groupNameIssuesNow = core.watchlistGroupNameIssues(watchlistGroupNameQuery);

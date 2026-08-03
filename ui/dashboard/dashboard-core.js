@@ -336,14 +336,20 @@
     }
     if (event.type === "SELECT_KLINE_INSTRUMENT") {
       var instrumentPeriods = klinePeriods(current.view, event.instrumentId);
-      if (instrumentPeriods.length) {
+      // A valid Taiwan equity watchlist entry may be newly added before its
+      // first local K-line snapshot exists. Keep it selectable so the bounded
+      // data-update command can classify/fetch it; missing bars are a data gap,
+      // not a navigation jump.
+      var updateableTaiwanEquity = /^(TWSE|TPEX):[1-9][0-9]{3}$/.test(String(event.instrumentId || "").trim().toUpperCase());
+      if (instrumentPeriods.length || updateableTaiwanEquity) {
         var periodExists = instrumentPeriods.indexOf(current.selectedKlinePeriod) >= 0;
         return Object.assign({}, current, {
-          // Changing instrument from the chart page must not throw the user off
-          // it; anywhere else lands on the company's numbers first.
-          activeSection: current.activeSection === "technical" ? "technical" : "company",
+          // Keep a stock selection inside the current work surface. The home
+          // page is the one intentional exception: its shared picker opens the
+          // company's numbers so the selection has an immediate read model.
+          activeSection: current.activeSection === "home" ? "company" : current.activeSection,
           selectedKlineInstrumentId: event.instrumentId,
-          selectedKlinePeriod: periodExists ? current.selectedKlinePeriod : instrumentPeriods[0],
+          selectedKlinePeriod: periodExists ? current.selectedKlinePeriod : (instrumentPeriods[0] || "1D"),
           klineSelectionMessage: null
         });
       }

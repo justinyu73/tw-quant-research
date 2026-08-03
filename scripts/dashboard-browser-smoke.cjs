@@ -464,12 +464,16 @@ async function main() {
     assert.equal(await page.locator('[data-testid="data-update-button"]').isDisabled(), true);
     assert.match(await page.locator('[data-testid="data-update-status"]').innerText(), /瀏覽器預覽不下載/);
 
-    const watchlistPicker = page.locator('[data-testid="watchlist-picker"]');
+    // Symbol search is owned by the shared instrument bar. Watchlist keeps
+    // group/save controls and the bar supplies the contextual add action.
+    assert.equal(await page.locator('[data-testid="watchlist-picker"]').count(), 0);
+    const watchlistPicker = page.locator('[data-testid="kline-instrument"]');
     await watchlistPicker.click();
     assert.equal(await watchlistPicker.evaluate((element) => document.activeElement === element), true);
-    await watchlistPicker.type("2330");
-    await page.locator('[data-testid="watchlist-symbol-results"] .symbol-search-result').filter({ hasText: "2330" }).first().click();
-    await page.locator('[data-testid="watchlist-add"]').click();
+    await watchlistPicker.fill("2330");
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="kline-symbol-results"] .symbol-search-result').length > 0);
+    await page.locator('[data-testid="kline-symbol-results"] .symbol-search-result').filter({ hasText: "2330" }).first().click();
+    await page.locator('[data-testid="instrument-add-to-watchlist"]').click();
     await page.locator('[data-testid="watchlist-table"]').waitFor();
     assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 1);
     assert.deepEqual(
@@ -481,24 +485,25 @@ async function main() {
     // No valuation yet: value-derived columns must be em dashes, never inferred.
     assert.equal(await page.locator('[data-testid="watchlist-base-value"]').first().innerText(), "—");
     assert.equal(await page.locator('[data-testid="watchlist-discount"]').first().innerText(), "—");
-    // A stock that is already tracked exists; answering "找不到符合的商品" for
-    // it is the box lying about the catalog. It stays in the results, marked,
-    // and the add button carries the real reason.
+    // A stock that is already tracked remains searchable in the shared picker;
+    // the contextual add action is the only disabled state.
     await watchlistPicker.fill("2330");
-    await page.waitForFunction(() => document.querySelectorAll('[data-testid="watchlist-symbol-results"] .symbol-search-result').length > 0);
-    assert.equal(await page.locator('[data-testid="watchlist-symbol-results"] .symbol-search-empty').count(), 0);
-    const trackedResult = page.locator('[data-testid="watchlist-symbol-results"] .symbol-search-result[data-instrument-id="TWSE:2330"]');
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="kline-symbol-results"] .symbol-search-result').length > 0);
+    assert.equal(await page.locator('[data-testid="kline-symbol-results"] .symbol-search-empty').count(), 0);
+    const trackedResult = page.locator('[data-testid="kline-symbol-results"] .symbol-search-result[data-instrument-id="TWSE:2330"]');
     assert.equal(await trackedResult.count(), 1);
-    assert.equal(await trackedResult.isDisabled(), true);
-    assert.match(await trackedResult.innerText(), /已在自選清單/);
-    assert.match(await page.locator('[data-testid="watchlist-add-issues"]').innerText(), /此商品已在目前群組/);
+    assert.equal(await trackedResult.isDisabled(), false);
+    assert.equal(await page.locator('[data-testid="instrument-add-to-watchlist"]').isDisabled(), true);
+    assert.match(await page.locator('[data-testid="instrument-add-to-watchlist"]').innerText(), /已在目前群組/);
     // A code that really is absent still says so.
     await watchlistPicker.fill("999999");
-    await page.waitForFunction(() => document.querySelector('[data-testid="watchlist-symbol-results"] .symbol-search-empty') !== null);
+    await page.waitForFunction(() => document.querySelector('[data-testid="kline-symbol-results"] .symbol-search-empty') !== null);
 
     await watchlistPicker.fill("2308");
-    assert.equal(await page.locator('[data-testid="watchlist-add"]').isDisabled(), false);
-    await page.locator('[data-testid="watchlist-add"]').click();
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="kline-symbol-results"] .symbol-search-result').length > 0);
+    await page.locator('[data-testid="kline-symbol-results"] .symbol-search-result[data-instrument-id="TWSE:2308"]').click();
+    assert.equal(await page.locator('[data-testid="instrument-add-to-watchlist"]').isDisabled(), false);
+    await page.locator('[data-testid="instrument-add-to-watchlist"]').click();
     assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 2);
     await page.locator('[data-action="watchlist-remove"][data-instrument-id="TWSE:2308"]').click();
     assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 1);
@@ -687,7 +692,6 @@ async function main() {
       await page.setViewportSize(size);
       await assertNoOverlap(page, [
         '[data-testid="watchlist-toolbar"] .watchlist-toolbar-grouping',
-        '[data-testid="watchlist-toolbar"] .watchlist-toolbar-search',
         '[data-testid="watchlist-toolbar"] .watchlist-toolbar-actions',
         '[data-testid="watchlist-state"]',
       ], `watchlist toolbar at ${size.width}px`);

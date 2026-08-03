@@ -207,10 +207,12 @@ def update_twse_history(
     monthly official requests, and writes raw responses plus normalized K6a
     snapshots only after each response passes the OHLCV admission rules.
     """
-    instrument_id = str(instrument.get("instrument_id") or "")
-    market = str(instrument.get("market") or "")
+    instrument_id = str(instrument.get("instrument_id") or "").strip()
+    market = str(instrument.get("market") or "").strip().upper()
     symbol = str(instrument.get("symbol") or "").strip()
     if market != "TWSE" or not re.fullmatch(r"[1-9][0-9]{3}", symbol):
+        if market == "TPEX":
+            raise DataUpdateError("目前本機更新先支援 TWSE 四位數上市個股；TPEx 個股（例如 5289）尚未納入此資料來源")
         raise DataUpdateError("目前本機更新先支援 TWSE 四位數上市個股")
     if instrument_id != f"TWSE:{symbol}":
         raise DataUpdateError("instrument identity mismatch")
@@ -280,6 +282,8 @@ def update_twse_history(
         "terms_url": TWSE_TERMS_URL,
         "license_ref": TAIWAN_DATA_LICENSE,
     }
+    status = "success" if not errors else ("partial" if downloaded_bars else "error")
+    record["status"] = status
     manifest["last_update"] = record
     downloads = [item for item in manifest.get("downloads", []) if not (
         isinstance(item, Mapping) and item.get("instrument_id") == instrument_id
@@ -287,7 +291,6 @@ def update_twse_history(
     downloads.append(record)
     manifest["downloads"] = downloads[-100:]
     _write_json(_manifest_path(data_root), manifest)
-    status = "success" if not errors else ("partial" if downloaded_bars else "error")
     return {
         "status": status,
         "instrument_id": instrument_id,
@@ -333,8 +336,45 @@ def update_twse_watchlist(
         }
 
     results: list[dict[str, Any]] = []
+    manifest = read_manifest(data_dir)
+    required_months = set(_month_range(current_day, requested_years))
+
+    def existing_result(instrument: Mapping[str, Any]) -> dict[str, Any] | None:
+        instrument_id = str(instrument.get("instrument_id") or "").strip()
+        records = [
+            item for item in manifest.get("downloads", [])
+            if isinstance(item, Mapping) and str(item.get("instrument_id") or "").strip() == instrument_id
+        ]
+        if not records:
+            return None
+        record = records[-1]
+        downloaded_months = {str(month) for month in record.get("months_downloaded", []) if month}
+        if (
+            str(record.get("status") or "success") == "success"
+            and int(record.get("years") or 0) >= requested_years
+            and required_months.issubset(downloaded_months)
+        ):
+            return {
+                "status": "pass",
+                "instrument_id": instrument_id,
+                "symbol": str(instrument.get("symbol") or ""),
+                "market": str(instrument.get("market") or ""),
+                "years": requested_years,
+                "months_requested": len(required_months),
+                "months_downloaded": len(downloaded_months),
+                "bars_downloaded": 0,
+                "errors": [],
+                "message": "已有符合範圍的本機資料",
+            }
+        return None
+
     for instrument in selected:
         instrument_id = str(instrument.get("instrument_id") or "")
+        cached = existing_result(instrument)
+        if cached is not None:
+            cached["display_name"] = str(instrument.get("display_name") or cached.get("symbol") or instrument_id)
+            results.append(cached)
+            continue
         try:
             result = update_twse_history(
                 data_dir,
@@ -346,7 +386,7 @@ def update_twse_watchlist(
         except (DataUpdateError, OSError, ValueError, TypeError) as exc:
             market = str(instrument.get("market") or "")
             symbol = str(instrument.get("symbol") or "")
-            unsupported = market != "TWSE" or not re.fullmatch(r"[1-9][0-9]{3}", symbol)
+            unsupported = market.strip().upper() != "TWSE" or not re.fullmatch(r"[1-9][0-9]{3}", symbol.strip())
             result = {
                 "status": "unsupported" if unsupported else "error",
                 "instrument_id": instrument_id,
@@ -357,18 +397,22 @@ def update_twse_watchlist(
                 "months_downloaded": 0,
                 "bars_downloaded": 0,
                 "errors": [{"error": str(exc)}],
+                "message": str(exc),
             }
         result["display_name"] = str(instrument.get("display_name") or result.get("symbol") or instrument_id)
         results.append(result)
 
     updated = [result for result in results if result["status"] in {"success", "partial"}]
-    status = "success" if len(updated) == len(results) else "partial" if updated else "error"
+    passed = [result for result in results if result["status"] == "pass"]
+    ready = updated + passed
+    status = "success" if len(ready) == len(results) else "partial" if ready else "error"
     return {
         "scope": "watchlist",
         "status": status,
         "years": requested_years,
         "requested_count": len(results),
         "updated_count": len(updated),
+        "passed_count": len(passed),
         "bars_downloaded": sum(int(result.get("bars_downloaded") or 0) for result in results),
         "results": results,
     }

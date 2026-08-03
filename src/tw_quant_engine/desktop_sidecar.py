@@ -5,6 +5,7 @@ import copy
 import gzip
 import hashlib
 import json
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -409,6 +410,28 @@ def load_catalog(fixture_root: str | Path, data_dir: str | Path | None = None) -
     return KlineCatalog(tuple(instrument_rows), models, _digest(digest_payload), _load_fundamentals(local_root))
 
 
+def _update_instrument(catalog: KlineCatalog, instrument_id: str) -> dict[str, Any] | None:
+    """Resolve an update target even when it has no local K-line yet."""
+    existing = next((item for item in catalog.instruments if item["instrument_id"] == instrument_id), None)
+    if existing is not None:
+        return copy.deepcopy(existing)
+    match = re.fullmatch(r"(TWSE|TPEX):([1-9][0-9]{3})", str(instrument_id).strip().upper())
+    if not match:
+        return None
+    market = "TWSE" if match.group(1) == "TWSE" else "TPEx"
+    symbol = match.group(2)
+    return {
+        "instrument_id": f"{market}:{symbol}",
+        "market": market,
+        "symbol": symbol,
+        "display_name": symbol,
+        "asset_class": "equity",
+        "currency": "TWD",
+        "contract_month": None,
+        "expiry": None,
+    }
+
+
 def _load_fundamentals(data_dir: Path | None) -> dict[str, Any] | None:
     """Read the locally accumulated fundamentals series, if the human has ever
     captured one. Absence is a normal state, not an error."""
@@ -496,7 +519,7 @@ def _request_handler(runtime: dict[str, Any]) -> type[BaseHTTPRequestHandler]:
                     raise DataUpdateError("data update instrument list must be non-empty and unique")
                 instruments = []
                 for instrument_id in instrument_ids:
-                    instrument = next((item for item in runtime["catalog"].instruments if item["instrument_id"] == instrument_id), None)
+                    instrument = _update_instrument(runtime["catalog"], instrument_id)
                     if instrument is None:
                         _json_response(self, 404, {"error": "instrument_not_found", "instrument_id": instrument_id})
                         return

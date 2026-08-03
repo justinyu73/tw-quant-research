@@ -205,9 +205,11 @@ dark chrome carrying the six primary sections (there is no left rail), one page
 header, one card hierarchy, 34–40 px controls, and table overflow only inside a
 `.table-responsive` wrapper.
 
-The watchlist command area keeps four non-overlapping regions: group management;
-symbol search plus the primary add action; clear/save actions; persistence
-status. A search-result overlay must never intercept the primary add action.
+The watchlist command area keeps three non-overlapping regions: group
+management; clear/save actions; persistence status. Symbol search is owned by
+the shared instrument bar below the top navigation; while Watchlist is active,
+that bar also owns the primary add-to-current-group action. A search-result
+overlay must never intercept the shared picker or its contextual add action.
 
 Valuation, buy-plan, and review forms collapse from 3-column to 2-column at
 1100 px and to 1-column at 720 px. No input, select, label, or button may

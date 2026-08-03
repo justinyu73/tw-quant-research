@@ -84,7 +84,7 @@ class DataUpdateTests(unittest.TestCase):
 
         instruments = [
             {"instrument_id": "TWSE:2308", "market": "TWSE", "symbol": "2308", "display_name": "台達電"},
-            {"instrument_id": "TAIFEX:TX:202608", "market": "TAIFEX", "symbol": "TX", "display_name": "臺股期貨"},
+            {"instrument_id": "TPEx:5289", "market": "TPEx", "symbol": "5289", "display_name": "宜鼎"},
         ]
         with tempfile.TemporaryDirectory(prefix="tqr-data-update-") as directory:
             result = update_twse_watchlist(directory, instruments, 1, today=date(2026, 7, 20), fetcher=fake_fetcher)
@@ -94,6 +94,40 @@ class DataUpdateTests(unittest.TestCase):
             self.assertEqual(result["updated_count"], 1)
             self.assertEqual(result["bars_downloaded"], 13)
             self.assertEqual([item["status"] for item in result["results"]], ["success", "unsupported"])
+            self.assertIn("TPEx", result["results"][1]["message"])
+            self.assertEqual(len(calls), 13)
+
+    def test_watchlist_update_passes_covered_data_and_downloads_only_new_stock(self) -> None:
+        calls: list[str] = []
+
+        def fake_fetcher(request: Request) -> tuple[bytes, int, str]:
+            query = parse_qs(urlsplit(request.full_url).query)
+            month = query["date"][0]
+            symbol = query["stockNo"][0]
+            calls.append(symbol + ":" + month)
+            year = int(month[:4])
+            month_number = int(month[4:6])
+            roc_year = year - 1911
+            payload = {
+                "stat": "OK",
+                "fields": ["日期", "成交股數", "成交金額", "開盤價", "最高價", "最低價", "收盤價", "漲跌價差", "成交筆數"],
+                "data": [[f"{roc_year:03d}/{month_number:02d}/01", "1,000", "10,000", "10", "11", "9", "10.5", "0.5", "10"]],
+            }
+            return json.dumps(payload, ensure_ascii=False).encode("utf-8"), 200, "application/json"
+
+        existing = {"instrument_id": "TWSE:2308", "market": "TWSE", "symbol": "2308", "display_name": "台達電"}
+        new_stock = {"instrument_id": "TWSE:1514", "market": "TWSE", "symbol": "1514", "display_name": "亞力"}
+        with tempfile.TemporaryDirectory(prefix="tqr-data-update-") as directory:
+            first = update_twse_watchlist(directory, [existing], 1, today=date(2026, 7, 20), fetcher=fake_fetcher)
+            self.assertEqual(first["status"], "success")
+            calls.clear()
+            second = update_twse_watchlist(directory, [existing, new_stock], 1, today=date(2026, 7, 20), fetcher=fake_fetcher)
+            self.assertEqual(second["status"], "success")
+            self.assertEqual(second["requested_count"], 2)
+            self.assertEqual(second["updated_count"], 1)
+            self.assertEqual(second["passed_count"], 1)
+            self.assertEqual([item["status"] for item in second["results"]], ["pass", "success"])
+            self.assertTrue(all(call.startswith("1514:") for call in calls))
             self.assertEqual(len(calls), 13)
 
 
