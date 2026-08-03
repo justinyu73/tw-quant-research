@@ -601,6 +601,7 @@ async function main() {
     await page.locator('[data-testid="valuation-evaluate"]').click();
     await page.locator('[data-testid="valuation-result-card"]').first().waitFor();
     assert.equal(await page.locator('[data-testid="valuation-base-value"]').first().innerText(), "800");
+    assert.equal(await page.locator('[data-testid="valuation-current-price"]').first().innerText(), "2,440");
     // Buy ladder = Base x 85% / 75%, computed by the engine, not the browser.
     assert.equal(await page.locator('[data-testid="valuation-zone-first"]').first().innerText(), "680");
     assert.equal(await page.locator('[data-testid="valuation-zone-sweet"]').first().innerText(), "600");
@@ -609,6 +610,7 @@ async function main() {
     const valGap = await page.locator('[data-testid="valuation-discount"]').first().innerText();
     assert.match(valGap, /^溢價 /, `valuation premium rendered as: ${valGap}`);
     assert.match(await page.locator('[data-testid="valuation-discount"]').first().getAttribute("class"), /\bvaluation-premium\b/);
+    assert.match(await page.locator('[data-testid="valuation-discount-cell"]').first().getAttribute("class"), /\bvaluation-premium\b/);
     await settle(page);
     screenshots.valuation = screenshotHash(await page.screenshot({
       path: path.join(SCREENSHOT_DIR, "valuation.png"),

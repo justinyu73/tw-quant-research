@@ -972,6 +972,13 @@ input, select, textarea, button { font-family: inherit; }
 .valuation-zone-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
 .valuation-compare { display: flex; flex-wrap: wrap; gap: 16px; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); color: var(--text-muted); font-size: var(--type-helper); }
 .valuation-compare strong { color: var(--text); font-family: var(--font-mono, ui-monospace, monospace); }
+.valuation-compare-emphasis { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.5fr) minmax(150px, .8fr); gap: 10px; padding: 10px; }
+.valuation-compare-item { display: grid; align-content: center; gap: 4px; min-width: 0; padding: 12px 14px; border: 1px solid var(--border-light); border-radius: var(--radius); background: var(--surface-secondary); }
+.valuation-compare-item > span { color: var(--text-muted); font-size: var(--type-helper); font-weight: 750; }
+.valuation-compare-item > strong { font-size: 26px; font-weight: 850; line-height: 1.2; }
+.valuation-compare-item.valuation-stage-item > strong { font-size: 19px; }
+.valuation-compare-item.valuation-gap.valuation-discount { border-color: rgba(11, 143, 112, 0.34); background: rgba(11, 143, 112, 0.1); }
+.valuation-compare-item.valuation-gap.valuation-premium { border-color: rgba(217, 75, 75, 0.34); background: rgba(217, 75, 75, 0.1); }
 .valuation-compare strong.valuation-discount,
 .valuation-discount { color: var(--green); }
 .valuation-compare strong.valuation-premium,
@@ -1010,7 +1017,7 @@ input, select, textarea, button { font-family: inherit; }
 }
 
 @media (max-width: 720px) {
-  .valuation-zone-grid, .valuation-ratio-row, .valuation-basis, .buyplan-form, .review-form { grid-template-columns: minmax(0, 1fr); }
+  .valuation-zone-grid, .valuation-ratio-row, .valuation-basis, .buyplan-form, .review-form, .valuation-compare-emphasis { grid-template-columns: minmax(0, 1fr); }
   .watchlist-filter-bar label { min-width: 100%; }
 }
 

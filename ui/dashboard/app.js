@@ -1696,6 +1696,7 @@
     var zone = result.buy_zone || {};
     var comparison = result.comparison || {};
     var basis = result.basis || {};
+    var comparisonTone = valuationToneClass(comparison.discount_pct);
     return '<article class="valuation-result" data-testid="valuation-result-card">' +
       '<header><strong>' + text(result.label) + '</strong><span class="status status-draft">' + text(result.security_id) + '</span></header>' +
       '<div class="valuation-scenario-grid">' +
@@ -1710,9 +1711,10 @@
       '<div><span class="detail-label">甜蜜價</span><strong data-testid="valuation-zone-sweet">' + core.formatNumber(zone.sweet) + '</strong></div>' +
       '<div><span class="detail-label">極端錯價</span><strong>' + core.formatNumber(zone.extreme) + '</strong></div>' +
       '</div>' +
-      '<div class="valuation-compare"><span>現價 <strong>' + core.formatNumber(result.current_price) + '</strong></span>' +
-      '<span data-testid="valuation-discount-cell"><strong class="' + valuationToneClass(comparison.discount_pct) + '" data-testid="valuation-discount">' + discountLabel(comparison.discount_pct) + '</strong></span>' +
-      '<span>目前階段 <strong data-testid="valuation-stage">' + text(core.STAGE_LABELS[result.stage]) + '</strong></span></div>' +
+      '<div class="valuation-compare valuation-compare-emphasis">' +
+      '<div class="valuation-compare-item valuation-current-price"><span>現價</span><strong data-testid="valuation-current-price">' + core.formatNumber(result.current_price) + '</strong></div>' +
+      '<div class="valuation-compare-item valuation-gap ' + comparisonTone + '" data-testid="valuation-discount-cell"><span>折／溢價</span><strong class="' + comparisonTone + '" data-testid="valuation-discount">' + discountLabel(comparison.discount_pct) + '</strong></div>' +
+      '<div class="valuation-compare-item valuation-stage-item"><span>目前階段</span><strong data-testid="valuation-stage">' + text(core.STAGE_LABELS[result.stage]) + '</strong></div></div>' +
       '<small class="valuation-result-params">EPS ' + text(basis.eps_period) + '（' + (basis.eps_kind === "actual" ? "實際值" : "預估值") + '）· PE 理由 ' + text(basis.pe_rationale || "未記錄") +
       ' · 財報日 ' + text(basis.financial_data_date || "未記錄") + ' · 估值日 ' + text(basis.valuation_date) + ' · 公式版本 ' + text(result.formula_version) + '</small></article>';
   }
