@@ -600,6 +600,9 @@ async function main() {
     assert.equal(await page.locator('[data-testid="valuation-worksheet"]').count(), 1);
     await page.locator('[data-testid="valuation-evaluate"]').click();
     await page.locator('[data-testid="valuation-result-card"]').first().waitFor();
+    assert.equal(await page.locator('[data-testid="valuation-rail"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="valuation-rail-bands"] .valuation-rail-band').count(), 5);
+    assert.match(await page.locator('[data-testid="valuation-current-marker"]').getAttribute("class"), /\bvaluation-premium\b/);
     assert.equal(await page.locator('[data-testid="valuation-base-value"]').first().innerText(), "800");
     assert.equal(await page.locator('[data-testid="valuation-current-price"]').first().innerText(), "2,440");
     // Buy ladder = Base x 85% / 75%, computed by the engine, not the browser.

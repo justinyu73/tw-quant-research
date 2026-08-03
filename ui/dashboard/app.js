@@ -1687,6 +1687,48 @@
       '</div>';
   }
 
+  function valuationRailIcon(kind) {
+    var paths = {
+      bear: '<path d="M12 3 4.5 6v5c0 4.8 3.2 8.1 7.5 10 4.3-1.9 7.5-5.2 7.5-10V6L12 3Z"/><path d="M12 8v7M9.5 12.5 12 15l2.5-2.5"/>',
+      base: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
+      bull: '<path d="m5 18 13-13M9 5h9v9"/>'
+    };
+    return '<svg class="valuation-rail-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths[kind] + '</svg>';
+  }
+
+  function valuationRailPercent(value, low, high) {
+    if (typeof value !== "number" || !isFinite(value) || typeof low !== "number" || !isFinite(low) || typeof high !== "number" || !isFinite(high) || high <= low) return null;
+    return Math.max(0, Math.min(100, ((value - low) / (high - low)) * 100));
+  }
+
+  function valuationRailMarkup(values, zone, currentPrice, comparisonTone) {
+    var low = values.bear;
+    var high = values.bull;
+    var basePosition = valuationRailPercent(values.base, low, high);
+    var currentPosition = valuationRailPercent(currentPrice, low, high);
+    var markerPosition = currentPosition === null ? 50 : Math.max(4, Math.min(96, currentPosition));
+    var rangeHint = currentPosition === null ? "" : currentPrice > high ? "（高於 Bull）" : currentPrice < low ? "（低於 Bear）" : "";
+    function node(kind, label, value, position, testid, extraClass) {
+      var positionStyle = position === null ? "" : ' style="left:' + position.toFixed(2) + '%"';
+      return '<div class="valuation-rail-node ' + extraClass + '"' + positionStyle + '><span class="valuation-rail-node-label">' + valuationRailIcon(kind) + '<span>' + text(label) + '</span></span><strong' + (testid ? ' data-testid="' + testid + '"' : '') + '>' + core.formatNumber(value) + '</strong></div>';
+    }
+    function band(label, value, testid) {
+      return '<div class="valuation-rail-band"><span>' + text(label) + '</span><strong' + (testid ? ' data-testid="' + testid + '"' : '') + '>' + core.formatNumber(value) + '</strong></div>';
+    }
+    return '<section class="valuation-rail" data-testid="valuation-rail">' +
+      '<header class="valuation-rail-header"><div><span class="detail-label">估值位置</span><strong>Bear → Bull</strong></div><span class="valuation-rail-hint">現價落點 · 買進區間</span></header>' +
+      '<div class="valuation-rail-track" style="--valuation-current-position:' + markerPosition.toFixed(2) + '%">' +
+      '<div class="valuation-rail-line" aria-hidden="true"></div>' +
+      node("bear", "Bear", values.bear, 0, "valuation-bear-value", "valuation-rail-node-bear") +
+      node("base", "Base 合理價值", values.base, basePosition, "valuation-base-value", "valuation-rail-node-base") +
+      node("bull", "Bull", values.bull, 100, "valuation-bull-value", "valuation-rail-node-bull") +
+      '<div class="valuation-rail-current-marker ' + comparisonTone + '" data-testid="valuation-current-marker"><span>現價 ' + core.formatNumber(currentPrice) + rangeHint + '</span><i aria-hidden="true"></i></div>' +
+      '</div>' +
+      '<div class="valuation-rail-bands" data-testid="valuation-rail-bands">' +
+      band("極端錯價", zone.extreme) + band("甜蜜價", zone.sweet, "valuation-zone-sweet") + band("第二階段", zone.second) + band("第一階段", zone.first, "valuation-zone-first") + band("觀察區", zone.watch) +
+      '</div></section>';
+  }
+
   function valuationResultCard(result) {
     if (result.status !== "ok") {
       return '<article class="valuation-result" data-testid="valuation-result-card"><header><strong>' + text(result.label) + '</strong><span class="status status-draft">資料不足</span></header>' +
@@ -1699,18 +1741,7 @@
     var comparisonTone = valuationToneClass(comparison.discount_pct);
     return '<article class="valuation-result" data-testid="valuation-result-card">' +
       '<header><strong>' + text(result.label) + '</strong><span class="status status-draft">' + text(result.security_id) + '</span></header>' +
-      '<div class="valuation-scenario-grid">' +
-      '<div><span class="detail-label">Bear</span><strong>' + core.formatNumber(values.bear) + '</strong></div>' +
-      '<div><span class="detail-label">Base 合理價值</span><strong class="valuation-price" data-testid="valuation-base-value">' + core.formatNumber(values.base) + '</strong></div>' +
-      '<div><span class="detail-label">Bull</span><strong>' + core.formatNumber(values.bull) + '</strong></div>' +
-      '</div>' +
-      '<div class="valuation-zone-grid" data-testid="valuation-zone">' +
-      '<div><span class="detail-label">觀察區</span><strong>' + core.formatNumber(zone.watch) + '</strong></div>' +
-      '<div><span class="detail-label">第一階段</span><strong data-testid="valuation-zone-first">' + core.formatNumber(zone.first) + '</strong></div>' +
-      '<div><span class="detail-label">第二階段</span><strong>' + core.formatNumber(zone.second) + '</strong></div>' +
-      '<div><span class="detail-label">甜蜜價</span><strong data-testid="valuation-zone-sweet">' + core.formatNumber(zone.sweet) + '</strong></div>' +
-      '<div><span class="detail-label">極端錯價</span><strong>' + core.formatNumber(zone.extreme) + '</strong></div>' +
-      '</div>' +
+      valuationRailMarkup(values, zone, result.current_price, comparisonTone) +
       '<div class="valuation-compare valuation-compare-emphasis">' +
       '<div class="valuation-compare-item valuation-current-price"><span>現價</span><strong data-testid="valuation-current-price">' + core.formatNumber(result.current_price) + '</strong></div>' +
       '<div class="valuation-compare-item valuation-gap ' + comparisonTone + '" data-testid="valuation-discount-cell"><span>折／溢價</span><strong class="' + comparisonTone + '" data-testid="valuation-discount">' + discountLabel(comparison.discount_pct) + '</strong></div>' +

@@ -970,6 +970,32 @@ input, select, textarea, button { font-family: inherit; }
 .sparkline-empty { display: block; margin: 6px 0 2px; color: var(--text-muted); font-size: var(--type-micro); line-height: 24px; }
 .valuation-price { font-size: 20px; }
 .valuation-zone-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.valuation-rail { display: grid; gap: 12px; margin-top: 14px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.valuation-rail-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.valuation-rail-header > div { display: grid; gap: 2px; }
+.valuation-rail-header strong { font-size: var(--type-card); }
+.valuation-rail-hint { color: var(--text-muted); font-size: var(--type-helper); }
+.valuation-rail-track { position: relative; height: 112px; margin: 2px 8px 0; }
+.valuation-rail-line { position: absolute; top: 67px; right: 4%; left: 4%; height: 6px; border-radius: 999px; background: linear-gradient(90deg, var(--text-muted), var(--primary), var(--text-muted)); opacity: .55; }
+.valuation-rail-node { position: absolute; top: 0; display: grid; width: 138px; gap: 4px; color: var(--text); text-align: center; transform: translateX(-50%); }
+.valuation-rail-node-bear { transform: none; text-align: left; }
+.valuation-rail-node-bull { transform: translateX(-100%); text-align: right; }
+.valuation-rail-node-label { display: inline-flex; align-items: center; justify-content: center; gap: 5px; color: var(--text-muted); font-size: var(--type-helper); font-weight: 750; }
+.valuation-rail-node-bear .valuation-rail-node-label { justify-content: flex-start; }
+.valuation-rail-node-bull .valuation-rail-node-label { justify-content: flex-end; }
+.valuation-rail-icon { width: 22px; height: 22px; color: var(--primary-dk); }
+.valuation-rail-node strong { font-family: var(--font-mono, ui-monospace, monospace); font-size: 20px; font-weight: 850; }
+.valuation-rail-current-marker { position: absolute; top: 39px; left: var(--valuation-current-position); z-index: 2; display: grid; justify-items: center; gap: 4px; color: var(--text); transform: translateX(-50%); white-space: nowrap; }
+.valuation-rail-current-marker span { padding: 4px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--text); background: var(--surface); box-shadow: var(--shadow); font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--type-helper); font-weight: 800; }
+.valuation-rail-current-marker i { display: block; width: 16px; height: 16px; border: 4px solid var(--surface); border-radius: 50%; background: var(--text); box-shadow: 0 0 0 2px var(--text); }
+.valuation-rail-current-marker.valuation-discount span { border-color: rgba(11, 143, 112, .35); color: var(--green); }
+.valuation-rail-current-marker.valuation-discount i { background: var(--green); box-shadow: 0 0 0 2px var(--green); }
+.valuation-rail-current-marker.valuation-premium span { border-color: rgba(217, 75, 75, .35); color: var(--red); }
+.valuation-rail-current-marker.valuation-premium i { background: var(--red); box-shadow: 0 0 0 2px var(--red); }
+.valuation-rail-bands { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; }
+.valuation-rail-band { display: grid; gap: 3px; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--surface-secondary); }
+.valuation-rail-band span { color: var(--text-muted); font-size: var(--type-micro); font-weight: 750; }
+.valuation-rail-band strong { font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--type-body); }
 .valuation-compare { display: flex; flex-wrap: wrap; gap: 16px; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); color: var(--text-muted); font-size: var(--type-helper); }
 .valuation-compare strong { color: var(--text); font-family: var(--font-mono, ui-monospace, monospace); }
 .valuation-compare-emphasis { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.5fr) minmax(150px, .8fr); gap: 10px; padding: 10px; }
@@ -1013,11 +1039,16 @@ input, select, textarea, button { font-family: inherit; }
 @media (max-width: 1100px) {
   .valuation-scenario-row, .valuation-scenario-grid { grid-template-columns: minmax(0, 1fr); }
   .valuation-zone-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .valuation-rail-bands { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .valuation-ratio-row, .valuation-basis, .buyplan-form, .review-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 720px) {
-  .valuation-zone-grid, .valuation-ratio-row, .valuation-basis, .buyplan-form, .review-form, .valuation-compare-emphasis { grid-template-columns: minmax(0, 1fr); }
+  .valuation-zone-grid, .valuation-ratio-row, .valuation-basis, .buyplan-form, .review-form, .valuation-compare-emphasis, .valuation-rail-bands { grid-template-columns: minmax(0, 1fr); }
+  .valuation-rail { padding: 10px; }
+  .valuation-rail-track { height: 124px; margin-inline: 0; }
+  .valuation-rail-node { width: 104px; }
+  .valuation-rail-node strong { font-size: 17px; }
   .watchlist-filter-bar label { min-width: 100%; }
 }
 
