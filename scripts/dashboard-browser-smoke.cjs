@@ -722,6 +722,57 @@ async function main() {
     // A stock with nothing downloaded yet must not be reported as a dead
     // sidecar: that message sent the user off to restart a service that was
     // running fine. Runs last so the served bundle is untouched beforehand.
+    // A watchlist download runs for minutes; the 15s read limit used to abort it
+    // and then tell the user the service had stopped responding. The button is
+    // desktop-only, so this runs on its own page with a minimal Tauri stub —
+    // checking it on the preview page would silently skip (the button is always
+    // disabled there) and read as a pass.
+    const desktopPage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await desktopPage.addInitScript(([sidecar]) => {
+      const watchlist = JSON.stringify({ schema: "tw-quant-engine-watchlist/v1", version: 1, items: ["TWSE:2330"] });
+      window.__TAURI__ = {
+        core: {
+          invoke: (command) => {
+            if (command === "sidecar_url") return Promise.resolve(sidecar);
+            if (command === "load_watchlist") return Promise.resolve(watchlist);
+            if (command === "save_watchlist") return Promise.resolve(null);
+            return Promise.reject(new Error("unstubbed command: " + command));
+          },
+        },
+      };
+    }, [sidecarBaseUrl]);
+    let updateHeld = 0;
+    await desktopPage.route(/\/data\/update/, async (route) => {
+      updateHeld += 1;
+      await new Promise((resolve) => setTimeout(resolve, 17000));
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { status: "success", updated_count: 1, requested_count: 1, bars_downloaded: 0, results: [] } }),
+      });
+    });
+    await desktopPage.goto(`${baseUrl}/index.html`, { waitUntil: "networkidle" });
+    await desktopPage.locator('[data-action="section"][data-section="watchlist"]').first().click();
+    await desktopPage.locator('[data-testid="data-update-panel"]').waitFor();
+    const desktopUpdateButton = desktopPage.locator('[data-testid="data-update-button"]');
+    // A disabled button here means the stub did not take and nothing was measured.
+    assertOk(!(await desktopUpdateButton.isDisabled()), "data update button never enabled: the desktop stub did not take");
+    await desktopUpdateButton.click();
+    await desktopPage.waitForTimeout(16500);
+    // Behaviour, not wording: past the old 15s limit the download must still be
+    // running. Asserting on the error text instead would pass for any reworded
+    // failure.
+    const midFlight = await desktopPage.locator('[data-testid="data-update-status"]').innerText();
+    assert.match(midFlight, /正在下載/, `download already gave up before 16.5s: ${midFlight}`);
+    await desktopPage.waitForFunction(
+      () => !/更新中/.test(document.querySelector('[data-testid="data-update-status"]').textContent),
+      null,
+      { timeout: 30000 },
+    );
+    assert.doesNotMatch(await desktopPage.locator('[data-testid="data-update-status"]').innerText(), /逾時/);
+    assert.equal(updateHeld, 1, "the download request was never issued");
+    await desktopPage.close();
+
     const errorsBeforeDataGap = browserErrors.length;
     await page.route(`${sidecarBaseUrl}/kline?instrument=${encodeURIComponent("TWSE:2317")}*`, (route) =>
       route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "kline_not_found" }) }));

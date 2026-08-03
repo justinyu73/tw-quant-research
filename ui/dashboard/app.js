@@ -578,12 +578,18 @@
   // A hung loopback call must not strand the UI: without this the evaluate
   // button stays at 計算中… forever with no message and no way to retry.
   var SIDECAR_TIMEOUT_MS = 15000;
+  // Downloading a year of TWSE history for a whole watchlist is minutes of
+  // work, not a hung call: the 15s read limit aborted it every time and then
+  // blamed the service for not responding.
+  var DATA_UPDATE_TIMEOUT_MS = 600000;
 
   function sidecarRequest(path, options) {
     var base = sidecarBaseUrl();
     if (!base) return Promise.reject(new Error("sidecar must use loopback HTTP"));
     var request = Object.assign({ method: "GET", cache: "no-store" }, options || {});
-    if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) request.signal = AbortSignal.timeout(SIDECAR_TIMEOUT_MS);
+    var timeoutMs = request.timeoutMs || SIDECAR_TIMEOUT_MS;
+    delete request.timeoutMs;
+    if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) request.signal = AbortSignal.timeout(timeoutMs);
     return fetch(base + path, request).then(function (response) {
       return response.json().catch(function () { return {}; }).then(function (payload) {
         if (!response.ok) throw new Error(payload.error || ("sidecar request failed: " + response.status));
@@ -592,10 +598,13 @@
     });
   }
 
-  function sidecarErrorMessage(error) {
+  function sidecarErrorMessage(error, timeoutMs) {
     var message = error && error.message ? String(error.message) : "";
     if ((error && error.name === "TimeoutError") || /timed? ?out/i.test(message)) {
-      return "本機資料服務逾時未回應（" + (SIDECAR_TIMEOUT_MS / 1000) + " 秒）；請確認 TQR 仍在執行後重試。";
+      if (timeoutMs === DATA_UPDATE_TIMEOUT_MS) {
+        return "下載超過 " + (DATA_UPDATE_TIMEOUT_MS / 60000) + " 分鐘仍未完成；請縮小範圍（改成「目前個股」或減少年數）後重試。";
+      }
+      return "本機資料服務逾時未回應（" + ((timeoutMs || SIDECAR_TIMEOUT_MS) / 1000) + " 秒）；請確認 TQR 仍在執行後重試。";
     }
     if (!message || /load failed|failed to fetch|networkerror|network request failed/i.test(message)) {
       return "本機資料服務無法連線；請重新啟動 TQR 後再試。";
@@ -1368,7 +1377,8 @@
     sidecarRequest("/data/update", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      timeoutMs: DATA_UPDATE_TIMEOUT_MS
     }).then(function (payload) {
       var result = payload && payload.data || {};
       var message = update.scope === "watchlist"
@@ -1381,7 +1391,7 @@
       klineRequestKey = null;
       watchlistModelRequests = {};
     }).catch(function (error) {
-      state = core.reduce(state, { type: "DATA_UPDATE_ERROR", message: sidecarErrorMessage(error) });
+      state = core.reduce(state, { type: "DATA_UPDATE_ERROR", message: sidecarErrorMessage(error, DATA_UPDATE_TIMEOUT_MS) });
     }).then(function () {
       dataUpdateInFlight = false;
       render();
