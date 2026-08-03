@@ -971,14 +971,20 @@ input, select, textarea, button { font-family: inherit; }
 .valuation-zone-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
 .valuation-compare { display: flex; flex-wrap: wrap; gap: 16px; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); color: var(--text-muted); font-size: var(--type-helper); }
 .valuation-compare strong { color: var(--text); font-family: var(--font-mono, ui-monospace, monospace); }
+.valuation-compare strong.valuation-discount,
+.valuation-discount { color: var(--green); }
+.valuation-compare strong.valuation-premium,
+.valuation-premium { color: var(--red); }
+.valuation-compare strong.valuation-neutral,
+.valuation-neutral { color: var(--text); }
 .valuation-result-params { display: block; color: var(--text-muted); font-size: var(--type-helper); line-height: 1.5; overflow-wrap: anywhere; }
 .valuation-note { margin-top: 12px; color: var(--text-muted); font-size: var(--type-helper); line-height: 1.55; }
 
 .watchlist-filter-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
 .watchlist-filter-bar label { display: grid; gap: 4px; min-width: 130px; color: var(--text-muted); font-size: var(--type-helper); font-weight: 700; }
 .watchlist-filter-bar select { height: 32px; padding: 0 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--surface); font-size: var(--type-helper); }
-.tone-down { color: #b4232a; }
-.tone-up { color: #17794a; }
+.buyplan-valuation-position { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-bottom: 12px; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--surface-secondary); }
+.buyplan-valuation-position strong { font-family: var(--font-mono, ui-monospace, monospace); }
 
 .thesis-form { display: grid; gap: 12px; }
 .thesis-field { display: grid; gap: 4px; }

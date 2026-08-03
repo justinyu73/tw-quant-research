@@ -1434,6 +1434,14 @@
     return (value < 0 ? "折價 " : value > 0 ? "溢價 " : "持平 ") + core.formatPercent(Math.abs(value));
   }
 
+  // Valuation colour is deliberately separate from the quote's market-change
+  // convention and from fundamental/technical metric rendering. Only the
+  // current-price-versus-Base comparison gets red/green semantics.
+  function valuationToneClass(value) {
+    if (typeof value !== "number" || !isFinite(value) || value === 0) return "valuation-neutral";
+    return value < 0 ? "valuation-discount" : "valuation-premium";
+  }
+
   function num(value) {
     return value === null || value === undefined ? "—" : core.formatNumber(value);
   }
@@ -1476,7 +1484,7 @@
         '<td><span class="cell-strong">' + text(row.name) + '</span><small>' + text(row.industry) + '</small></td>' +
         '<td class="cell-mono">' + num(row.price) + '</td>' +
         '<td class="cell-mono" data-testid="watchlist-base-value">' + num(row.base_value) + '</td>' +
-        '<td class="cell-mono ' + (row.discount === null ? "" : row.discount < 0 ? "tone-up" : "tone-down") + '" data-testid="watchlist-discount">' + discountLabel(row.discount) + '</td>' +
+        '<td class="cell-mono ' + valuationToneClass(row.discount) + '" data-testid="watchlist-discount">' + discountLabel(row.discount) + '</td>' +
         '<td class="cell-mono">' + num(row.first_price) + '</td>' +
         '<td class="cell-mono">' + num(row.sweet_price) + '</td>' +
         '<td>' + text(row.fundamental_state) + '</td>' +
@@ -1703,7 +1711,7 @@
       '<div><span class="detail-label">極端錯價</span><strong>' + core.formatNumber(zone.extreme) + '</strong></div>' +
       '</div>' +
       '<div class="valuation-compare"><span>現價 <strong>' + core.formatNumber(result.current_price) + '</strong></span>' +
-      '<span data-testid="valuation-discount-cell"><strong data-testid="valuation-discount">' + discountLabel(comparison.discount_pct) + '</strong></span>' +
+      '<span data-testid="valuation-discount-cell"><strong class="' + valuationToneClass(comparison.discount_pct) + '" data-testid="valuation-discount">' + discountLabel(comparison.discount_pct) + '</strong></span>' +
       '<span>目前階段 <strong data-testid="valuation-stage">' + text(core.STAGE_LABELS[result.stage]) + '</strong></span></div>' +
       '<small class="valuation-result-params">EPS ' + text(basis.eps_period) + '（' + (basis.eps_kind === "actual" ? "實際值" : "預估值") + '）· PE 理由 ' + text(basis.pe_rationale || "未記錄") +
       ' · 財報日 ' + text(basis.financial_data_date || "未記錄") + ' · 估值日 ' + text(basis.valuation_date) + ' · 公式版本 ' + text(result.formula_version) + '</small></article>';
@@ -1999,7 +2007,7 @@
         return '<tr data-testid="opportunity-row"><td><span class="cell-strong">' + text(row.symbol) + '</span><small>' + text(row.name) + '</small></td>' +
           '<td class="cell-mono">' + core.formatNumber(row.price) + '</td>' +
           '<td class="cell-mono">' + core.formatNumber(row.base_value) + '</td>' +
-          '<td class="cell-mono ' + (row.discount < 0 ? "tone-up" : "tone-down") + '" data-testid="opportunity-discount">' + discountLabel(row.discount) + '</td>' +
+          '<td class="cell-mono ' + valuationToneClass(row.discount) + '" data-testid="opportunity-discount">' + discountLabel(row.discount) + '</td>' +
           '<td>' + text(row.stage_label) + '</td></tr>';
       }).join("") + '</tbody></table></div>';
   }
@@ -2191,6 +2199,10 @@
     var issues = core.buyPlanFormIssues(buyPlanDraft);
     var tranches = core.buyPlanTranches(state, instrumentId);
     var hasZone = tranches.some(function (item) { return item.price !== null; });
+    var opportunity = core.opportunityRows(state).find(function (item) { return item.symbol === symbol; });
+    var valuationPosition = opportunity
+      ? '<div class="buyplan-valuation-position" data-testid="buyplan-valuation-position"><span class="detail-label">現價相對 Base 合理價值</span><strong class="' + valuationToneClass(opportunity.discount) + '" data-testid="buyplan-valuation-position-value">' + discountLabel(opportunity.discount) + '</strong></div>'
+      : '<div class="buyplan-valuation-position" data-testid="buyplan-valuation-position"><span class="detail-label">現價相對 Base 合理價值</span><strong class="valuation-neutral" data-testid="buyplan-valuation-position-value">—</strong></div>';
     var rows = tranches.map(function (item) {
       var reachedLabel = item.reached === null ? "—" : item.reached ? "已到價" : "未到價";
       return '<tr data-testid="buyplan-tranche" data-tranche="' + item.key + '"><td>' + text(item.label) + '</td>' +
@@ -2218,6 +2230,7 @@
         formIssuesMarkup(issues, "buyplan-issues") + '</div></div>', "") +
       card("分段狀態", hasZone ? "價格對照 Valuation 的買進區間" : "尚未建立估值", 
         (hasZone ? "" : '<div class="empty-state" data-testid="buyplan-no-valuation"><strong>此標的尚未建立 Base 合理價值。</strong><span>分段價格一律由估值推導，不從市價或歷史高點回推。</span></div>') +
+        valuationPosition +
         '<div class="table-responsive"><table class="table" data-testid="buyplan-table"><thead><tr><th>階段</th><th>價格</th><th>比例</th><th>金額</th><th>到價</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
         prompt +
         '<p class="valuation-note">到價只提示你回頭檢查投資假設。這裡不提供、也不會出現「建議買進」「強力買進」或任何信心分數；沒有下單、模擬下單或券商連線。</p>', "");

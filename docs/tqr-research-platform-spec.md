@@ -117,6 +117,22 @@ reason a fair value changed:
 `eps_period`, `eps_kind` (`actual` | `estimate`), `pe_rationale`,
 `financial_data_date`, `valuation_date`, `change_reason`.
 
+### Valuation display semantics
+
+This extends `TQR-VALUATION-003` at the presentation layer only; it does not
+change any valuation calculation or stage threshold:
+
+- Fundamental snapshot values such as monthly revenue, EPS, and BVPS remain
+  neutral. A positive number is not automatically a red signal.
+- Technical indicator readings remain neutral; they do not use the valuation
+  colour semantics.
+- A current price below Base fair value is labelled `折價` and rendered green;
+  a current price above Base fair value is labelled `溢價` and rendered red.
+- Equality, missing data, and unavailable comparisons remain neutral.
+
+The same semantic rule is used by Watchlist, Home, Valuation, and Buy Plan so
+the colour never changes meaning between pages.
+
 ## Buy plan contract
 
 Decision: `TQR-BUYPLAN-003`

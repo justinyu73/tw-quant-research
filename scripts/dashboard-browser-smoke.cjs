@@ -412,6 +412,7 @@ async function main() {
     await page.locator('[data-testid="kline-chart"]').waitFor();
     await settle(page);
     await assertChartIdentity(page, sidecarBaseUrl, catalog.instruments, "TWSE:2330", "after returning to 2330");
+    assert.equal(await page.locator('[data-testid^="technical-value-"][class*="valuation-"]').count(), 0);
 
     // The curated watchlist has to be reachable from the chart, not only by
     // typing a code from memory.
@@ -435,6 +436,7 @@ async function main() {
     // reach Watchlist columns, Watchlist filters, and the Home counters —
     // rendering them is not enough, they have to be writable and to propagate.
     await page.locator('[data-testid="company-status"]').waitFor();
+    assert.equal(await page.locator('[data-testid="fundamental-snapshot"] .fundamental-metric strong[class*="valuation-"]').count(), 0);
     // Not tracked yet: the page must say the judgement will not surface anywhere,
     // instead of silently recording into a view the human never sees.
     assert.equal(await page.locator('[data-testid="company-tracking-missing"]').count(), 1);
@@ -485,6 +487,7 @@ async function main() {
     // No valuation yet: value-derived columns must be em dashes, never inferred.
     assert.equal(await page.locator('[data-testid="watchlist-base-value"]').first().innerText(), "—");
     assert.equal(await page.locator('[data-testid="watchlist-discount"]').first().innerText(), "—");
+    assert.match(await page.locator('[data-testid="watchlist-discount"]').first().getAttribute("class"), /\bvaluation-neutral\b/);
     // A stock that is already tracked remains searchable in the shared picker;
     // the contextual add action is the only disabled state.
     await watchlistPicker.fill("2330");
@@ -595,6 +598,7 @@ async function main() {
     // 2,440 against a base of 800 is a premium, on this page too.
     const valGap = await page.locator('[data-testid="valuation-discount"]').first().innerText();
     assert.match(valGap, /^溢價 /, `valuation premium rendered as: ${valGap}`);
+    assert.match(await page.locator('[data-testid="valuation-discount"]').first().getAttribute("class"), /\bvaluation-premium\b/);
     await settle(page);
     screenshots.valuation = screenshotHash(await page.screenshot({
       path: path.join(SCREENSHOT_DIR, "valuation.png"),
@@ -612,11 +616,13 @@ async function main() {
     const wlGap = await page.locator('[data-testid="watchlist-discount"]').first().innerText();
     assert.match(wlGap, /^溢價 /, `premium rendered as: ${wlGap}`);
     assert.doesNotMatch(wlGap, /折價/);
+    assert.match(await page.locator('[data-testid="watchlist-discount"]').first().getAttribute("class"), /\bvaluation-premium\b/);
 
     await page.locator('[data-action="section"][data-section="home"]').first().click();
     await page.locator('[data-testid="opportunity-list"]').waitFor();
     assert.equal(await page.locator('[data-testid="opportunity-row"]').count(), 1);
     assert.match(await page.locator('[data-testid="opportunity-discount"]').first().innerText(), /^溢價 /);
+    assert.match(await page.locator('[data-testid="opportunity-discount"]').first().getAttribute("class"), /\bvaluation-premium\b/);
     assert.equal(await page.locator('[data-testid="buyplan-status"] li').count(), 1);
 
     // Buy Plan and Review are declared but not yet built; they must say so
@@ -628,6 +634,8 @@ async function main() {
     assert.equal(await page.locator('[data-testid="buyplan-tranche"]').count(), 4);
     assert.equal(await page.locator('[data-tranche="first"] td').nth(1).innerText(), "680");
     assert.equal(await page.locator('[data-tranche="sweet"] td').nth(1).innerText(), "600");
+    assert.match(await page.locator('[data-testid="buyplan-valuation-position-value"]').innerText(), /^溢價 /);
+    assert.match(await page.locator('[data-testid="buyplan-valuation-position-value"]').getAttribute("class"), /\bvaluation-premium\b/);
     assert.equal(await page.locator('[data-testid="buyplan-prompt-idle"]').count(), 1);
     // Allocations must total 100% before the plan can be saved.
     await page.locator('[data-testid="buyplan-budget"]').fill("1000000");
