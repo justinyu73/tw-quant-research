@@ -122,8 +122,10 @@ reason a fair value changed:
 This extends `TQR-VALUATION-003` at the presentation layer only; it does not
 change any valuation calculation or stage threshold:
 
-- Fundamental snapshot values such as monthly revenue, EPS, and BVPS remain
-  neutral. A positive number is not automatically a red signal.
+- In the Fundamental Snapshot and Trend Table, monthly revenue (including its
+  YoY/MoM and accumulated-growth fields), EPS, and BVPS values are highlighted
+  red. Other fundamental fields such as gross margin, operating margin, net
+  margin, debt ratio, and current ratio remain neutral.
 - Technical indicator readings remain neutral; they do not use the valuation
   colour semantics.
 - A current price below Base fair value is labelled `折價` and rendered green;

@@ -351,6 +351,12 @@ async function main() {
     assert.equal(await page.locator('[data-testid="fundamental-eps"] strong').innerText(), "15.42");
     assert.equal(await page.locator('[data-testid="fundamental-gross-margin"] strong').innerText(), "60.00%");
     assert.equal(await page.locator('[data-testid="fundamental-revenue-yoy"] strong').innerText(), "47.62%");
+    for (const testid of ["fundamental-revenue-yoy", "fundamental-revenue-mom", "fundamental-eps", "fundamental-bvps"]) {
+      assert.match(await page.locator(`[data-testid="${testid}"] strong`).getAttribute("class"), /\bfundamental-key\b/);
+    }
+    for (const testid of ["fundamental-gross-margin", "fundamental-operating-margin", "fundamental-net-margin", "fundamental-debt-ratio", "fundamental-current-ratio"]) {
+      assert.match(await page.locator(`[data-testid="${testid}"] strong`).getAttribute("class"), /\bfundamental-neutral\b/);
+    }
     assert.match(await page.locator('[data-testid="fundamental-provenance"]').innerText(), /非公司公告時間/);
     assert.equal(await page.locator('[data-testid="trend-coverage-quarters"]').innerText(), "1 / 8");
     assert.equal(await page.locator('[data-testid="trend-coverage-months"]').innerText(), "2 / 12");
@@ -363,6 +369,10 @@ async function main() {
     assert.equal(await page.locator('[data-testid="trend-quarter-row"]').count(), 1);
     // Only captured periods appear; the table must not pad to 12 rows.
     assert.equal(await page.locator('[data-testid="trend-month-row"]').count(), 2);
+    assert.match(await page.locator('[data-testid="trend-quarter-row"] td').nth(1).getAttribute("class"), /\bfundamental-key\b/);
+    assert.match(await page.locator('[data-testid="trend-quarter-row"] td').nth(5).getAttribute("class"), /\bfundamental-key\b/);
+    assert.match(await page.locator('[data-testid="trend-month-row"] td').nth(1).getAttribute("class"), /\bfundamental-key\b/);
+    assert.match(await page.locator('[data-testid="trend-balance-row"] td').nth(3).getAttribute("class"), /\bfundamental-key\b/);
 
     // 技術指標: chart, technical readings, alerts.
     await page.locator('[data-action="section"][data-section="technical"]').first().click();

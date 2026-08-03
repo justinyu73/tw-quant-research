@@ -964,8 +964,9 @@ input, select, textarea, button { font-family: inherit; }
 /* Sparkline: axis-free trend glyph inside a metric tile. */
 .sparkline { display: block; width: 100%; height: 24px; margin: 6px 0 2px; overflow: visible; }
 .sparkline path { fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-.sparkline.rising path { stroke: var(--red); }
-.sparkline.falling path { stroke: var(--green); }
+.fundamental-key { color: var(--red); }
+.fundamental-key-sparkline path { stroke: var(--red); }
+.fundamental-neutral-sparkline path { stroke: var(--text-muted); }
 .sparkline-empty { display: block; margin: 6px 0 2px; color: var(--text-muted); font-size: var(--type-micro); line-height: 24px; }
 .valuation-price { font-size: 20px; }
 .valuation-zone-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }

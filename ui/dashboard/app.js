@@ -2082,7 +2082,7 @@
   // Axis-free trend glyph. Fewer than two real points cannot describe a
   // trend, so it says so instead of drawing a flat line — the series is not
   // padded, interpolated, or carried forward.
-  function sparkline(values, testid) {
+  function sparkline(values, testid, keyMetric) {
     var points = (values || []).filter(function (value) { return typeof value === "number" && isFinite(value); });
     if (points.length < 2) return '<span class="sparkline-empty" data-testid="' + testid + '">走勢需 2 期以上</span>';
     var min = Math.min.apply(null, points);
@@ -2093,9 +2093,8 @@
       var y = 22 - ((value - min) / span) * 20;
       return (index ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1);
     }).join(" ");
-    // 台股紅漲綠跌 — the glyph follows the same convention as the K line.
     var rising = points[points.length - 1] >= points[0];
-    return '<svg class="sparkline ' + (rising ? "rising" : "falling") + '" viewBox="0 0 96 24" preserveAspectRatio="none" ' +
+    return '<svg class="sparkline ' + (keyMetric ? "fundamental-key-sparkline" : "fundamental-neutral-sparkline") + '" viewBox="0 0 96 24" preserveAspectRatio="none" ' +
       'role="img" aria-label="' + (rising ? "走勢上升" : "走勢下降") + '" data-testid="' + testid + '"><path d="' + path + '"/></svg>';
   }
 
@@ -2109,9 +2108,9 @@
     if (!revenue && !income && !balance) {
       return '<div class="empty-state" data-testid="fundamental-snapshot-empty"><strong>此標的尚無已擷取的基本面期別。</strong><span>執行 <code>scripts/capture_fundamentals.py</code> 擷取一期後才會顯示；不以價格推估，也不補 0。</span></div>';
     }
-    function tile(label, value, hint, testid, series) {
-      return '<article class="fundamental-metric" data-testid="' + testid + '"><span>' + text(label) + '</span><strong>' + text(value) + '</strong>' +
-        sparkline(series, testid + "-spark") + '<small>' + text(hint) + '</small></article>';
+    function tile(label, value, hint, testid, series, keyMetric) {
+      return '<article class="fundamental-metric" data-testid="' + testid + '"><span>' + text(label) + '</span><strong class="' + (keyMetric ? "fundamental-key" : "fundamental-neutral") + '">' + text(value) + '</strong>' +
+        sparkline(series, testid + "-spark", keyMetric) + '<small>' + text(hint) + '</small></article>';
     }
     // Observations arrive newest-first; a sparkline reads left-to-right in time.
     function seriesOf(block, key) {
@@ -2122,15 +2121,15 @@
     var incomeValues = income ? income.values : {};
     var balanceValues = balance ? balance.values : {};
     return '<div class="fundamental-metric-grid" data-testid="fundamental-snapshot">' +
-      tile("月營收 YoY", revenue ? pctCell(revenueValues.revenue_yoy) : "—", revenue ? revenue.period : "未擷取", "fundamental-revenue-yoy", seriesOf(data && data.monthly_revenue, "revenue_yoy")) +
-      tile("月營收 MoM", revenue ? pctCell(revenueValues.revenue_mom) : "—", revenue ? revenue.period : "未擷取", "fundamental-revenue-mom", seriesOf(data && data.monthly_revenue, "revenue_mom")) +
-      tile("EPS", income && incomeValues.eps !== null ? core.formatNumber(incomeValues.eps) : "—", income ? income.period : "未擷取", "fundamental-eps", seriesOf(data && data.income_statement, "eps")) +
+      tile("月營收 YoY", revenue ? pctCell(revenueValues.revenue_yoy) : "—", revenue ? revenue.period : "未擷取", "fundamental-revenue-yoy", seriesOf(data && data.monthly_revenue, "revenue_yoy"), true) +
+      tile("月營收 MoM", revenue ? pctCell(revenueValues.revenue_mom) : "—", revenue ? revenue.period : "未擷取", "fundamental-revenue-mom", seriesOf(data && data.monthly_revenue, "revenue_mom"), true) +
+      tile("EPS", income && incomeValues.eps !== null ? core.formatNumber(incomeValues.eps) : "—", income ? income.period : "未擷取", "fundamental-eps", seriesOf(data && data.income_statement, "eps"), true) +
       tile("毛利率", income ? pctCell(incomeValues.gross_margin) : "—", income ? income.period : "未擷取", "fundamental-gross-margin", seriesOf(data && data.income_statement, "gross_margin")) +
       tile("營益率", income ? pctCell(incomeValues.operating_margin) : "—", income ? income.period : "未擷取", "fundamental-operating-margin", seriesOf(data && data.income_statement, "operating_margin")) +
       tile("淨利率", income ? pctCell(incomeValues.net_margin) : "—", income ? income.period : "未擷取", "fundamental-net-margin", seriesOf(data && data.income_statement, "net_margin")) +
       tile("負債比", balance ? pctCell(balanceValues.debt_ratio) : "—", balance ? balance.period : "未擷取", "fundamental-debt-ratio", seriesOf(data && data.balance_sheet, "debt_ratio")) +
       tile("流動比", balance && balanceValues.current_ratio !== null ? core.formatNumber(balanceValues.current_ratio) : "—", balance ? balance.period : "未擷取", "fundamental-current-ratio", seriesOf(data && data.balance_sheet, "current_ratio")) +
-      tile("每股淨值", balance && balanceValues.bvps !== null ? core.formatNumber(balanceValues.bvps) : "—", balance ? balance.period : "未擷取", "fundamental-bvps", seriesOf(data && data.balance_sheet, "bvps")) +
+      tile("每股淨值", balance && balanceValues.bvps !== null ? core.formatNumber(balanceValues.bvps) : "—", balance ? balance.period : "未擷取", "fundamental-bvps", seriesOf(data && data.balance_sheet, "bvps"), true) +
       '</div>' +
       '<p class="valuation-note" data-testid="fundamental-provenance">來源 ' + text(data.attribution) + '｜available_at 採交易所整批出表日（保守上界），非公司公告時間；published_at 未接入。</p>';
   }
@@ -2147,19 +2146,19 @@
     var quarterRows = quarters.length ? quarters.map(function (item) {
       var v = item.values;
       return '<tr data-testid="trend-quarter-row"><td>' + text(item.period) + '</td>' +
-        '<td class="cell-mono">' + core.formatNumber(v.revenue) + '</td>' +
+        '<td class="cell-mono fundamental-key">' + core.formatNumber(v.revenue) + '</td>' +
         '<td class="cell-mono">' + pctCell(v.gross_margin) + '</td>' +
         '<td class="cell-mono">' + pctCell(v.operating_margin) + '</td>' +
         '<td class="cell-mono">' + pctCell(v.net_margin) + '</td>' +
-        '<td class="cell-mono">' + (v.eps === null ? "—" : core.formatNumber(v.eps)) + '</td></tr>';
+        '<td class="cell-mono fundamental-key">' + (v.eps === null ? "—" : core.formatNumber(v.eps)) + '</td></tr>';
     }).join("") : '<tr><td colspan="6">尚無已擷取的季別。</td></tr>';
     var monthRows = months.length ? months.map(function (item) {
       var v = item.values;
       return '<tr data-testid="trend-month-row"><td>' + text(item.period) + '</td>' +
-        '<td class="cell-mono">' + core.formatNumber(v.monthly_revenue) + '</td>' +
-        '<td class="cell-mono">' + pctCell(v.revenue_mom) + '</td>' +
-        '<td class="cell-mono">' + pctCell(v.revenue_yoy) + '</td>' +
-        '<td class="cell-mono">' + pctCell(v.cumulative_yoy) + '</td></tr>';
+        '<td class="cell-mono fundamental-key">' + core.formatNumber(v.monthly_revenue) + '</td>' +
+        '<td class="cell-mono fundamental-key">' + pctCell(v.revenue_mom) + '</td>' +
+        '<td class="cell-mono fundamental-key">' + pctCell(v.revenue_yoy) + '</td>' +
+        '<td class="cell-mono fundamental-key">' + pctCell(v.cumulative_yoy) + '</td></tr>';
     }).join("") : '<tr><td colspan="5">尚無已擷取的月份。</td></tr>';
     var balances = data.balance_sheet ? data.balance_sheet.observations : [];
     var balanceRows = balances.length ? balances.map(function (item) {
@@ -2167,7 +2166,7 @@
       return '<tr data-testid="trend-balance-row"><td>' + text(item.period) + '</td>' +
         '<td class="cell-mono">' + pctCell(v.debt_ratio) + '</td>' +
         '<td class="cell-mono">' + (v.current_ratio === null ? "—" : core.formatNumber(v.current_ratio)) + '</td>' +
-        '<td class="cell-mono">' + (v.bvps === null ? "—" : core.formatNumber(v.bvps)) + '</td></tr>';
+        '<td class="cell-mono fundamental-key">' + (v.bvps === null ? "—" : core.formatNumber(v.bvps)) + '</td></tr>';
     }).join("") : '<tr><td colspan="4">尚無已擷取的財務品質期別。</td></tr>';
     return '<div class="trend-coverage" data-testid="trend-coverage">' +
       '<span>季報深度 <strong data-testid="trend-coverage-quarters">' + text(data.income_statement.coverage.label) + '</strong></span>' +
