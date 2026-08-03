@@ -42,7 +42,11 @@ fn spawn_sidecar(app: &AppHandle) -> Result<CommandChild, String> {
         .sidecar(SIDECAR_NAME)
         .map_err(|error| format!("resolve sidecar: {error}"))?
         .env("TQE_DATA_DIR", config.data_dir.to_string_lossy().to_string())
-        .env("TQE_SIDECAR_PORT", config.port.to_string());
+        .env("TQE_SIDECAR_PORT", config.port.to_string())
+        // Every exit that skips CloseRequested (crash, force quit, log off)
+        // used to leave the sidecar running; the orphans then hold
+        // tqe-sidecar.exe open and the next install cannot overwrite it.
+        .args(["--exit-with-parent"]);
     let (mut events, child) = command.spawn().map_err(|error| format!("spawn sidecar: {error}"))?;
     tauri::async_runtime::spawn(async move {
         while let Some(event) = events.recv().await {
@@ -169,6 +173,17 @@ pub fn run() {
                 }
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running TW Quant Research");
+        .build(tauri::generate_context!())
+        .expect("error while building TW Quant Research")
+        .run(|app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                if let Some(process) = app_handle.try_state::<SidecarProcess>() {
+                    if let Ok(mut child) = process.0.lock() {
+                        if let Some(child) = child.take() {
+                            let _ = child.kill();
+                        }
+                    }
+                }
+            }
+        });
 }
