@@ -77,5 +77,23 @@ class SidecarParentExitTest(unittest.TestCase):
         self.assertFalse(self._run(["--exit-with-parent"]), "sidecar outlived its parent")
 
 
+class WindowsInstallerReapsOrphansTest(unittest.TestCase):
+    """The app-side fix cannot help with orphans an older build already left
+    running, and those are exactly what blocks an install or an uninstall.
+    zibaldone hit the same thing and solved it with an NSIS pre-install hook;
+    TQR never had one."""
+
+    def test_nsis_hooks_kill_the_sidecar(self) -> None:
+        import json
+
+        config = json.loads((ROOT / "frontend/src-tauri/tauri.conf.json").read_text(encoding="utf-8"))
+        nsis = config["bundle"]["windows"]["nsis"]
+        hooks_name = nsis["installerHooks"]
+        hooks = (ROOT / "frontend/src-tauri" / hooks_name).read_text(encoding="utf-8")
+        for macro in ("NSIS_HOOK_PREINSTALL", "NSIS_HOOK_PREUNINSTALL"):
+            self.assertIn(macro, hooks, f"{hooks_name} has no {macro}")
+        self.assertIn("tqe-sidecar.exe", hooks, "the hook does not name the sidecar it must kill")
+
+
 if __name__ == "__main__":
     unittest.main()
