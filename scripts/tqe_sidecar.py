@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import threading
 from pathlib import Path
 
 
@@ -38,7 +39,28 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--port", type=int, default=int(os.getenv("TQE_SIDECAR_PORT", "8767")))
     parser.add_argument("--fixture-dir", type=Path, default=Path(os.getenv("TQE_FIXTURE_DIR", _default_fixture_dir())))
     parser.add_argument("--data-dir", type=Path, default=None, help="optional writable local data directory for explicit user updates")
+    parser.add_argument(
+        "--exit-with-parent",
+        action="store_true",
+        help="shut down when the parent process closes our stdin (desktop shell only)",
+    )
     return parser
+
+
+def _exit_when_parent_closes_stdin(server) -> None:
+    """The desktop shell cannot reap us on a crash or a force quit, and a
+    surviving sidecar holds its executable open — the next install then fails
+    with files in use. The parent's pipe closing is the one signal that
+    survives every exit path."""
+    def watch() -> None:
+        try:
+            sys.stdin.buffer.read()
+        except Exception:
+            pass
+        server.shutdown()
+
+    thread = threading.Thread(target=watch, daemon=True)
+    thread.start()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -52,6 +74,8 @@ def main(argv: list[str] | None = None) -> int:
         f"instruments={len(catalog.instruments)} digest={catalog.digest}",
         flush=True,
     )
+    if args.exit_with_parent:
+        _exit_when_parent_closes_stdin(server)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

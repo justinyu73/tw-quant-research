@@ -257,7 +257,31 @@ IA 從六個區段變七個。`PRIMARY_SECTION_IDS` 與 browser-smoke 的「恰�
 
 ## v0.3.1 桌面版實測（2026-08-03，Windows）
 
-### NSIS `.exe` 安裝到一半失敗（未修）
+### 真正的根因：sidecar 變孤兒（已修）
+
+實際錯誤訊息是「The setup was unable to automatically close all requested
+applications」——不是 WebView2（JY 機器上 WebView2 已裝，`150.0.4078.105`），是**檔案
+使用中**。查行程抓到**三個孤兒 `tqe-sidecar.exe`**，來自兩個安裝根目錄
+（`Program Files` 與 `AppData\Local`），app 本身沒在跑。
+
+`lib.rs` 只在 `WindowEvent::CloseRequested` 收 sidecar——只有從視窗關閉那條路才會收。
+當掉、強制結束、登出都不會經過它，於是每開一次就留一個孤兒，孤兒鎖住
+`tqe-sidecar.exe`，下次安裝就覆蓋不了。zibaldone 也是 Tauri＋PyInstaller sidecar，
+同一個形狀——這就是 JY 說的「老問題」。
+
+修兩層：
+
+1. **Rust**：`.build().run(|app, event| ...)` 補 `RunEvent::Exit` 也收一次，
+   不再只靠視窗事件
+2. **Python sidecar**：新增 `--exit-with-parent`，開一條 daemon thread 讀 stdin，
+   父行程一死管線就關、read 返回、`server.shutdown()`。這一層才擋得住當掉與強制結束，
+   因為那些路徑上 Rust 沒機會執行任何 handler。Rust 端 spawn 時帶上這個旗標
+
+**閘**：`tests/test_sidecar_exits_with_parent.py`（CI 的 unittest 會跑）。用 SIGKILL 砍
+父行程，模擬沒有機會跑 handler 的結束。兩個測試：**沒有旗標必須產生孤兒**（守住這個閘
+本身，否則哪天不再孤兒了它會對任何 build 都綠）、有旗標必須跟著死。
+
+### NSIS `.exe` 安裝到一半失敗（原始診斷，已被上面推翻）
 
 JY 回報 `TQR-Windows-x64-setup.exe` 安裝到一半失敗，並指出做 zibaldone 時也一樣。
 兩個 app 的共同點：都是 Tauri＋PyInstaller sidecar（`externalBin`），而且**兩邊都沒設
@@ -269,9 +293,9 @@ JY 回報 `TQR-Windows-x64-setup.exe` 安裝到一半失敗，並指出做 zibal
 **`.msi` 可以正常安裝**，所以問題在 NSIS 那條路，不是建置壞掉。release 上的 MSI 我下載
 驗過：magic bytes、WiX 3.14、SHA256 與 SHA256SUMS.txt 一致。
 
-尚未修，因為還沒拿到 NSIS 的實際失敗訊息（NSIS 不出 log）。候選解法：
-`webviewInstallMode: offlineInstaller`（安裝檔變大但不依賴網路）或 `embedBootstrapper`，
-以及 `installMode: currentUser`。
+WebView2 那條假設**已被否證**（JY 機器上已裝 `150.0.4078.105`，安裝程式會跳過那一步）。
+`installMode` 仍是 perMachine、需要 UAC，且機器上同時存在 per-user 與 per-machine 兩份
+安裝——這兩點還沒處理，但不是這次失敗的原因。
 
 ### 「下載並更新自選資料」15 秒就逾時（已修）
 
