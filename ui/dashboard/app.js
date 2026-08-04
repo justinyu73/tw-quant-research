@@ -25,9 +25,6 @@
   var KLINE_INSTRUMENTS_RETRY_MS = 500;
   var notesLoadStarted = false;
   var notesPersistenceAvailable = null;
-  var watchlistSearchQuery = "";
-  var watchlistSearchSelection = null;
-  var watchlistSearchFocused = false;
   var watchlistGroupNameQuery = "";
   var klineSearchQuery = state.selectedKlineInstrumentId || "";
   var klineSearchFocused = false;
@@ -36,6 +33,7 @@
   var chartDrawingModelKey = null;
   var chartTemplateName = "default";
   var dataUpdateInFlight = false;
+  var fundamentalsUpdateInFlight = false;
   var alertsLoadStarted = false;
   var alertsPersistenceAvailable = null;
   var alertEvaluateInFlight = false;
@@ -116,6 +114,7 @@
   var valuationLoadStarted = false;
   var valuationEvaluateInFlight = false;
   var valuationDraft = defaultValuationDraft();
+  var valuationEditingWorksheetId = null;
   var BUY_PLAN_LOCAL_STORAGE_KEY = "tqr-buy-plans.v1";
   var buyPlanDraft = defaultBuyPlanDraft();
   var buyPlansLoaded = false;
@@ -229,6 +228,93 @@
     };
   }
 
+  function valuationDraftNumber(value) {
+    return value === null || value === undefined || value === "" ? "" : String(value);
+  }
+
+  function valuationDraftPercentage(value) {
+    if (!(value > 0)) return "";
+    return String(Number((value * 100).toFixed(4)));
+  }
+
+  function valuationDraftFromWorksheet(definition) {
+    var scenarios = definition.scenarios || {};
+    var ratios = definition.buy_zone_ratios || {};
+    var basis = definition.basis || {};
+    return {
+      label: definition.label || "",
+      bearEps: valuationDraftNumber(scenarios.bear && scenarios.bear.eps),
+      bearPe: valuationDraftNumber(scenarios.bear && scenarios.bear.pe),
+      baseEps: valuationDraftNumber(scenarios.base && scenarios.base.eps),
+      basePe: valuationDraftNumber(scenarios.base && scenarios.base.pe),
+      bullEps: valuationDraftNumber(scenarios.bull && scenarios.bull.eps),
+      bullPe: valuationDraftNumber(scenarios.bull && scenarios.bull.pe),
+      ratioWatch: valuationDraftPercentage(ratios.watch),
+      ratioFirst: valuationDraftPercentage(ratios.first),
+      ratioSecond: valuationDraftPercentage(ratios.second),
+      ratioSweet: valuationDraftPercentage(ratios.sweet),
+      ratioExtreme: valuationDraftPercentage(ratios.extreme),
+      epsPeriod: basis.eps_period || "",
+      epsKind: basis.eps_kind === "actual" ? "actual" : "estimate",
+      peRationale: basis.pe_rationale || "",
+      financialDataDate: basis.financial_data_date || "",
+      valuationDate: basis.valuation_date || todayIso(),
+      changeReason: basis.change_reason || ""
+    };
+  }
+
+  function valuationDraftScenarioValue(prefix) {
+    var eps = Number(valuationDraft[prefix + "Eps"]);
+    var pe = Number(valuationDraft[prefix + "Pe"]);
+    if (!Number.isFinite(eps) || !Number.isFinite(pe) || !(eps > 0) || !(pe > 0)) return null;
+    return eps * pe;
+  }
+
+  function valuationDraftScenarioText(prefix) {
+    var value = valuationDraftScenarioValue(prefix);
+    return value === null ? "—" : core.formatNumber(value);
+  }
+
+  function valuationScenarioValuesFromDefinition(definition) {
+    var scenarios = definition && definition.scenarios ? definition.scenarios : {};
+    function valueFor(prefix) {
+      var entry = scenarios[prefix] || {};
+      var eps = Number(entry.eps);
+      var pe = Number(entry.pe);
+      return Number.isFinite(eps) && Number.isFinite(pe) && eps > 0 && pe > 0 ? eps * pe : null;
+    }
+    return { bear: valueFor("bear"), base: valueFor("base"), bull: valueFor("bull") };
+  }
+
+  function valuationValueText(value) {
+    return value === null || value === undefined ? "—" : core.formatNumber(value);
+  }
+
+  function valuationValueRulerMarkup(values, testid) {
+    var low = values && values.bear;
+    var high = values && values.bull;
+    var basePosition = valuationRailPercent(values && values.base, low, high);
+    function positionFor(kind) {
+      if (kind === "bear") return 0;
+      if (kind === "bull") return 100;
+      return basePosition === null ? 50 : basePosition;
+    }
+    function tick(kind, label, value) {
+      var position = positionFor(kind);
+      var extraClass = kind === "bear" ? " valuation-value-ruler-tick-bear" : kind === "bull" ? " valuation-value-ruler-tick-bull" : "";
+      return '<div class="valuation-value-ruler-tick' + extraClass + '" style="left:' + position.toFixed(2) + '%"><i aria-hidden="true"></i><span><small>' + text(label) + '</small><strong>' + valuationValueText(value) + '</strong></span></div>';
+    }
+    return '<div class="valuation-value-ruler" data-testid="' + testid + '" aria-label="Bear Base Bull 數值尺規"><div class="valuation-value-ruler-line" aria-hidden="true"></div>' +
+      tick("bear", "Bear", values && values.bear) + tick("base", "Base", values && values.base) + tick("bull", "Bull", values && values.bull) + '</div>';
+  }
+
+  function refreshValuationScenarioPreview() {
+    ["bear", "base", "bull"].forEach(function (prefix) {
+      var node = root.querySelector('[data-testid="valuation-draft-' + prefix + '-value"]');
+      if (node) node.textContent = valuationDraftScenarioText(prefix);
+    });
+  }
+
   function todayIso() {
     return new Date().toISOString().slice(0, 10);
   }
@@ -280,6 +366,7 @@
     valid: "有效",
     partial: "部分可用",
     invalid: "無效",
+    success: "完成",
     unavailable: "不可用",
     unsupported_period: "不支援期間",
     loading: "載入中",
@@ -502,9 +589,22 @@
 
 
   function selectedKlineInstrument() {
-    return core.klineInstruments(state.view).find(function (instrument) {
+    var existing = core.klineInstruments(state.view).find(function (instrument) {
       return instrument.instrument_id === state.selectedKlineInstrumentId;
-    }) || null;
+    });
+    if (existing) return existing;
+    var match = /^(TWSE|TPEX):([0-9A-Z]{4,6})$/i.exec(String(state.selectedKlineInstrumentId || "").trim());
+    if (!match) return null;
+    if (match[1].toUpperCase() === "TWSE" && !/^[1-9][0-9]{3}$/.test(match[2])) return null;
+    var market = match[1].toUpperCase() === "TWSE" ? "TWSE" : "TPEx";
+    return {
+      instrument_id: market + ":" + match[2],
+      market: market,
+      symbol: match[2],
+      display_name: "尚未下載",
+      asset_class: "equity",
+      currency: "TWD"
+    };
   }
 
   function klineLabel(model, instrument) {
@@ -582,6 +682,7 @@
   // work, not a hung call: the 15s read limit aborted it every time and then
   // blamed the service for not responding.
   var DATA_UPDATE_TIMEOUT_MS = 600000;
+  var FUNDAMENTALS_UPDATE_TIMEOUT_MS = 300000;
 
   function sidecarRequest(path, options) {
     var base = sidecarBaseUrl();
@@ -604,6 +705,9 @@
       if (timeoutMs === DATA_UPDATE_TIMEOUT_MS) {
         return "下載超過 " + (DATA_UPDATE_TIMEOUT_MS / 60000) + " 分鐘仍未完成；請縮小範圍（改成「目前個股」或減少年數）後重試。";
       }
+      if (timeoutMs === FUNDAMENTALS_UPDATE_TIMEOUT_MS) {
+        return "財務擷取超過 " + (FUNDAMENTALS_UPDATE_TIMEOUT_MS / 60000) + " 分鐘仍未完成；請縮小範圍（改成「目前個股」）後重試。";
+      }
       return "本機資料服務逾時未回應（" + ((timeoutMs || SIDECAR_TIMEOUT_MS) / 1000) + " 秒）；請確認 TQR 仍在執行後重試。";
     }
     if (!message || /load failed|failed to fetch|networkerror|network request failed/i.test(message)) {
@@ -611,6 +715,9 @@
     }
     if (message === "data_update_unavailable_in_preview") {
       return "瀏覽器預覽不提供下載；請使用桌面版 TQR。";
+    }
+    if (message === "fundamentals_update_unavailable_in_preview") {
+      return "瀏覽器預覽不提供財務擷取；請使用桌面版 TQR。";
     }
     if (message === "instrument_not_found") {
       return "找不到這個自選標的，請重新載入商品清單。";
@@ -621,8 +728,8 @@
     if (message === "unsupported_period") {
       return "這個期間沒有可用的 K 線資料。";
     }
-    if (/^TWSE (returned|response)/i.test(message)) {
-      return "官方 TWSE 資料回應失敗：" + message;
+    if (/^(TWSE|TPEx) (returned|response)/i.test(message)) {
+      return "官方 " + (message.indexOf("TPEx") === 0 ? "TPEx" : "TWSE") + " 資料回應失敗：" + message;
     }
     return "本機資料更新失敗：" + message;
   }
@@ -908,7 +1015,39 @@
     return saveLocalValuation(core.valuationStorePayload(state));
   }
 
-  function buildWorksheetFromDraft() {
+  function valuationWorksheetById(worksheetId) {
+    var worksheets = state.valuation && Array.isArray(state.valuation.worksheets) ? state.valuation.worksheets : [];
+    return worksheets.find(function (definition) { return definition.worksheet_id === worksheetId; }) || null;
+  }
+
+  function editValuationWorksheet(worksheetId) {
+    var definition = valuationWorksheetById(worksheetId);
+    if (!definition) return;
+    var targetId = definition.target && definition.target.security_id;
+    var targetInstrument = core.klineInstruments(state.view).find(function (instrument) {
+      return instrument.instrument_id === targetId || instrument.symbol === targetId;
+    });
+    if (!targetInstrument) {
+      state = core.reduce(state, { type: "VALUATION_ERROR", message: "此範本的標的目前不在本機資料目錄，無法載入編輯" });
+      render();
+      return;
+    }
+    valuationEditingWorksheetId = definition.worksheet_id;
+    valuationDraft = valuationDraftFromWorksheet(definition);
+    if (state.selectedKlineInstrumentId !== targetInstrument.instrument_id) {
+      selectKlineInstrument(targetInstrument.instrument_id, true);
+      return;
+    }
+    render();
+  }
+
+  function cancelValuationEdit() {
+    valuationEditingWorksheetId = null;
+    valuationDraft = defaultValuationDraft();
+    render();
+  }
+
+  function buildWorksheetFromDraft(existingDefinition) {
     var instrument = selectedKlineInstrument();
     var symbol = instrument && instrument.symbol;
     if (!symbol || !String(valuationDraft.label || "").trim()) return null;
@@ -933,7 +1072,7 @@
     if (Object.keys(ratios).some(function (key) { return ratios[key] === null; })) return null;
     return {
       schema: core.VALUATION_WORKSHEET_SCHEMA,
-      worksheet_id: "tqr-" + symbol + "-" + Date.now(),
+      worksheet_id: existingDefinition ? existingDefinition.worksheet_id : "tqr-" + symbol + "-" + Date.now(),
       label: String(valuationDraft.label).trim().slice(0, 120),
       target: { security_id: symbol },
       scenarios: { bear: bear, base: base, bull: bull },
@@ -946,14 +1085,20 @@
         valuation_date: String(valuationDraft.valuationDate || "").trim().slice(0, 200),
         change_reason: String(valuationDraft.changeReason || "").trim().slice(0, 200)
       },
-      created_at: new Date().toISOString()
+      created_at: existingDefinition && existingDefinition.created_at ? existingDefinition.created_at : new Date().toISOString()
     };
   }
 
-  function addWorksheetFromDraft() {
+  function saveWorksheetFromDraft() {
     var instrument = selectedKlineInstrument();
     var issues = core.valuationFormIssues(valuationDraft, { symbol: instrument && instrument.symbol });
-    var definition = issues.length ? null : buildWorksheetFromDraft();
+    var existingDefinition = valuationEditingWorksheetId ? valuationWorksheetById(valuationEditingWorksheetId) : null;
+    if (valuationEditingWorksheetId && !existingDefinition) {
+      state = core.reduce(state, { type: "VALUATION_ERROR", message: "找不到正在編輯的估值範本；請重新載入後再試" });
+      render();
+      return;
+    }
+    var definition = issues.length ? null : buildWorksheetFromDraft(existingDefinition);
     if (!definition) {
       state = core.reduce(state, {
         type: "VALUATION_ERROR",
@@ -962,7 +1107,8 @@
       render();
       return;
     }
-    state = core.reduce(state, { type: "ADD_VALUATION_WORKSHEET", worksheet: definition });
+    state = core.reduce(state, { type: existingDefinition ? "UPDATE_VALUATION_WORKSHEET" : "ADD_VALUATION_WORKSHEET", worksheet: definition });
+    valuationEditingWorksheetId = null;
     valuationDraft = defaultValuationDraft();
     persistValuation();
     render();
@@ -1211,26 +1357,6 @@
     if (current) current.outerHTML = markup;
   }
 
-  // The empty-query guidance doubles as the add-button gate, but showing it
-  // as a warning right after a successful add reads like an error. Only
-  // surface it while the user is interacting with the search box.
-  function visibleWatchlistAddIssues(issues) {
-    if (String(watchlistSearchQuery || "").trim() || watchlistSearchFocused) return issues;
-    return issues.filter(function (item) { return item.field !== "query"; });
-  }
-
-  function refreshWatchlistAddButtons() {
-    var instruments = core.klineInstruments(state.view);
-    var items = core.watchlistItemsForActiveGroup(state);
-    var selected = instrumentForId(watchlistSearchSelection) || resolveSearchSelection(instruments, watchlistSearchQuery);
-    var issues = core.watchlistAddIssues({ query: watchlistSearchQuery, selected: selected, items: items });
-    root.querySelectorAll('[data-action="watchlist-add"]').forEach(function (button) {
-      button.disabled = issues.length > 0;
-    });
-    var visible = visibleWatchlistAddIssues(issues);
-    refreshFormIssues("watchlist-add-issues", visible);
-  }
-
   function requestWatchlistModels() {
     if (state.klineRuntimeStatus !== "ready") return;
     (state.watchlist && state.watchlist.items || []).forEach(function (instrumentId) {
@@ -1350,11 +1476,11 @@
 
   function dataUpdateResultMarkup(results) {
     if (!Array.isArray(results) || !results.length) return "";
-    var labels = { success: "完成", partial: "部分完成", error: "失敗", unsupported: "未支援" };
+    var labels = { pass: "PASS", success: "完成", partial: "部分完成", error: "失敗", unsupported: "未支援" };
     return '<div class="data-update-results" data-testid="data-update-results">' + results.map(function (result) {
       var instrument = instrumentForId(result.instrument_id) || {};
       var name = instrument.symbol || result.symbol || result.instrument_id || "未指定標的";
-      var detail = result.bars_downloaded ? "K 線 " + result.bars_downloaded + " 筆" : (result.errors && result.errors[0] && (result.errors[0].error || result.errors[0].message)) || "沒有新增資料";
+      var detail = result.message || (result.bars_downloaded ? "K 線 " + result.bars_downloaded + " 筆" : (result.errors && result.errors[0] && (result.errors[0].error || result.errors[0].message)) || "沒有新增資料");
       return '<div class="data-update-result"><span><strong>' + text(name) + '</strong><small>' + text(instrument.display_name || result.display_name || result.instrument_id) + '</small></span><span class="data-update-result-status status-' + escapeHtml(result.status || "error") + '">' + text(labels[result.status] || result.status || "失敗") + '</span><small class="data-update-result-detail">' + text(detail) + '</small></div>';
     }).join("") + '</div>';
   }
@@ -1382,7 +1508,7 @@
     }).then(function (payload) {
       var result = payload && payload.data || {};
       var message = update.scope === "watchlist"
-        ? "自選更新：" + (result.updated_count || 0) + "/" + (result.requested_count || instrumentIds.length) + " 檔，K 線 " + (result.bars_downloaded || 0) + " 筆"
+        ? "自選更新：" + ((result.updated_count || 0) + (result.passed_count || 0)) + "/" + (result.requested_count || instrumentIds.length) + " 檔就緒（新增 " + (result.updated_count || 0) + "，PASS " + (result.passed_count || 0) + "），K 線 " + (result.bars_downloaded || 0) + " 筆"
         : "目前個股：K 線 " + (result.bars_downloaded || 0) + " 筆";
       state = core.reduce(state, { type: "DATA_UPDATE_SUCCESS", status: result.status || "success", message: message, results: result.results || [result] });
       if (Array.isArray(payload.instruments)) {
@@ -1397,6 +1523,61 @@
       render();
       requestKlineModel();
       requestWatchlistModels();
+    });
+  }
+
+  function fundamentalsUpdateTargetIds() {
+    var update = state.fundamentalsUpdate || {};
+    if (update.scope === "selected") {
+      var selected = selectedKlineInstrument();
+      return selected ? [selected.instrument_id] : [];
+    }
+    return state.watchlist && Array.isArray(state.watchlist.items) ? state.watchlist.items.slice() : [];
+  }
+
+  function fundamentalsUpdateResultMarkup(results) {
+    if (!Array.isArray(results) || !results.length) return "";
+    var labels = { success: "3/3 類完成", partial: "部分完成", unavailable: "尚無資料", unsupported: "未支援", error: "失敗" };
+    return '<div class="data-update-results fundamentals-update-results" data-testid="fundamentals-update-results">' + results.map(function (result) {
+      var instrument = instrumentForId(result.instrument_id) || {};
+      var name = instrument.symbol || result.symbol || result.instrument_id || "未指定標的";
+      var detail = result.message || "未取得最新期別";
+      return '<div class="data-update-result"><span><strong>' + text(name) + '</strong><small>' + text(instrument.display_name || result.display_name || result.instrument_id) + '</small></span><span class="data-update-result-status status-' + escapeHtml(result.status || "error") + '">' + text(labels[result.status] || result.status || "失敗") + '</span><small class="data-update-result-detail">' + text(detail) + '</small></div>';
+    }).join("") + '</div>';
+  }
+
+  function requestFundamentalsUpdate() {
+    if (fundamentalsUpdateInFlight) return;
+    var update = state.fundamentalsUpdate || { scope: "watchlist" };
+    var instrumentIds = fundamentalsUpdateTargetIds();
+    if (!instrumentIds.length) {
+      state = core.reduce(state, { type: "FUNDAMENTALS_UPDATE_ERROR", message: update.scope === "selected" ? "請先選取一個個股" : "請先加入自選標的" });
+      render();
+      return;
+    }
+    fundamentalsUpdateInFlight = true;
+    state = core.reduce(state, { type: "FUNDAMENTALS_UPDATE_START" });
+    render();
+    var body = { scope: update.scope || "watchlist", instrument_ids: instrumentIds };
+    if (update.scope === "selected") body.instrument_id = instrumentIds[0];
+    sidecarRequest("/fundamentals/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      timeoutMs: FUNDAMENTALS_UPDATE_TIMEOUT_MS
+    }).then(function (payload) {
+      var result = payload && payload.data || {};
+      var updated = Number(result.updated_count || 0);
+      var unavailable = Number(result.unavailable_count || 0);
+      var message = "財務更新：" + updated + "/" + (result.requested_count || instrumentIds.length) + " 檔有最新資料" + (unavailable ? "，" + unavailable + " 檔尚無官方期別" : "");
+      state = core.reduce(state, { type: "FUNDAMENTALS_UPDATE_SUCCESS", status: result.status || "success", message: message, results: result.results || [] });
+      fundamentalsCache = {};
+      fundamentalsRequests = {};
+    }).catch(function (error) {
+      state = core.reduce(state, { type: "FUNDAMENTALS_UPDATE_ERROR", message: sidecarErrorMessage(error, FUNDAMENTALS_UPDATE_TIMEOUT_MS) });
+    }).then(function () {
+      fundamentalsUpdateInFlight = false;
+      render();
     });
   }
 
@@ -1435,7 +1616,24 @@
       ? "瀏覽器預覽不下載；請使用桌面版"
       : targetIds.length === 0 ? (isWatchlist ? "請先加入自選標的" : "請先選取個股")
       : update.status === "idle" ? "尚未更新；只下載目前範圍的個股" : (update.message || STATUS_LABELS[update.status] || update.status);
-    return '<section class="data-update-panel" data-testid="data-update-panel"><div class="data-update-heading"><div><span class="eyebrow">官方免費來源 → 本機保存</span><h2>更新台股資料</h2><p>更新範圍：' + text(targetLabel) + '</p></div><span class="data-update-status status-' + escapeHtml(update.status) + '" data-testid="data-update-status">' + text(statusText) + '</span></div><div class="data-update-controls"><label><span>更新範圍</span><select data-action="data-update-scope" data-testid="data-update-scope"><option value="watchlist"' + (isWatchlist ? ' selected' : '') + '>全部自選（' + targetIds.length + ' 檔）</option><option value="selected"' + (isWatchlist ? '' : ' selected') + '>目前個股</option></select></label><label><span>歷史範圍</span><select data-action="data-update-years" data-testid="data-update-years"><option value="1"' + (update.years === 1 ? ' selected' : '') + '>近 1 年</option><option value="2"' + (update.years === 2 ? ' selected' : '') + '>近 2 年</option><option value="3"' + (update.years === 3 ? ' selected' : '') + '>近 3 年</option></select></label><button class="btn btn-primary" type="button" data-action="data-update" data-testid="data-update-button"' + (enabled ? '' : ' disabled') + '>' + (dataUpdateInFlight ? '更新中…' : (isWatchlist ? '下載並更新自選資料' : '下載並更新目前個股')) + '</button></div><small class="data-update-note">目前提供 TWSE 上市個股；只處理目前範圍，不下載全市場。資料保存於本機 raw 與 K 線快照，不是即時行情；瀏覽器預覽僅展示介面。</small>' + dataUpdateResultMarkup(update.results) + '</section>';
+    return '<section class="data-update-panel" data-testid="data-update-panel"><div class="data-update-heading"><div><span class="eyebrow">官方免費來源 → 本機保存</span><h2>更新台股資料</h2><p>更新範圍：' + text(targetLabel) + '</p></div><span class="data-update-status status-' + escapeHtml(update.status) + '" data-testid="data-update-status">' + text(statusText) + '</span></div><div class="data-update-controls"><label><span>更新範圍</span><select data-action="data-update-scope" data-testid="data-update-scope"><option value="watchlist"' + (isWatchlist ? ' selected' : '') + '>全部自選（' + targetIds.length + ' 檔）</option><option value="selected"' + (isWatchlist ? '' : ' selected') + '>目前個股</option></select></label><label><span>歷史範圍</span><select data-action="data-update-years" data-testid="data-update-years"><option value="1"' + (update.years === 1 ? ' selected' : '') + '>近 1 年</option><option value="2"' + (update.years === 2 ? ' selected' : '') + '>近 2 年</option><option value="3"' + (update.years === 3 ? ' selected' : '') + '>近 3 年</option></select></label><button class="btn btn-primary" type="button" data-action="data-update" data-testid="data-update-button"' + (enabled ? '' : ' disabled') + '>' + (dataUpdateInFlight ? '更新中…' : (isWatchlist ? '下載並更新自選資料' : '下載並更新目前個股')) + '</button></div><small class="data-update-note">目前提供 TWSE 上市與 TPEx 上櫃個股；只處理目前範圍，不下載全市場。資料保存於本機 raw 與 K 線快照，不是即時行情；瀏覽器預覽僅展示介面。</small>' + dataUpdateResultMarkup(update.results) + '</section>';
+  }
+
+  function fundamentalsUpdateMarkup() {
+    var update = state.fundamentalsUpdate || { scope: "watchlist", status: "idle", message: "", results: [] };
+    var instrument = selectedKlineInstrument();
+    var targetIds = fundamentalsUpdateTargetIds();
+    var isWatchlist = update.scope !== "selected";
+    var desktopAvailable = desktopDataUpdateAvailable();
+    var enabled = targetIds.length > 0 && desktopAvailable && !fundamentalsUpdateInFlight;
+    var targetLabel = isWatchlist
+      ? "全部自選（" + targetIds.length + " 檔）"
+      : instrument ? (instrument.market + ":" + instrument.symbol + " · " + instrument.display_name) : "尚未選取個股";
+    var statusText = !desktopAvailable
+      ? "瀏覽器預覽不擷取；請使用桌面版"
+      : targetIds.length === 0 ? (isWatchlist ? "請先加入自選標的" : "請先選取個股")
+      : update.status === "idle" ? "尚未擷取；每次只取得官方最新一期" : (update.message || STATUS_LABELS[update.status] || update.status);
+    return '<section class="data-update-panel fundamentals-update-panel" data-testid="fundamentals-update-panel"><div class="data-update-heading"><div><span class="eyebrow">官方財報來源 → 本機保存</span><h2>更新財務指標</h2><p>更新範圍：' + text(targetLabel) + '</p></div><span class="data-update-status status-' + escapeHtml(update.status) + '" data-testid="fundamentals-update-status">' + text(statusText) + '</span></div><div class="data-update-controls"><label><span>更新範圍</span><select data-action="fundamentals-update-scope" data-testid="fundamentals-update-scope"><option value="watchlist"' + (isWatchlist ? ' selected' : '') + '>全部自選（' + targetIds.length + ' 檔）</option><option value="selected"' + (isWatchlist ? '' : ' selected') + '>目前個股</option></select></label><button class="btn btn-primary" type="button" data-action="fundamentals-update" data-testid="fundamentals-update-button"' + (enabled ? '' : ' disabled') + '>' + (fundamentalsUpdateInFlight ? '擷取中…' : (isWatchlist ? '擷取並更新自選財務' : '擷取目前個股財務')) + '</button></div><small class="data-update-note">只在按下後擷取 TWSE／TPEx 最新月營收、季報與財務品質期別；不會把近 1 年 K 線當成財報歷史，也不會背景更新。</small>' + fundamentalsUpdateResultMarkup(update.results) + '</section>';
   }
 
   // Price above fair value is a premium, not a discount. Rendering +205% under a
@@ -1443,6 +1641,14 @@
   function discountLabel(value) {
     if (value === null || value === undefined) return "—";
     return (value < 0 ? "折價 " : value > 0 ? "溢價 " : "持平 ") + core.formatPercent(Math.abs(value));
+  }
+
+  // Valuation colour is deliberately separate from the quote's market-change
+  // convention and from fundamental/technical metric rendering. Only the
+  // current-price-versus-Base comparison gets red/green semantics.
+  function valuationToneClass(value) {
+    if (typeof value !== "number" || !isFinite(value) || value === 0) return "valuation-neutral";
+    return value < 0 ? "valuation-discount" : "valuation-premium";
   }
 
   function num(value) {
@@ -1487,7 +1693,7 @@
         '<td><span class="cell-strong">' + text(row.name) + '</span><small>' + text(row.industry) + '</small></td>' +
         '<td class="cell-mono">' + num(row.price) + '</td>' +
         '<td class="cell-mono" data-testid="watchlist-base-value">' + num(row.base_value) + '</td>' +
-        '<td class="cell-mono ' + (row.discount === null ? "" : row.discount < 0 ? "tone-up" : "tone-down") + '" data-testid="watchlist-discount">' + discountLabel(row.discount) + '</td>' +
+        '<td class="cell-mono ' + valuationToneClass(row.discount) + '" data-testid="watchlist-discount">' + discountLabel(row.discount) + '</td>' +
         '<td class="cell-mono">' + num(row.first_price) + '</td>' +
         '<td class="cell-mono">' + num(row.sweet_price) + '</td>' +
         '<td>' + text(row.fundamental_state) + '</td>' +
@@ -1503,24 +1709,19 @@
   }
 
   function watchlistMarkup() {
-    var instruments = core.klineInstruments(state.view);
     var items = core.watchlistItemsForActiveGroup(state);
     var groups = Array.isArray(state.watchlistGroups) ? state.watchlistGroups : [{ id: "default", name: "我的自選", items: items }];
-    var selected = instrumentForId(watchlistSearchSelection) || resolveSearchSelection(instruments, watchlistSearchQuery);
     var saving = state.watchlist && state.watchlist.status === "saving";
     var canSave = state.watchlist && state.watchlist.dirty && !saving && watchlistPersistenceAvailable !== false;
     var activeGroup = groups.find(function (group) { return group.id === state.activeWatchlistGroupId; }) || groups[0];
     var canDeleteGroup = activeGroup && activeGroup.id !== "default";
     var groupNameIssues = core.watchlistGroupNameIssues(watchlistGroupNameQuery);
-    var watchlistAddIssueList = core.watchlistAddIssues({ query: watchlistSearchQuery, selected: selected, items: items });
     return card("自選清單", "本機保存 · 明確儲存 · 資料唯讀", '<div class="watchlist-toolbar-shell"><div class="watchlist-toolbar" data-testid="watchlist-toolbar">' +
       '<section class="watchlist-toolbar-grouping" aria-label="自選群組管理"><div class="watchlist-group-control"><label class="watchlist-group-picker"><span>目前群組</span><select data-action="watchlist-group-select" data-testid="watchlist-group-select">' + groups.map(function (group) {
         return '<option value="' + escapeHtml(group.id) + '"' + (group.id === state.activeWatchlistGroupId ? ' selected' : '') + '>' + text(group.name) + ' · ' + group.items.length + '</option>';
       }).join("") + '</select></label><button class="btn btn-outline btn-sm watchlist-group-delete" type="button" data-action="watchlist-group-delete" data-group-id="' + escapeHtml(activeGroup && activeGroup.id || "default") + '" data-testid="watchlist-group-delete"' + (canDeleteGroup ? '' : ' disabled') + '>刪除群組</button></div>' +
       '<div class="watchlist-group-new-control"><label class="watchlist-group-new"><span>新增群組</span><input type="text" maxlength="32" placeholder="例如 半導體" value="' + escapeHtml(watchlistGroupNameQuery) + '" data-action="watchlist-group-name" data-testid="watchlist-group-name"></label>' +
       '<button class="btn btn-outline" type="button" data-action="watchlist-group-create" data-testid="watchlist-group-create"' + (groupNameIssues.length ? ' disabled' : '') + '>建立群組</button>' + formIssuesMarkup(groupNameIssues, "watchlist-group-issues") + '</div></section>' +
-      '<section class="watchlist-toolbar-search" aria-label="搜尋並加入商品"><div class="watchlist-picker symbol-search' + (watchlistSearchFocused ? " search-open" : "") + '"><label><span>搜尋商品</span><input type="search" autocomplete="off" placeholder="代號、名稱或市場，例如 2330 / 台積電" value="' + escapeHtml(watchlistSearchQuery) + '" data-action="watchlist-search" data-testid="watchlist-picker" aria-controls="watchlist-symbol-results"></label>' +
-      symbolSearchResults(instruments, watchlistSearchQuery, items, watchlistSearchSelection, "watchlist-symbol-results", "watchlist-search-pick") + '</div><button class="btn btn-primary" type="button" data-action="watchlist-add" data-testid="watchlist-add"' + (watchlistAddIssueList.length ? ' disabled' : '') + '>加入自選</button>' + formIssuesMarkup(visibleWatchlistAddIssues(watchlistAddIssueList), "watchlist-add-issues") + '</section>' +
       '<section class="watchlist-toolbar-actions" aria-label="自選清單操作"><button class="btn btn-outline" type="button" data-action="watchlist-clear" data-testid="watchlist-clear"' + (items.length ? '' : ' disabled') + '>清除草稿</button>' +
       '<button class="btn btn-primary" type="button" data-action="watchlist-save" data-testid="watchlist-save"' + (canSave ? '' : ' disabled') + '>儲存自選清單</button></section>' +
       '<span class="watchlist-state" data-testid="watchlist-state">' + text(watchlistStatus()) + '</span></div></div>' +
@@ -1671,11 +1872,13 @@
       '<small>' + text(note) + '</small></div>';
   }
 
-  function valuationScenarioField(prefix, label) {
-    return '<div class="valuation-scenario" data-testid="valuation-scenario-' + prefix + '"><h4>' + text(label) + '</h4>' +
+  function valuationScenarioField(prefix, label, englishLabel) {
+    return '<div class="valuation-scenario valuation-scenario-' + prefix + '" data-testid="valuation-scenario-' + prefix + '">' +
+      '<div class="valuation-scenario-node">' + valuationRailIcon(prefix) + '<span><strong>' + text(label) + '</strong><small>' + text(englishLabel) + '</small></span><em class="valuation-scenario-price" data-testid="valuation-draft-' + prefix + '-value">' + valuationDraftScenarioText(prefix) + '</em><small class="valuation-scenario-price-label">合理價</small></div>' +
+      '<div class="valuation-scenario-fields">' +
       '<label><span>EPS</span><input type="number" step="0.01" inputmode="decimal" value="' + escapeHtml(valuationDraft[prefix + "Eps"]) + '" data-action="valuation-ws-input" data-field="' + prefix + 'Eps" data-testid="valuation-ws-' + prefix + '-eps"></label>' +
       '<label><span>合理本益比</span><input type="number" step="0.1" inputmode="decimal" value="' + escapeHtml(valuationDraft[prefix + "Pe"]) + '" data-action="valuation-ws-input" data-field="' + prefix + 'Pe" data-testid="valuation-ws-' + prefix + '-pe"></label>' +
-      '</div>';
+      '</div></div>';
   }
 
   function valuationRatioField(field, label, testid) {
@@ -1695,6 +1898,72 @@
       '</div>';
   }
 
+  function valuationRailIcon(kind) {
+    var paths = {
+      bear: '<path d="M12 3 4.5 6v5c0 4.8 3.2 8.1 7.5 10 4.3-1.9 7.5-5.2 7.5-10V6L12 3Z"/><path d="M12 8v7M9.5 12.5 12 15l2.5-2.5"/>',
+      base: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
+      bull: '<path d="m5 18 13-13M9 5h9v9"/>'
+    };
+    return '<svg class="valuation-rail-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths[kind] + '</svg>';
+  }
+
+  function valuationRailPercent(value, low, high) {
+    if (typeof value !== "number" || !isFinite(value) || typeof low !== "number" || !isFinite(low) || typeof high !== "number" || !isFinite(high) || high <= low) return null;
+    return Math.max(0, Math.min(100, ((value - low) / (high - low)) * 100));
+  }
+
+  function valuationRailMarkup(values, zone, currentPrice, comparisonTone) {
+    var low = values.bear;
+    var high = values.bull;
+    var basePosition = valuationRailPercent(values.base, low, high);
+    var rangeStatus = core.valuationRangeStatus(currentPrice, values);
+    var currentRawPosition = rangeStatus.position;
+    var currentPosition = currentRawPosition === null ? null : Math.max(0, Math.min(100, currentRawPosition));
+    var isCurrentOutside = rangeStatus.status === "outside";
+    var markerPosition = currentPosition === null ? 50 : isCurrentOutside ? (currentRawPosition > 100 ? 100 : 0) : Math.max(4, Math.min(96, currentPosition));
+    var rangeHint = rangeStatus.direction === "above_bull" ? "高於 Bull" : rangeStatus.direction === "below_bear" ? "低於 Bear" : "";
+    var outsideClass = rangeStatus.direction === "above_bull" ? "valuation-outside-high" : rangeStatus.direction === "below_bear" ? "valuation-outside-low" : "";
+    function node(kind, label, value, position, testid, extraClass) {
+      var positionStyle = position === null ? "" : ' style="left:' + position.toFixed(2) + '%"';
+      return '<div class="valuation-rail-node ' + extraClass + '"' + positionStyle + '><span class="valuation-rail-node-label">' + valuationRailIcon(kind) + '<span>' + text(label) + '</span></span><strong' + (testid ? ' data-testid="' + testid + '"' : '') + '>' + core.formatNumber(value) + '</strong></div>';
+    }
+    function band(label, value, testid) {
+      return '<div class="valuation-rail-band"><span>' + text(label) + '</span><strong' + (testid ? ' data-testid="' + testid + '"' : '') + '>' + core.formatNumber(value) + '</strong></div>';
+    }
+    function currentHeader() {
+      if (!isCurrentOutside) return '<span class="valuation-rail-hint">現價落點 · 買進區間</span>';
+      return '<span class="valuation-rail-hint valuation-rail-hint-outside">區間外 · 需查明原因並重估</span>';
+    }
+    function currentMarker() {
+      var markerClass = 'valuation-rail-current-marker ' + comparisonTone + (isCurrentOutside ? ' valuation-outside ' + outsideClass : '');
+      return '<div class="' + markerClass + '" data-testid="valuation-current-marker" style="left:' + markerPosition.toFixed(2) + '%"><span>現價 ' + core.formatNumber(currentPrice) + (rangeHint ? ' · ' + text(rangeHint) : '') + '</span><i aria-hidden="true"></i></div>';
+    }
+    function rangeWarning() {
+      if (!isCurrentOutside) return '';
+      return '<aside class="valuation-range-warning ' + comparisonTone + '" data-testid="valuation-range-warning"><span>區間外</span><div><strong>現價 ' + core.formatNumber(currentPrice) + ' ' + text(rangeHint) + '</strong><small>可能發生新事件／基本面變化，或估值假設與計算方式已不合理；請查明原因後重估 Bear～Bull。</small></div></aside>';
+    }
+    function scaleTick(kind, position) {
+      if (position === null) return '';
+      var tickClass = kind === "bear" ? " valuation-rail-scale-tick-bear" : kind === "bull" ? " valuation-rail-scale-tick-bull" : "";
+      return '<span class="valuation-rail-scale-tick' + tickClass + '" style="left:' + position.toFixed(2) + '%" data-testid="valuation-rail-ruler-tick-' + kind + '" aria-hidden="true"><i></i></span>';
+    }
+    var trackClass = 'valuation-rail-track' + (isCurrentOutside ? ' valuation-rail-track-outside ' + outsideClass : '');
+    return '<section class="valuation-rail" data-testid="valuation-rail">' +
+      '<header class="valuation-rail-header"><div><span class="detail-label">估值位置 · 數值尺規</span><strong>Bear → Base → Bull</strong></div>' + currentHeader() + '</header>' +
+      '<div class="' + trackClass + '" style="--valuation-current-position:' + markerPosition.toFixed(2) + '%">' +
+      '<div class="valuation-rail-line" aria-hidden="true"></div>' +
+      scaleTick("bear", 0) + scaleTick("base", basePosition) + scaleTick("bull", 100) +
+      node("bear", "Bear", values.bear, 0, "valuation-bear-value", "valuation-rail-node-bear") +
+      node("base", "Base 合理價值", values.base, basePosition, "valuation-base-value", "valuation-rail-node-base") +
+      node("bull", "Bull", values.bull, 100, "valuation-bull-value", "valuation-rail-node-bull") +
+      currentMarker() +
+      '</div>' +
+      rangeWarning() +
+      '<div class="valuation-rail-bands" data-testid="valuation-rail-bands">' +
+      band("極端錯價", zone.extreme) + band("甜蜜價", zone.sweet, "valuation-zone-sweet") + band("第二階段", zone.second) + band("第一階段", zone.first, "valuation-zone-first") + band("觀察區", zone.watch) +
+      '</div></section>';
+  }
+
   function valuationResultCard(result) {
     if (result.status !== "ok") {
       return '<article class="valuation-result" data-testid="valuation-result-card"><header><strong>' + text(result.label) + '</strong><span class="status status-draft">資料不足</span></header>' +
@@ -1704,23 +1973,14 @@
     var zone = result.buy_zone || {};
     var comparison = result.comparison || {};
     var basis = result.basis || {};
+    var comparisonTone = valuationToneClass(comparison.discount_pct);
     return '<article class="valuation-result" data-testid="valuation-result-card">' +
       '<header><strong>' + text(result.label) + '</strong><span class="status status-draft">' + text(result.security_id) + '</span></header>' +
-      '<div class="valuation-scenario-grid">' +
-      '<div><span class="detail-label">Bear</span><strong>' + core.formatNumber(values.bear) + '</strong></div>' +
-      '<div><span class="detail-label">Base 合理價值</span><strong class="valuation-price" data-testid="valuation-base-value">' + core.formatNumber(values.base) + '</strong></div>' +
-      '<div><span class="detail-label">Bull</span><strong>' + core.formatNumber(values.bull) + '</strong></div>' +
-      '</div>' +
-      '<div class="valuation-zone-grid" data-testid="valuation-zone">' +
-      '<div><span class="detail-label">觀察區</span><strong>' + core.formatNumber(zone.watch) + '</strong></div>' +
-      '<div><span class="detail-label">第一階段</span><strong data-testid="valuation-zone-first">' + core.formatNumber(zone.first) + '</strong></div>' +
-      '<div><span class="detail-label">第二階段</span><strong>' + core.formatNumber(zone.second) + '</strong></div>' +
-      '<div><span class="detail-label">甜蜜價</span><strong data-testid="valuation-zone-sweet">' + core.formatNumber(zone.sweet) + '</strong></div>' +
-      '<div><span class="detail-label">極端錯價</span><strong>' + core.formatNumber(zone.extreme) + '</strong></div>' +
-      '</div>' +
-      '<div class="valuation-compare"><span>現價 <strong>' + core.formatNumber(result.current_price) + '</strong></span>' +
-      '<span data-testid="valuation-discount-cell"><strong data-testid="valuation-discount">' + discountLabel(comparison.discount_pct) + '</strong></span>' +
-      '<span>目前階段 <strong data-testid="valuation-stage">' + text(core.STAGE_LABELS[result.stage]) + '</strong></span></div>' +
+      valuationRailMarkup(values, zone, result.current_price, comparisonTone) +
+      '<div class="valuation-compare valuation-compare-emphasis">' +
+      '<div class="valuation-compare-item valuation-current-price"><span>現價</span><strong data-testid="valuation-current-price">' + core.formatNumber(result.current_price) + '</strong></div>' +
+      '<div class="valuation-compare-item valuation-gap ' + comparisonTone + '" data-testid="valuation-discount-cell"><span>折／溢價</span><strong class="' + comparisonTone + '" data-testid="valuation-discount">' + discountLabel(comparison.discount_pct) + '</strong></div>' +
+      '<div class="valuation-compare-item valuation-stage-item"><span>目前階段</span><strong data-testid="valuation-stage">' + text(core.STAGE_LABELS[result.stage]) + '</strong></div></div>' +
       '<small class="valuation-result-params">EPS ' + text(basis.eps_period) + '（' + (basis.eps_kind === "actual" ? "實際值" : "預估值") + '）· PE 理由 ' + text(basis.pe_rationale || "未記錄") +
       ' · 財報日 ' + text(basis.financial_data_date || "未記錄") + ' · 估值日 ' + text(basis.valuation_date) + ' · 公式版本 ' + text(result.formula_version) + '</small></article>';
   }
@@ -1733,15 +1993,22 @@
     var symbol = instrument && instrument.symbol;
     var issues = core.valuationFormIssues(valuationDraft, { symbol: symbol });
     var evaluateBlocker = valuationEvaluateBlocker();
+    var editingDefinition = valuationEditingWorksheetId ? valuationWorksheetById(valuationEditingWorksheetId) : null;
 
     var worksheetCards = worksheets.length ? worksheets.map(function (definition) {
       var scenarios = definition.scenarios || {};
       var base = scenarios.base || {};
-      return '<article class="valuation-worksheet" data-testid="valuation-worksheet"><div><strong>' + text(definition.label) +
+      var editing = definition.worksheet_id === valuationEditingWorksheetId;
+      return '<article class="valuation-worksheet' + (editing ? ' active' : '') + '" data-testid="valuation-worksheet" data-worksheet-id="' + escapeHtml(definition.worksheet_id) + '"><div><strong>' + text(definition.label) +
         '</strong><small>' + text(definition.target && definition.target.security_id) + ' · Base ' + core.formatNumber(base.eps) + ' × ' + core.formatNumber(base.pe) +
-        ' · ' + text((definition.basis || {}).eps_period) + '</small></div>' +
-        '<button class="icon-button" type="button" data-action="valuation-delete" data-worksheet-id="' + escapeHtml(definition.worksheet_id) + '" aria-label="刪除估值工作表">×</button></article>';
+        ' · ' + text((definition.basis || {}).eps_period) + '</small>' + valuationValueRulerMarkup(valuationScenarioValuesFromDefinition(definition), "valuation-worksheet-ruler") + '</div>' +
+        '<div class="valuation-worksheet-actions"><button class="btn btn-outline btn-sm" type="button" data-action="valuation-edit" data-worksheet-id="' + escapeHtml(definition.worksheet_id) + '" data-testid="valuation-edit">' + (editing ? '編輯中' : '載入編輯') + '</button>' +
+        '<button class="icon-button" type="button" data-action="valuation-delete" data-worksheet-id="' + escapeHtml(definition.worksheet_id) + '" aria-label="刪除估值工作表">×</button></div></article>';
     }).join("") : '<div class="alert-empty" data-testid="valuation-empty">尚未建立估值工作表。</div>';
+    var worksheetListHeader = worksheets.length ? '<div class="valuation-worksheet-list-header"><div><strong>已儲存範本</strong><span>可載入編輯，不必重新輸入 Bear～Bull 假設</span></div><span>' + worksheets.length + ' 個</span></div>' : '';
+    var editingMarkup = editingDefinition
+      ? '<div class="valuation-editing-state" data-testid="valuation-editing-state"><div><span>正在編輯範本</span><strong>' + text(editingDefinition.label) + '</strong></div><button class="btn btn-outline btn-sm" type="button" data-action="valuation-cancel-edit" data-testid="valuation-cancel-edit">取消編輯</button></div>'
+      : '';
 
     var statusMarkup = valuation.status === "error"
       ? '<p class="alert-status error" data-testid="valuation-status">' + text(valuation.message || "估值計算失敗") + '</p>'
@@ -1750,8 +2017,11 @@
     return '<section class="valuation-panel" data-testid="valuation-panel">' +
       '<header class="subsection-heading"><div><h2>Bear／Base／Bull 估值工作表</h2><span class="muted">合理價值 = 預估 EPS × 合理本益比；買進區間 = Base 合理價值 × 自訂比例</span></div><span class="status status-draft">' + text(core.VALUATION_WORKSHEET_SCHEMA) + '</span></header>' +
       '<div class="valuation-form" data-testid="valuation-form">' +
+      editingMarkup +
       '<label class="valuation-field"><span>工作表名稱</span><input type="text" maxlength="120" placeholder="例如：2330 三情境合理價" value="' + escapeHtml(valuationDraft.label) + '" data-action="valuation-ws-input" data-field="label" data-testid="valuation-ws-label"></label>' +
-      '<div class="valuation-scenario-row">' + valuationScenarioField("bear", "Bear 保守") + valuationScenarioField("base", "Base 最合理") + valuationScenarioField("bull", "Bull 樂觀") + '</div>' +
+      '<section class="valuation-scenario-row" data-testid="valuation-scenario-panel">' +
+      '<header class="valuation-scenario-row-header"><div><h4>三情境估值</h4><span>保守 → 最合理 → 樂觀</span></div><span class="valuation-scenario-row-hint">合理價尺規 · EPS × 合理本益比</span></header>' +
+      '<div class="valuation-scenario-inputs">' + valuationScenarioField("bear", "保守", "Bear") + valuationScenarioField("base", "最合理", "Base") + valuationScenarioField("bull", "樂觀", "Bull") + '</div></section>' +
       '<div class="valuation-ratio-row" data-testid="valuation-ratios"><h4>買進區間比例（相對 Base 合理價值）</h4>' +
       valuationRatioField("ratioWatch", "觀察區", "valuation-ratio-watch") +
       valuationRatioField("ratioFirst", "第一階段", "valuation-ratio-first") +
@@ -1759,9 +2029,9 @@
       valuationRatioField("ratioSweet", "甜蜜區", "valuation-ratio-sweet") +
       valuationRatioField("ratioExtreme", "極端錯價", "valuation-ratio-extreme") + '</div>' +
       valuationBasisMarkup() +
-      '<div class="valuation-actions"><button class="btn btn-primary" type="button" data-action="valuation-add" data-testid="valuation-add"' + (issues.length ? " disabled" : "") + '>加入估值工作表</button>' +
+      '<div class="valuation-actions"><button class="btn btn-primary" type="button" data-action="valuation-add" data-testid="valuation-add"' + (issues.length ? " disabled" : "") + '>' + (editingDefinition ? '更新估值範本' : '儲存估值範本') + '</button>' +
       formIssuesMarkup(issues, "valuation-form-issues") + '</div></div>' +
-      '<div class="valuation-worksheet-list" data-testid="valuation-worksheet-list">' + worksheetCards + '</div>' +
+      '<div class="valuation-worksheet-list" data-testid="valuation-worksheet-list">' + worksheetListHeader + worksheetCards + '</div>' +
       '<div class="alert-toolbar"><button class="btn btn-primary btn-sm" type="button" data-action="valuation-evaluate" data-testid="valuation-evaluate"' + (valuationEvaluateInFlight ? " disabled" : "") + '>' + (valuationEvaluateInFlight ? "計算中…" : "計算合理價值與買進區間") + '</button>' +
       (evaluateBlocker ? '<span class="muted" data-testid="valuation-evaluate-hint">' + text(evaluateBlocker) + '</span>' : "") + '</div>' +
       statusMarkup +
@@ -2015,7 +2285,7 @@
         return '<tr data-testid="opportunity-row"><td><span class="cell-strong">' + text(row.symbol) + '</span><small>' + text(row.name) + '</small></td>' +
           '<td class="cell-mono">' + core.formatNumber(row.price) + '</td>' +
           '<td class="cell-mono">' + core.formatNumber(row.base_value) + '</td>' +
-          '<td class="cell-mono ' + (row.discount < 0 ? "tone-up" : "tone-down") + '" data-testid="opportunity-discount">' + discountLabel(row.discount) + '</td>' +
+          '<td class="cell-mono ' + valuationToneClass(row.discount) + '" data-testid="opportunity-discount">' + discountLabel(row.discount) + '</td>' +
           '<td>' + text(row.stage_label) + '</td></tr>';
       }).join("") + '</tbody></table></div>';
   }
@@ -2037,7 +2307,7 @@
   function watchlistPageMarkup() {
     return pageHeader("自選清單", "追蹤清單 · 合理價值 · 折價幅度 · 買進階段") +
       '<div class="data-source-banner"><strong>免費資料本地保存</strong><span>目前顯示已核准的本機資料；未接入付費訂閱、即時行情或券商。</span></div>' +
-      dataUpdateMarkup() + watchlistMarkup();
+      dataUpdateMarkup() + fundamentalsUpdateMarkup() + watchlistMarkup();
   }
 
   // Reading order: the company's own numbers first, then the judgements built
@@ -2090,7 +2360,7 @@
   // Axis-free trend glyph. Fewer than two real points cannot describe a
   // trend, so it says so instead of drawing a flat line — the series is not
   // padded, interpolated, or carried forward.
-  function sparkline(values, testid) {
+  function sparkline(values, testid, keyMetric) {
     var points = (values || []).filter(function (value) { return typeof value === "number" && isFinite(value); });
     if (points.length < 2) return '<span class="sparkline-empty" data-testid="' + testid + '">走勢需 2 期以上</span>';
     var min = Math.min.apply(null, points);
@@ -2101,9 +2371,8 @@
       var y = 22 - ((value - min) / span) * 20;
       return (index ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1);
     }).join(" ");
-    // 台股紅漲綠跌 — the glyph follows the same convention as the K line.
     var rising = points[points.length - 1] >= points[0];
-    return '<svg class="sparkline ' + (rising ? "rising" : "falling") + '" viewBox="0 0 96 24" preserveAspectRatio="none" ' +
+    return '<svg class="sparkline ' + (keyMetric ? "fundamental-key-sparkline" : "fundamental-neutral-sparkline") + '" viewBox="0 0 96 24" preserveAspectRatio="none" ' +
       'role="img" aria-label="' + (rising ? "走勢上升" : "走勢下降") + '" data-testid="' + testid + '"><path d="' + path + '"/></svg>';
   }
 
@@ -2115,11 +2384,11 @@
     var income = data && data.income_statement.observations[0];
     var balance = data && data.balance_sheet && data.balance_sheet.observations[0];
     if (!revenue && !income && !balance) {
-      return '<div class="empty-state" data-testid="fundamental-snapshot-empty"><strong>此標的尚無已擷取的基本面期別。</strong><span>執行 <code>scripts/capture_fundamentals.py</code> 擷取一期後才會顯示；不以價格推估，也不補 0。</span></div>';
+      return '<div class="empty-state" data-testid="fundamental-snapshot-empty"><strong>此標的尚無已擷取的基本面期別。</strong><span>請回到自選清單按「更新財務指標」擷取官方最新一期；不以價格推估，也不補 0。</span></div>';
     }
-    function tile(label, value, hint, testid, series) {
-      return '<article class="fundamental-metric" data-testid="' + testid + '"><span>' + text(label) + '</span><strong>' + text(value) + '</strong>' +
-        sparkline(series, testid + "-spark") + '<small>' + text(hint) + '</small></article>';
+    function tile(label, value, hint, testid, series, keyMetric) {
+      return '<article class="fundamental-metric" data-testid="' + testid + '"><span>' + text(label) + '</span><strong class="' + (keyMetric ? "fundamental-key" : "fundamental-neutral") + '">' + text(value) + '</strong>' +
+        sparkline(series, testid + "-spark", keyMetric) + '<small>' + text(hint) + '</small></article>';
     }
     // Observations arrive newest-first; a sparkline reads left-to-right in time.
     function seriesOf(block, key) {
@@ -2130,15 +2399,15 @@
     var incomeValues = income ? income.values : {};
     var balanceValues = balance ? balance.values : {};
     return '<div class="fundamental-metric-grid" data-testid="fundamental-snapshot">' +
-      tile("月營收 YoY", revenue ? pctCell(revenueValues.revenue_yoy) : "—", revenue ? revenue.period : "未擷取", "fundamental-revenue-yoy", seriesOf(data && data.monthly_revenue, "revenue_yoy")) +
-      tile("月營收 MoM", revenue ? pctCell(revenueValues.revenue_mom) : "—", revenue ? revenue.period : "未擷取", "fundamental-revenue-mom", seriesOf(data && data.monthly_revenue, "revenue_mom")) +
-      tile("EPS", income && incomeValues.eps !== null ? core.formatNumber(incomeValues.eps) : "—", income ? income.period : "未擷取", "fundamental-eps", seriesOf(data && data.income_statement, "eps")) +
+      tile("月營收 YoY", revenue ? pctCell(revenueValues.revenue_yoy) : "—", revenue ? revenue.period : "未擷取", "fundamental-revenue-yoy", seriesOf(data && data.monthly_revenue, "revenue_yoy"), true) +
+      tile("月營收 MoM", revenue ? pctCell(revenueValues.revenue_mom) : "—", revenue ? revenue.period : "未擷取", "fundamental-revenue-mom", seriesOf(data && data.monthly_revenue, "revenue_mom"), true) +
+      tile("EPS", income && incomeValues.eps !== null ? core.formatNumber(incomeValues.eps) : "—", income ? income.period : "未擷取", "fundamental-eps", seriesOf(data && data.income_statement, "eps"), true) +
       tile("毛利率", income ? pctCell(incomeValues.gross_margin) : "—", income ? income.period : "未擷取", "fundamental-gross-margin", seriesOf(data && data.income_statement, "gross_margin")) +
       tile("營益率", income ? pctCell(incomeValues.operating_margin) : "—", income ? income.period : "未擷取", "fundamental-operating-margin", seriesOf(data && data.income_statement, "operating_margin")) +
       tile("淨利率", income ? pctCell(incomeValues.net_margin) : "—", income ? income.period : "未擷取", "fundamental-net-margin", seriesOf(data && data.income_statement, "net_margin")) +
       tile("負債比", balance ? pctCell(balanceValues.debt_ratio) : "—", balance ? balance.period : "未擷取", "fundamental-debt-ratio", seriesOf(data && data.balance_sheet, "debt_ratio")) +
       tile("流動比", balance && balanceValues.current_ratio !== null ? core.formatNumber(balanceValues.current_ratio) : "—", balance ? balance.period : "未擷取", "fundamental-current-ratio", seriesOf(data && data.balance_sheet, "current_ratio")) +
-      tile("每股淨值", balance && balanceValues.bvps !== null ? core.formatNumber(balanceValues.bvps) : "—", balance ? balance.period : "未擷取", "fundamental-bvps", seriesOf(data && data.balance_sheet, "bvps")) +
+      tile("每股淨值", balance && balanceValues.bvps !== null ? core.formatNumber(balanceValues.bvps) : "—", balance ? balance.period : "未擷取", "fundamental-bvps", seriesOf(data && data.balance_sheet, "bvps"), true) +
       '</div>' +
       '<p class="valuation-note" data-testid="fundamental-provenance">來源 ' + text(data.attribution) + '｜available_at 採交易所整批出表日（保守上界），非公司公告時間；published_at 未接入。</p>';
   }
@@ -2155,19 +2424,19 @@
     var quarterRows = quarters.length ? quarters.map(function (item) {
       var v = item.values;
       return '<tr data-testid="trend-quarter-row"><td>' + text(item.period) + '</td>' +
-        '<td class="cell-mono">' + core.formatNumber(v.revenue) + '</td>' +
+        '<td class="cell-mono fundamental-key">' + core.formatNumber(v.revenue) + '</td>' +
         '<td class="cell-mono">' + pctCell(v.gross_margin) + '</td>' +
         '<td class="cell-mono">' + pctCell(v.operating_margin) + '</td>' +
         '<td class="cell-mono">' + pctCell(v.net_margin) + '</td>' +
-        '<td class="cell-mono">' + (v.eps === null ? "—" : core.formatNumber(v.eps)) + '</td></tr>';
+        '<td class="cell-mono fundamental-key">' + (v.eps === null ? "—" : core.formatNumber(v.eps)) + '</td></tr>';
     }).join("") : '<tr><td colspan="6">尚無已擷取的季別。</td></tr>';
     var monthRows = months.length ? months.map(function (item) {
       var v = item.values;
       return '<tr data-testid="trend-month-row"><td>' + text(item.period) + '</td>' +
-        '<td class="cell-mono">' + core.formatNumber(v.monthly_revenue) + '</td>' +
-        '<td class="cell-mono">' + pctCell(v.revenue_mom) + '</td>' +
-        '<td class="cell-mono">' + pctCell(v.revenue_yoy) + '</td>' +
-        '<td class="cell-mono">' + pctCell(v.cumulative_yoy) + '</td></tr>';
+        '<td class="cell-mono fundamental-key">' + core.formatNumber(v.monthly_revenue) + '</td>' +
+        '<td class="cell-mono fundamental-key">' + pctCell(v.revenue_mom) + '</td>' +
+        '<td class="cell-mono fundamental-key">' + pctCell(v.revenue_yoy) + '</td>' +
+        '<td class="cell-mono fundamental-key">' + pctCell(v.cumulative_yoy) + '</td></tr>';
     }).join("") : '<tr><td colspan="5">尚無已擷取的月份。</td></tr>';
     var balances = data.balance_sheet ? data.balance_sheet.observations : [];
     var balanceRows = balances.length ? balances.map(function (item) {
@@ -2175,7 +2444,7 @@
       return '<tr data-testid="trend-balance-row"><td>' + text(item.period) + '</td>' +
         '<td class="cell-mono">' + pctCell(v.debt_ratio) + '</td>' +
         '<td class="cell-mono">' + (v.current_ratio === null ? "—" : core.formatNumber(v.current_ratio)) + '</td>' +
-        '<td class="cell-mono">' + (v.bvps === null ? "—" : core.formatNumber(v.bvps)) + '</td></tr>';
+        '<td class="cell-mono fundamental-key">' + (v.bvps === null ? "—" : core.formatNumber(v.bvps)) + '</td></tr>';
     }).join("") : '<tr><td colspan="4">尚無已擷取的財務品質期別。</td></tr>';
     return '<div class="trend-coverage" data-testid="trend-coverage">' +
       '<span>季報深度 <strong data-testid="trend-coverage-quarters">' + text(data.income_statement.coverage.label) + '</strong></span>' +
@@ -2207,6 +2476,10 @@
     var issues = core.buyPlanFormIssues(buyPlanDraft);
     var tranches = core.buyPlanTranches(state, instrumentId);
     var hasZone = tranches.some(function (item) { return item.price !== null; });
+    var opportunity = core.opportunityRows(state).find(function (item) { return item.symbol === symbol; });
+    var valuationPosition = opportunity
+      ? '<div class="buyplan-valuation-position" data-testid="buyplan-valuation-position"><span class="detail-label">現價相對 Base 合理價值</span><strong class="' + valuationToneClass(opportunity.discount) + '" data-testid="buyplan-valuation-position-value">' + discountLabel(opportunity.discount) + '</strong></div>'
+      : '<div class="buyplan-valuation-position" data-testid="buyplan-valuation-position"><span class="detail-label">現價相對 Base 合理價值</span><strong class="valuation-neutral" data-testid="buyplan-valuation-position-value">—</strong></div>';
     var rows = tranches.map(function (item) {
       var reachedLabel = item.reached === null ? "—" : item.reached ? "已到價" : "未到價";
       return '<tr data-testid="buyplan-tranche" data-tranche="' + item.key + '"><td>' + text(item.label) + '</td>' +
@@ -2234,6 +2507,7 @@
         formIssuesMarkup(issues, "buyplan-issues") + '</div></div>', "") +
       card("分段狀態", hasZone ? "價格對照 Valuation 的買進區間" : "尚未建立估值", 
         (hasZone ? "" : '<div class="empty-state" data-testid="buyplan-no-valuation"><strong>此標的尚未建立 Base 合理價值。</strong><span>分段價格一律由估值推導，不從市價或歷史高點回推。</span></div>') +
+        valuationPosition +
         '<div class="table-responsive"><table class="table" data-testid="buyplan-table"><thead><tr><th>階段</th><th>價格</th><th>比例</th><th>金額</th><th>到價</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
         prompt +
         '<p class="valuation-note">到價只提示你回頭檢查投資假設。這裡不提供、也不會出現「建議買進」「強力買進」或任何信心分數；沒有下單、模擬下單或券商連線。</p>', "");
@@ -2316,11 +2590,20 @@
 
   function instrumentBarMarkup() {
     var instrument = selectedKlineInstrument();
+    var selectedId = state.selectedKlineInstrumentId;
+    var quickAdd = "";
+    if (state.activeSection === "watchlist") {
+      var items = core.watchlistItemsForActiveGroup(state);
+      var activeGroup = (state.watchlistGroups || []).find(function (group) { return group.id === state.activeWatchlistGroupId; });
+      var alreadyInGroup = Boolean(selectedId && items.indexOf(selectedId) >= 0);
+      var addLabel = alreadyInGroup ? "已在目前群組" : "加入目前群組";
+      quickAdd = '<div class="instrument-bar-action"><span>目前群組：' + text(activeGroup ? activeGroup.name : "我的自選") + '</span><button class="btn ' + (alreadyInGroup ? "btn-outline" : "btn-primary") + ' btn-sm" type="button" data-action="watchlist-add-selected" data-testid="instrument-add-to-watchlist"' + (!instrument || alreadyInGroup ? " disabled" : "") + '>' + addLabel + '</button></div>';
+    }
     return '<div class="instrument-bar" data-testid="instrument-picker">' +
       instrumentPickerMarkup(core.klineInstruments(state.view), state.selectedKlineInstrumentId) +
       '<span class="instrument-bar-current" data-testid="instrument-bar-current">' +
       text(instrument ? (instrument.symbol || instrument.instrument_id) + " · " + (instrument.display_name || "") : "尚未選擇商品") +
-      '</span></div>';
+      '</span>' + quickAdd + '</div>';
   }
 
   function systemTopbarMarkup() {
@@ -2379,9 +2662,16 @@
     }
     if (action === "alert-evaluate") evaluateAlerts();
     if (action === "alert-clear-events") state = core.reduce(state, { type: "CLEAR_ALERT_EVENTS" });
-    if (action === "valuation-add") addWorksheetFromDraft();
+    if (action === "valuation-add") saveWorksheetFromDraft();
+    if (action === "valuation-edit") editValuationWorksheet(target.getAttribute("data-worksheet-id"));
+    if (action === "valuation-cancel-edit") cancelValuationEdit();
     if (action === "valuation-delete") {
-      state = core.reduce(state, { type: "DELETE_VALUATION_WORKSHEET", worksheetId: target.getAttribute("data-worksheet-id") });
+      var deletedWorksheetId = target.getAttribute("data-worksheet-id");
+      state = core.reduce(state, { type: "DELETE_VALUATION_WORKSHEET", worksheetId: deletedWorksheetId });
+      if (valuationEditingWorksheetId === deletedWorksheetId) {
+        valuationEditingWorksheetId = null;
+        valuationDraft = defaultValuationDraft();
+      }
       persistValuation();
     }
     if (action === "valuation-evaluate") evaluateValuation();
@@ -2431,6 +2721,10 @@
       requestDataUpdate();
       return;
     }
+    if (action === "fundamentals-update") {
+      requestFundamentalsUpdate();
+      return;
+    }
     if (action === "watchlist-group-create") {
       state = core.reduce(state, { type: "CREATE_WATCHLIST_GROUP", name: watchlistGroupNameQuery });
       watchlistGroupNameQuery = "";
@@ -2446,11 +2740,6 @@
     if (action === "product") state = core.reduce(state, { type: "OPEN_PRODUCT_DETAIL", index: Number(target.getAttribute("data-index")) });
     if (action === "kline-period") state = core.reduce(state, { type: "SELECT_KLINE_PERIOD", period: target.getAttribute("data-period") });
     if (action === "kline-indicator") state = core.reduce(state, { type: "TOGGLE_KLINE_INDICATOR", indicator: target.getAttribute("data-indicator") });
-    if (action === "watchlist-search-pick") {
-      watchlistSearchSelection = target.getAttribute("data-instrument-id");
-      watchlistSearchQuery = watchlistSearchSelection;
-      watchlistSearchFocused = false;
-    }
     if (action === "kline-search-pick") {
       selectKlineInstrument(target.getAttribute("data-instrument-id"));
       return;
@@ -2462,23 +2751,14 @@
       chartDrawingMode = false;
       state = core.reduce(state, { type: "TOGGLE_KLINE_INDICATOR", indicator: chartTemplateName === "research" ? "ma" : "ema" });
     }
-    if (action === "watchlist-add") {
-      var exactSelection = resolveSearchSelection(core.klineInstruments(state.view), watchlistSearchQuery);
-      var addInstrumentId = watchlistSearchSelection || (exactSelection && exactSelection.instrument_id);
-      if (addInstrumentId) {
-        state = core.reduce(state, { type: "TOGGLE_WATCHLIST", instrumentId: addInstrumentId });
-        watchlistSearchSelection = null;
-        watchlistSearchQuery = "";
-        watchlistSearchFocused = false;
-      }
+    if (action === "watchlist-add-selected" && state.selectedKlineInstrumentId) {
+      state = core.reduce(state, { type: "TOGGLE_WATCHLIST", instrumentId: state.selectedKlineInstrumentId });
     }
     if (action === "watchlist-toggle" && state.selectedKlineInstrumentId) {
       state = core.reduce(state, { type: "TOGGLE_WATCHLIST", instrumentId: state.selectedKlineInstrumentId });
     }
     if (action === "watchlist-remove") {
       state = core.reduce(state, { type: "REMOVE_WATCHLIST", instrumentId: target.getAttribute("data-instrument-id") });
-      if (watchlistSearchSelection === target.getAttribute("data-instrument-id")) watchlistSearchSelection = null;
-      watchlistSearchFocused = false;
     }
     if (action === "watchlist-clear") {
       if (window.confirm("確定清除目前自選草稿？要同步到本機 JSON，仍需再按「儲存自選清單」。")) {
@@ -2489,20 +2769,19 @@
     if (action === "reset") {
       if (!state.watchlist || !state.watchlist.dirty || window.confirm("目前自選草稿尚未儲存；確定只重設視圖、不清除本機自選清單？")) {
         state = core.reduce(state, { type: "RESET" });
-        watchlistSearchSelection = null;
-        watchlistSearchQuery = "";
-        watchlistSearchFocused = false;
         klineSearchQuery = state.selectedKlineInstrumentId || "";
         klineSearchFocused = false;
         chartDrawingMode = false;
         chartDrawings = [];
         chartDrawingModelKey = null;
         chartTemplateName = "default";
+        valuationEditingWorksheetId = null;
+        valuationDraft = defaultValuationDraft();
       }
     }
     render();
     if (action === "kline-period") requestKlineModel();
-    if (action === "watchlist-add" || action === "watchlist-toggle") requestWatchlistModels();
+    if (action === "watchlist-add-selected" || action === "watchlist-toggle") requestWatchlistModels();
   });
 
   root.addEventListener("change", function (event) {
@@ -2531,6 +2810,11 @@
       render();
       return;
     }
+    if (target.getAttribute("data-action") === "fundamentals-update-scope") {
+      state = core.reduce(state, { type: "SET_FUNDAMENTALS_UPDATE_SCOPE", scope: target.value });
+      render();
+      return;
+    }
     if (target.getAttribute("data-action") === "alert-input") {
       alertDraft[target.getAttribute("data-field")] = target.value;
       var alertIssuesOnChange = core.alertFormIssues(alertDraft, { symbol: (selectedKlineInstrument() || {}).symbol });
@@ -2543,15 +2827,6 @@
   root.addEventListener("input", function (event) {
     var target = event.target;
     if (!target) return;
-    if (target.getAttribute("data-action") === "watchlist-search") {
-      watchlistSearchQuery = target.value;
-      watchlistSearchSelection = null;
-      watchlistSearchFocused = true;
-      var watchlistResults = symbolSearchResults(core.klineInstruments(state.view), watchlistSearchQuery, core.watchlistItemsForActiveGroup(state), null, "watchlist-symbol-results", "watchlist-search-pick");
-      refreshSearchResults("watchlist-symbol-results", watchlistResults);
-      refreshWatchlistAddButtons();
-      return;
-    }
     if (target.getAttribute("data-action") === "watchlist-group-name") {
       watchlistGroupNameQuery = target.value;
       var groupNameIssuesNow = core.watchlistGroupNameIssues(watchlistGroupNameQuery);
@@ -2628,6 +2903,7 @@
       var valuationAddButton = root.querySelector('[data-testid="valuation-add"]');
       if (valuationAddButton) valuationAddButton.disabled = valuationIssuesNow.length > 0;
       refreshFormIssues("valuation-form-issues", valuationIssuesNow);
+      refreshValuationScenarioPreview();
       return;
     }
     if (target.getAttribute("data-action") === "valuation-indicator-period") {

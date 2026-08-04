@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "TW Quant Research",
-  "version": "0.3.2",
+  "version": "0.3.4",
   "identifier": "io.github.justinyu73.twquantengine",
   "plugins": {
     "updater": {
@@ -46,7 +46,7 @@
     ],
     "category": "DeveloperTool",
     "shortDescription": "Taiwan quantitative research viewer",
-    "longDescription": "Local EOD K-line research viewer with explicit user-triggered TWSE local data capture.",
+    "longDescription": "Local EOD K-line and fundamentals research viewer with explicit user-triggered official data capture.",
     "createUpdaterArtifacts": true,
     "windows": {
       "nsis": {

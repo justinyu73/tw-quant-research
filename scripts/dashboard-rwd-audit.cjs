@@ -17,7 +17,7 @@ const { spawn } = require("node:child_process");
 
 const ROOT = path.resolve(__dirname, "..");
 const OUT_FILE = path.join(ROOT, "outputs", "dashboard-rwd-audit.json");
-const REUSE_URL = "http://127.0.0.1:5173";
+const REUSE_URL = process.env.TQR_DASHBOARD_AUDIT_URL || "http://127.0.0.1:5173";
 const SPAWN_PORT = 5199;
 const SPAWN_SIDECAR_PORT = 8770;
 

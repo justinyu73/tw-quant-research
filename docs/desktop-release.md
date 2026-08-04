@@ -161,6 +161,13 @@ listed equity. Raw responses are kept under the app data directory's
 browser preview has no download capability. TPEx, full-market, real-time, and
 background refresh are not enabled by this button.
 
+The separate `更新財務指標` action follows
+`docs/tqr-research-platform-spec.md#explicit-fundamentals-update` and decision
+`TQR-FUNDAMENTALS-UPDATE-001`. It is also user-triggered and scoped to the
+selected equity or watchlist. It captures the latest admitted monthly-revenue,
+income-statement, and balance-sheet periods into the local fundamentals series;
+it does not alter the K-line history range or claim a one-year financial series.
+
 ## Product boundary
 
 The app reads the committed offline fixtures through a loopback sidecar. At

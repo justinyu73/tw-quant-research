@@ -153,17 +153,15 @@ async function main() {
       assert.equal(await groupIssues.isVisible(), true);
       assert.match(await groupIssues.innerText(), /群組名稱不可空白/);
       assert.equal(await page.locator('[data-testid="watchlist-group-create"]').isDisabled(), true);
-      // The empty-query hint is deliberately withheld until the human touches
-      // the search box (it read as an error right after a successful add), so
-      // the disabled button must explain itself there, not on arrival.
-      const addIssues = page.locator('[data-testid="watchlist-add-issues"]');
-      assert.equal(await addIssues.isVisible(), false);
-      assert.equal(await page.locator('[data-testid="watchlist-add"]').isDisabled(), true);
-      await page.locator('[data-testid="watchlist-picker"]').fill("2");
-      await page.locator('[data-testid="watchlist-picker"]').fill("");
-      assert.equal(await addIssues.isVisible(), true);
-      assert.match(await addIssues.innerText(), /請先輸入代號或名稱/);
-      assert.equal(await page.locator('[data-testid="watchlist-add"]').isDisabled(), true);
+      // The shared instrument bar is the only search/add surface; the card
+      // keeps group management and persistence controls only.
+      assert.equal(await page.locator('[data-testid="watchlist-picker"]').count(), 0);
+      assert.equal(await page.locator('[data-testid="watchlist-add"]').count(), 0);
+      const sharedPicker = page.locator('[data-testid="kline-instrument"]');
+      await sharedPicker.fill("2330");
+      await page.waitForFunction(() => document.querySelectorAll('[data-testid="kline-symbol-results"] .symbol-search-result').length > 0);
+      await page.locator('[data-testid="kline-symbol-results"] .symbol-search-result[data-instrument-id="TWSE:2330"]').click();
+      assert.equal(await page.locator('[data-testid="instrument-add-to-watchlist"]').isDisabled(), false);
     });
 
     await page.locator('[data-testid="watchlist-group-name"]').fill("半導體");
@@ -173,12 +171,9 @@ async function main() {
     });
     await page.locator('[data-testid="watchlist-group-name"]').fill("");
 
-    await page.locator('[data-testid="watchlist-picker"]').fill("2330");
     await record("watchlist_add_issues_hidden_when_selected", async () => {
-      assert.equal(await page.locator('[data-testid="watchlist-add-issues"]').isVisible(), false);
-      assert.equal(await page.locator('[data-testid="watchlist-add"]').isDisabled(), false);
+      assert.equal(await page.locator('[data-testid="instrument-add-to-watchlist"]').isDisabled(), false);
     });
-    await page.locator('[data-testid="watchlist-picker"]').fill("");
 
     // The alerts panel lives on 技術指標, beside the chart its condition is read
     // off.

@@ -18,6 +18,7 @@ from tw_quant_engine.desktop_sidecar import (  # noqa: E402
     SIDECAR_INSTRUMENTS_SCHEMA,
     SIDECAR_KLINE_SCHEMA,
     SidecarContractError,
+    _update_instrument,
     create_server,
     load_catalog,
     validate_loopback_host,
@@ -25,6 +26,13 @@ from tw_quant_engine.desktop_sidecar import (  # noqa: E402
 
 
 class DesktopSidecarTests(unittest.TestCase):
+    def test_update_resolves_a_new_tpex_instrument_without_local_kline(self) -> None:
+        instrument = _update_instrument(self.catalog, "TPEx:5289")
+        self.assertIsNotNone(instrument)
+        self.assertEqual(instrument["instrument_id"], "TPEx:5289")
+        self.assertEqual(instrument["market"], "TPEx")
+        self.assertEqual(instrument["symbol"], "5289")
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.catalog = load_catalog(ROOT / "tests" / "fixtures")
@@ -84,6 +92,18 @@ class DesktopSidecarTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertFalse(payload["enabled"])
 
+    def test_fundamentals_update_is_disabled_in_browser_preview(self) -> None:
+        request = Request(
+            f"{self.base}/fundamentals/update",
+            data=json.dumps({"scope": "selected", "instrument_id": "TWSE:2330"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with self.assertRaises(HTTPError) as context:
+            urlopen(request, timeout=5)  # nosec B310 - test server is loopback-only
+        self.assertEqual(context.exception.code, 409)
+        self.assertEqual(json.loads(context.exception.read().decode("utf-8"))["error"], "fundamentals_update_unavailable_in_preview")
+
     def test_health_and_json_update_preflight_are_available(self) -> None:
         status, payload = self._get("/health")
         self.assertEqual(status, 200)
@@ -126,7 +146,7 @@ class DesktopSidecarTests(unittest.TestCase):
                 base = f"http://127.0.0.1:{server.server_address[1]}"
                 body = json.dumps({
                     "scope": "watchlist",
-                    "instrument_ids": ["TWSE:2308", "TWSE:2330"],
+                    "instrument_ids": ["TWSE:2308", "TPEx:5289", "TWSE:2330"],
                     "years": 2,
                 }).encode("utf-8")
                 request = Request(
@@ -139,8 +159,8 @@ class DesktopSidecarTests(unittest.TestCase):
                     "scope": "watchlist",
                     "status": "success",
                     "years": 2,
-                    "requested_count": 2,
-                    "updated_count": 2,
+                    "requested_count": 3,
+                    "updated_count": 3,
                     "bars_downloaded": 20,
                     "results": [],
                 }
@@ -151,8 +171,51 @@ class DesktopSidecarTests(unittest.TestCase):
                 self.assertEqual(status, 200)
                 self.assertFalse(payload["read_only"])
                 self.assertEqual(payload["data"]["scope"], "watchlist")
-                self.assertEqual([item["instrument_id"] for item in updater.call_args.args[1]], ["TWSE:2308", "TWSE:2330"])
+                self.assertEqual([item["instrument_id"] for item in updater.call_args.args[1]], ["TWSE:2308", "TPEx:5289", "TWSE:2330"])
+                self.assertEqual(updater.call_args.args[1][1]["market"], "TPEx")
                 self.assertEqual(updater.call_args.args[2], 2)
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
+
+    def test_configured_fundamentals_update_route_passes_selected_scope_and_refreshes_catalog(self) -> None:
+        with TemporaryDirectory(prefix="tqr-sidecar-fundamentals-update-") as directory:
+            server = create_server(
+                self.catalog,
+                port=0,
+                fixture_root=ROOT / "tests" / "fixtures",
+                data_dir=directory,
+            )
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                base = f"http://127.0.0.1:{server.server_address[1]}"
+                body = json.dumps({
+                    "scope": "selected",
+                    "instrument_id": "TWSE:2330",
+                }).encode("utf-8")
+                request = Request(
+                    f"{base}/fundamentals/update",
+                    data=body,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                expected = {
+                    "scope": "fundamentals",
+                    "status": "success",
+                    "requested_count": 1,
+                    "updated_count": 1,
+                    "results": [{"instrument_id": "TWSE:2330", "status": "success"}],
+                }
+                with patch("tw_quant_engine.desktop_sidecar.update_fundamentals_scope", return_value=expected) as updater:
+                    with urlopen(request, timeout=5) as response:  # nosec B310 - test server is loopback-only
+                        status = response.status
+                        payload = json.loads(response.read().decode("utf-8"))
+                self.assertEqual(status, 200)
+                self.assertFalse(payload["read_only"])
+                self.assertEqual(payload["data"]["scope"], "fundamentals")
+                self.assertEqual([item["instrument_id"] for item in updater.call_args.args[1]], ["TWSE:2330"])
             finally:
                 server.shutdown()
                 server.server_close()

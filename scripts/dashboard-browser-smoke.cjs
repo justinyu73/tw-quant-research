@@ -15,20 +15,20 @@ const PREVIEW_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "tqr-preview-"));
 const SCREENSHOT_DIR = path.join(ROOT, "outputs", "dashboard-browser");
 const EXPECTED_SCREENSHOTS = {
   home: "d12325a029de0038d22c0152efde557c5ace47561b757bd825d615d73bc4f407",
-  company: "e7e43c56636042c33254c13706662a91ab1b65d343c6f91e89cd6e7f5c963f15",
+  company: "7847ca4f45738c0d4c92c042688aa1ec0fd9ea9907995bfd122a1764e94731ac",
   technical: "4f810a213fef4a463b3c47e63bb2ed1519ca859882f26b7ae071079b6927db82",
-  watchlist: "2ab44beae44c25ead3d6744a8dcfa2f3b71da386885fad66d3e80f1dcbd2f5bc",
-  buyplan: "94915f62eaa13ed0b3c619dc314c13d68d13b2bd3db10a8f6292a8773dfd5a96",
+  watchlist: "acb11ea116dd9cfbebadd3174dc83e712e9683fdad64b722d3aca6c047b3b487",
+  buyplan: "7aac161b9905ff5188409ca153e411668c00f60e12d7bd1549d9d2d4788a5c08",
   review: "abab9cb0446cb5a839252dd8cb7bd241c59e9cb97c63f5de3985a1867e0b99ce",
-  valuation: "e0b0f512f45614b18a2e45f9d8c6716ae9c776acd669c6ff10660fb73ce958df",
+  valuation: "918dadc022a43f7321bdb28614e88404c7d686cd55a27041be05dc070eaf60de",
   // Dark is the primary appearance and carries its own baselines; an empty
   // value here keeps the gate red until a human has looked at the capture.
   home_dark: "e674d860fbcefd6827a7fa5c571c8f44b41172147094c7bf4bb38631e152c6ba",
-  watchlist_dark: "86d76ed915163e7a63c2ee32d05e13298598d872a19f37c370b1f90e72e13aa2",
-  company_dark: "672af1d6df5350f72a4349d5a302f013150d21240d5869aa4a934fcb8a3b9d1d",
+  watchlist_dark: "758dfe8de04e99ccbc0b1c9d0a851cff7ab7ea26996f2be8ed11ee7cdc83aae7",
+  company_dark: "81f11e4c4bff197d1dbab72cc89b986acf09d0c96f0825358cefddd7aefbd640",
   technical_dark: "3a5289fb47fb132fe9212dc6db741f40c7d5f2babeb59f250b17dd3f6310c105",
-  valuation_dark: "5cdc6e49b3a16e645f4d7cf13092f25a192508746f90a2de6acb262b581715ab",
-  buyplan_dark: "b7f9b5c23340f591af48dd0f34c9a5e2133d5cfaadea1c4b1d5e8e8213177aee",
+  valuation_dark: "44ae0155faaec56973229d16468a67295f282ac4c1e220f5e7db694e56ad2927",
+  buyplan_dark: "90ee9e5c2bb681c4f2d61e84fe9f60b80a3daf21ecc19f754c0f4822fd2c33e4",
   review_dark: "cfcc3c65ee3f11691316e0e784935e1e64e04f010522ca23da5294bf2e2f7fbb",
 };
 
@@ -351,6 +351,12 @@ async function main() {
     assert.equal(await page.locator('[data-testid="fundamental-eps"] strong').innerText(), "15.42");
     assert.equal(await page.locator('[data-testid="fundamental-gross-margin"] strong').innerText(), "60.00%");
     assert.equal(await page.locator('[data-testid="fundamental-revenue-yoy"] strong').innerText(), "47.62%");
+    for (const testid of ["fundamental-revenue-yoy", "fundamental-revenue-mom", "fundamental-eps", "fundamental-bvps"]) {
+      assert.match(await page.locator(`[data-testid="${testid}"] strong`).getAttribute("class"), /\bfundamental-key\b/);
+    }
+    for (const testid of ["fundamental-gross-margin", "fundamental-operating-margin", "fundamental-net-margin", "fundamental-debt-ratio", "fundamental-current-ratio"]) {
+      assert.match(await page.locator(`[data-testid="${testid}"] strong`).getAttribute("class"), /\bfundamental-neutral\b/);
+    }
     assert.match(await page.locator('[data-testid="fundamental-provenance"]').innerText(), /非公司公告時間/);
     assert.equal(await page.locator('[data-testid="trend-coverage-quarters"]').innerText(), "1 / 8");
     assert.equal(await page.locator('[data-testid="trend-coverage-months"]').innerText(), "2 / 12");
@@ -363,6 +369,10 @@ async function main() {
     assert.equal(await page.locator('[data-testid="trend-quarter-row"]').count(), 1);
     // Only captured periods appear; the table must not pad to 12 rows.
     assert.equal(await page.locator('[data-testid="trend-month-row"]').count(), 2);
+    assert.match(await page.locator('[data-testid="trend-quarter-row"] td').nth(1).getAttribute("class"), /\bfundamental-key\b/);
+    assert.match(await page.locator('[data-testid="trend-quarter-row"] td').nth(5).getAttribute("class"), /\bfundamental-key\b/);
+    assert.match(await page.locator('[data-testid="trend-month-row"] td').nth(1).getAttribute("class"), /\bfundamental-key\b/);
+    assert.match(await page.locator('[data-testid="trend-balance-row"] td').nth(3).getAttribute("class"), /\bfundamental-key\b/);
 
     // 技術指標: chart, technical readings, alerts.
     await page.locator('[data-action="section"][data-section="technical"]').first().click();
@@ -412,6 +422,7 @@ async function main() {
     await page.locator('[data-testid="kline-chart"]').waitFor();
     await settle(page);
     await assertChartIdentity(page, sidecarBaseUrl, catalog.instruments, "TWSE:2330", "after returning to 2330");
+    assert.equal(await page.locator('[data-testid^="technical-value-"][class*="valuation-"]').count(), 0);
 
     // The curated watchlist has to be reachable from the chart, not only by
     // typing a code from memory.
@@ -435,6 +446,7 @@ async function main() {
     // reach Watchlist columns, Watchlist filters, and the Home counters —
     // rendering them is not enough, they have to be writable and to propagate.
     await page.locator('[data-testid="company-status"]').waitFor();
+    assert.equal(await page.locator('[data-testid="fundamental-snapshot"] .fundamental-metric strong[class*="valuation-"]').count(), 0);
     // Not tracked yet: the page must say the judgement will not surface anywhere,
     // instead of silently recording into a view the human never sees.
     assert.equal(await page.locator('[data-testid="company-tracking-missing"]').count(), 1);
@@ -463,13 +475,21 @@ async function main() {
     assert.equal(await page.locator('[data-testid="data-update-scope"]').inputValue(), "watchlist");
     assert.equal(await page.locator('[data-testid="data-update-button"]').isDisabled(), true);
     assert.match(await page.locator('[data-testid="data-update-status"]').innerText(), /瀏覽器預覽不下載/);
+    assert.equal(await page.locator('[data-testid="fundamentals-update-panel"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="fundamentals-update-scope"]').inputValue(), "watchlist");
+    assert.equal(await page.locator('[data-testid="fundamentals-update-button"]').isDisabled(), true);
+    assert.match(await page.locator('[data-testid="fundamentals-update-status"]').innerText(), /瀏覽器預覽不擷取/);
 
-    const watchlistPicker = page.locator('[data-testid="watchlist-picker"]');
+    // Symbol search is owned by the shared instrument bar. Watchlist keeps
+    // group/save controls and the bar supplies the contextual add action.
+    assert.equal(await page.locator('[data-testid="watchlist-picker"]').count(), 0);
+    const watchlistPicker = page.locator('[data-testid="kline-instrument"]');
     await watchlistPicker.click();
     assert.equal(await watchlistPicker.evaluate((element) => document.activeElement === element), true);
-    await watchlistPicker.type("2330");
-    await page.locator('[data-testid="watchlist-symbol-results"] .symbol-search-result').filter({ hasText: "2330" }).first().click();
-    await page.locator('[data-testid="watchlist-add"]').click();
+    await watchlistPicker.fill("2330");
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="kline-symbol-results"] .symbol-search-result').length > 0);
+    await page.locator('[data-testid="kline-symbol-results"] .symbol-search-result').filter({ hasText: "2330" }).first().click();
+    await page.locator('[data-testid="instrument-add-to-watchlist"]').click();
     await page.locator('[data-testid="watchlist-table"]').waitFor();
     assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 1);
     assert.deepEqual(
@@ -481,24 +501,26 @@ async function main() {
     // No valuation yet: value-derived columns must be em dashes, never inferred.
     assert.equal(await page.locator('[data-testid="watchlist-base-value"]').first().innerText(), "—");
     assert.equal(await page.locator('[data-testid="watchlist-discount"]').first().innerText(), "—");
-    // A stock that is already tracked exists; answering "找不到符合的商品" for
-    // it is the box lying about the catalog. It stays in the results, marked,
-    // and the add button carries the real reason.
+    assert.match(await page.locator('[data-testid="watchlist-discount"]').first().getAttribute("class"), /\bvaluation-neutral\b/);
+    // A stock that is already tracked remains searchable in the shared picker;
+    // the contextual add action is the only disabled state.
     await watchlistPicker.fill("2330");
-    await page.waitForFunction(() => document.querySelectorAll('[data-testid="watchlist-symbol-results"] .symbol-search-result').length > 0);
-    assert.equal(await page.locator('[data-testid="watchlist-symbol-results"] .symbol-search-empty').count(), 0);
-    const trackedResult = page.locator('[data-testid="watchlist-symbol-results"] .symbol-search-result[data-instrument-id="TWSE:2330"]');
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="kline-symbol-results"] .symbol-search-result').length > 0);
+    assert.equal(await page.locator('[data-testid="kline-symbol-results"] .symbol-search-empty').count(), 0);
+    const trackedResult = page.locator('[data-testid="kline-symbol-results"] .symbol-search-result[data-instrument-id="TWSE:2330"]');
     assert.equal(await trackedResult.count(), 1);
-    assert.equal(await trackedResult.isDisabled(), true);
-    assert.match(await trackedResult.innerText(), /已在自選清單/);
-    assert.match(await page.locator('[data-testid="watchlist-add-issues"]').innerText(), /此商品已在目前群組/);
+    assert.equal(await trackedResult.isDisabled(), false);
+    assert.equal(await page.locator('[data-testid="instrument-add-to-watchlist"]').isDisabled(), true);
+    assert.match(await page.locator('[data-testid="instrument-add-to-watchlist"]').innerText(), /已在目前群組/);
     // A code that really is absent still says so.
     await watchlistPicker.fill("999999");
-    await page.waitForFunction(() => document.querySelector('[data-testid="watchlist-symbol-results"] .symbol-search-empty') !== null);
+    await page.waitForFunction(() => document.querySelector('[data-testid="kline-symbol-results"] .symbol-search-empty') !== null);
 
     await watchlistPicker.fill("2308");
-    assert.equal(await page.locator('[data-testid="watchlist-add"]').isDisabled(), false);
-    await page.locator('[data-testid="watchlist-add"]').click();
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="kline-symbol-results"] .symbol-search-result').length > 0);
+    await page.locator('[data-testid="kline-symbol-results"] .symbol-search-result[data-instrument-id="TWSE:2308"]').click();
+    assert.equal(await page.locator('[data-testid="instrument-add-to-watchlist"]').isDisabled(), false);
+    await page.locator('[data-testid="instrument-add-to-watchlist"]').click();
     assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 2);
     await page.locator('[data-action="watchlist-remove"][data-instrument-id="TWSE:2308"]').click();
     assert.equal(await page.locator('[data-testid="watchlist-table"] tbody tr').count(), 1);
@@ -565,6 +587,8 @@ async function main() {
     const blockedStatus = await page.locator('[data-testid="valuation-status"]').innerText();
     assert.match(blockedStatus, /加入估值工作表/, `evaluate-before-worksheet said: ${blockedStatus}`);
     assert.equal(await page.locator('[data-testid="valuation-result-card"]').count(), 0);
+    assert.equal(await page.locator('[data-testid="valuation-scenario-panel"]').count(), 1);
+    assert.deepEqual(await page.locator('[data-testid="valuation-scenario-panel"] .valuation-scenario-node strong').allInnerTexts(), ["保守", "最合理", "樂觀"]);
     await page.locator('[data-testid="valuation-ws-label"]').fill("2330 三情境合理價");
     await page.locator('[data-testid="valuation-ws-bear-eps"]').fill("30");
     await page.locator('[data-testid="valuation-ws-bear-pe"]').fill("15");
@@ -572,6 +596,9 @@ async function main() {
     await page.locator('[data-testid="valuation-ws-base-pe"]').fill("20");
     await page.locator('[data-testid="valuation-ws-bull-eps"]').fill("50");
     await page.locator('[data-testid="valuation-ws-bull-pe"]').fill("25");
+    assert.equal(await page.locator('[data-testid="valuation-draft-bear-value"]').innerText(), "450");
+    assert.equal(await page.locator('[data-testid="valuation-draft-base-value"]').innerText(), "800");
+    assert.equal(await page.locator('[data-testid="valuation-draft-bull-value"]').innerText(), "1,250");
     // The basis fields are required: a valuation with no recorded EPS period
     // must not be addable.
     assert.equal(await page.locator('[data-testid="valuation-add"]').isDisabled(), true);
@@ -580,9 +607,36 @@ async function main() {
     assert.equal(await page.locator('[data-testid="valuation-add"]').isDisabled(), false);
     await page.locator('[data-testid="valuation-add"]').click();
     assert.equal(await page.locator('[data-testid="valuation-worksheet"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="valuation-worksheet-ruler"]').count(), 1);
+    const worksheetRulerText = await page.locator('[data-testid="valuation-worksheet-ruler"]').innerText();
+    assert.match(worksheetRulerText, /Bear\s*450/);
+    assert.match(worksheetRulerText, /Base\s*800/);
+    assert.match(worksheetRulerText, /Bull\s*1,250/);
+    await page.locator('[data-testid="valuation-worksheet"] [data-action="valuation-edit"]').click();
+    assert.equal(await page.locator('[data-testid="valuation-editing-state"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="valuation-ws-label"]').inputValue(), "2330 三情境合理價");
+    assert.equal(await page.locator('[data-testid="valuation-ws-base-pe"]').inputValue(), "20");
+    assert.equal(await page.locator('[data-testid="valuation-add"]').innerText(), "更新估值範本");
+    await page.locator('[data-testid="valuation-add"]').click();
+    assert.equal(await page.locator('[data-testid="valuation-editing-state"]').count(), 0);
+    assert.equal(await page.locator('[data-testid="valuation-worksheet"]').count(), 1);
     await page.locator('[data-testid="valuation-evaluate"]').click();
     await page.locator('[data-testid="valuation-result-card"]').first().waitFor();
+    assert.equal(await page.locator('[data-testid="valuation-rail"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="valuation-rail-bands"] .valuation-rail-band').count(), 5);
+    assert.equal(await page.locator('[data-testid^="valuation-rail-ruler-tick-"]').count(), 3);
+    assert.match(await page.locator('[data-testid="valuation-current-marker"]').getAttribute("class"), /\bvaluation-premium\b/);
+    assert.equal(await page.locator('.valuation-rail-header [data-testid="valuation-current-marker"]').count(), 0);
+    assert.equal(await page.locator('.valuation-rail-track [data-testid="valuation-current-marker"]').count(), 1);
+    assert.match(await page.locator('.valuation-rail-track [data-testid="valuation-current-marker"]').innerText(), /現價\s*2,440\s*·\s*高於 Bull/);
+    assert.match(await page.locator('[data-testid="valuation-current-marker"]').getAttribute("class"), /\bvaluation-outside-high\b/);
+    assert.match(await page.locator('[data-testid="valuation-current-marker"]').getAttribute("style"), /left:100\.00%/);
+    assert.equal(await page.locator('[data-testid="valuation-range-warning"]').count(), 1);
+    const valuationRangeWarning = await page.locator('[data-testid="valuation-range-warning"]').innerText();
+    assert.match(valuationRangeWarning, /重估 Bear～Bull/);
+    assert.match(valuationRangeWarning, /事件|基本面|假設|計算方式/);
     assert.equal(await page.locator('[data-testid="valuation-base-value"]').first().innerText(), "800");
+    assert.equal(await page.locator('[data-testid="valuation-current-price"]').first().innerText(), "2,440");
     // Buy ladder = Base x 85% / 75%, computed by the engine, not the browser.
     assert.equal(await page.locator('[data-testid="valuation-zone-first"]').first().innerText(), "680");
     assert.equal(await page.locator('[data-testid="valuation-zone-sweet"]').first().innerText(), "600");
@@ -590,6 +644,8 @@ async function main() {
     // 2,440 against a base of 800 is a premium, on this page too.
     const valGap = await page.locator('[data-testid="valuation-discount"]').first().innerText();
     assert.match(valGap, /^溢價 /, `valuation premium rendered as: ${valGap}`);
+    assert.match(await page.locator('[data-testid="valuation-discount"]').first().getAttribute("class"), /\bvaluation-premium\b/);
+    assert.match(await page.locator('[data-testid="valuation-discount-cell"]').first().getAttribute("class"), /\bvaluation-premium\b/);
     await settle(page);
     screenshots.valuation = screenshotHash(await page.screenshot({
       path: path.join(SCREENSHOT_DIR, "valuation.png"),
@@ -607,11 +663,13 @@ async function main() {
     const wlGap = await page.locator('[data-testid="watchlist-discount"]').first().innerText();
     assert.match(wlGap, /^溢價 /, `premium rendered as: ${wlGap}`);
     assert.doesNotMatch(wlGap, /折價/);
+    assert.match(await page.locator('[data-testid="watchlist-discount"]').first().getAttribute("class"), /\bvaluation-premium\b/);
 
     await page.locator('[data-action="section"][data-section="home"]').first().click();
     await page.locator('[data-testid="opportunity-list"]').waitFor();
     assert.equal(await page.locator('[data-testid="opportunity-row"]').count(), 1);
     assert.match(await page.locator('[data-testid="opportunity-discount"]').first().innerText(), /^溢價 /);
+    assert.match(await page.locator('[data-testid="opportunity-discount"]').first().getAttribute("class"), /\bvaluation-premium\b/);
     assert.equal(await page.locator('[data-testid="buyplan-status"] li').count(), 1);
 
     // Buy Plan and Review are declared but not yet built; they must say so
@@ -623,6 +681,8 @@ async function main() {
     assert.equal(await page.locator('[data-testid="buyplan-tranche"]').count(), 4);
     assert.equal(await page.locator('[data-tranche="first"] td').nth(1).innerText(), "680");
     assert.equal(await page.locator('[data-tranche="sweet"] td').nth(1).innerText(), "600");
+    assert.match(await page.locator('[data-testid="buyplan-valuation-position-value"]').innerText(), /^溢價 /);
+    assert.match(await page.locator('[data-testid="buyplan-valuation-position-value"]').getAttribute("class"), /\bvaluation-premium\b/);
     assert.equal(await page.locator('[data-testid="buyplan-prompt-idle"]').count(), 1);
     // Allocations must total 100% before the plan can be saved.
     await page.locator('[data-testid="buyplan-budget"]').fill("1000000");
@@ -687,7 +747,6 @@ async function main() {
       await page.setViewportSize(size);
       await assertNoOverlap(page, [
         '[data-testid="watchlist-toolbar"] .watchlist-toolbar-grouping',
-        '[data-testid="watchlist-toolbar"] .watchlist-toolbar-search',
         '[data-testid="watchlist-toolbar"] .watchlist-toolbar-actions',
         '[data-testid="watchlist-state"]',
       ], `watchlist toolbar at ${size.width}px`);
@@ -703,7 +762,12 @@ async function main() {
 
     // Dark is the primary appearance, so it carries its own pixel baseline:
     // the contrast audit checks colour and cannot see layout breaking.
+    await page.locator('[data-action="section"][data-section="evidence"]').first().click();
+    assert.equal(await page.locator(".page-title").innerText(), "資料來源");
+    assert.equal(await page.locator(".lineage-grid").count(), 1);
     await page.locator('[data-action="section"][data-section="settings"]').first().click();
+    assert.equal(await page.locator(".page-title").innerText(), "設定");
+    assert.equal(await page.locator('[data-testid="theme-panel"]').count(), 1);
     await page.locator('[data-testid="theme-dark"]').click();
     assert.equal(await page.evaluate(() => document.documentElement.getAttribute("data-theme")), "dark");
     for (const section of ["home", "watchlist", "company", "technical", "valuation", "buyplan", "review"]) {
@@ -742,6 +806,8 @@ async function main() {
       };
     }, [sidecarBaseUrl]);
     let updateHeld = 0;
+    let fundamentalsUpdateIssued = 0;
+    let fundamentalsUpdateBody = null;
     await desktopPage.route(/\/data\/update/, async (route) => {
       updateHeld += 1;
       await new Promise((resolve) => setTimeout(resolve, 17000));
@@ -749,6 +815,23 @@ async function main() {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({ data: { status: "success", updated_count: 1, requested_count: 1, bars_downloaded: 0, results: [] } }),
+      });
+    });
+    await desktopPage.route(/\/fundamentals\/update/, async (route) => {
+      fundamentalsUpdateIssued += 1;
+      fundamentalsUpdateBody = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: {
+            status: "success",
+            updated_count: 1,
+            requested_count: 1,
+            unavailable_count: 0,
+            results: [{ instrument_id: "TWSE:2330", status: "success", message: "月營收、季報與財務品質資料已更新" }],
+          },
+        }),
       });
     });
     await desktopPage.goto(`${baseUrl}/index.html`, { waitUntil: "networkidle" });
@@ -771,6 +854,17 @@ async function main() {
     );
     assert.doesNotMatch(await desktopPage.locator('[data-testid="data-update-status"]').innerText(), /逾時/);
     assert.equal(updateHeld, 1, "the download request was never issued");
+    const desktopFundamentalsButton = desktopPage.locator('[data-testid="fundamentals-update-button"]');
+    assertOk(!(await desktopFundamentalsButton.isDisabled()), "fundamentals update button never enabled: the desktop stub did not take");
+    await desktopFundamentalsButton.click();
+    await desktopPage.waitForFunction(
+      () => !/正在擷取/.test(document.querySelector('[data-testid="fundamentals-update-status"]').textContent),
+      null,
+      { timeout: 10000 },
+    );
+    assert.match(await desktopPage.locator('[data-testid="fundamentals-update-status"]').innerText(), /財務更新：1\/1/);
+    assert.equal(fundamentalsUpdateIssued, 1, "the fundamentals update request was never issued");
+    assert.deepEqual(fundamentalsUpdateBody, { scope: "watchlist", instrument_ids: ["TWSE:2330"] });
     await desktopPage.close();
 
     const errorsBeforeDataGap = browserErrors.length;

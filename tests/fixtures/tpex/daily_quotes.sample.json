@@ -1,0 +1,37 @@
+{
+  "stat": "ok",
+  "date": "20260804",
+  "tables": [
+    {
+      "title": "Daily Stock Quotes",
+      "fields": [
+        "Code",
+        "Name",
+        "Close",
+        "Change",
+        "Open",
+        "High",
+        "Low",
+        "Avg Price",
+        "Trading Shares",
+        "Trans. Amount (NTD)",
+        "Trans."
+      ],
+      "data": [
+        [
+          "5289",
+          "Innodisk Corporation",
+          "1415.00",
+          "+30.00",
+          "1370.00",
+          "1420.00",
+          "1340.00",
+          "1381.81",
+          "3,323,096",
+          "4,591,879,860",
+          "7,094"
+        ]
+      ]
+    }
+  ]
+}

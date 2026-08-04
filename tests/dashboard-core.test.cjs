@@ -32,6 +32,17 @@ assert.equal(state.dataUpdate.status, "loading");
 state = core.reduce(state, { type: "DATA_UPDATE_SUCCESS", status: "success", message: "本機資料已更新", results: [{ instrument_id: "TWSE:2330", status: "success" }] });
 assert.equal(state.dataUpdate.message, "本機資料已更新");
 assert.equal(state.dataUpdate.results[0].status, "success");
+assert.deepEqual(state.fundamentalsUpdate, { scope: "watchlist", status: "idle", message: "", results: [] });
+state = core.reduce(state, { type: "SET_FUNDAMENTALS_UPDATE_SCOPE", scope: "selected" });
+assert.equal(state.fundamentalsUpdate.scope, "selected");
+state = core.reduce(state, { type: "FUNDAMENTALS_UPDATE_START" });
+assert.equal(state.fundamentalsUpdate.status, "loading");
+state = core.reduce(state, { type: "FUNDAMENTALS_UPDATE_SUCCESS", status: "partial", message: "已更新 2/3 類", results: [{ instrument_id: "TWSE:2330", status: "partial" }] });
+assert.equal(state.fundamentalsUpdate.status, "partial");
+assert.equal(state.fundamentalsUpdate.results[0].status, "partial");
+state = core.reduce(state, { type: "FUNDAMENTALS_UPDATE_ERROR", message: "請先加入自選標的" });
+assert.equal(state.fundamentalsUpdate.status, "error");
+assert.equal(state.fundamentalsUpdate.results.length, 0);
 state = core.reduce(state, { type: "SET_WATCHLIST", items: ["TWSE:2330", "TAIFEX:TX:202608", "TWSE:2330", "bad id"] });
 assert.deepEqual(state.watchlist.items, ["TWSE:2330", "TAIFEX:TX:202608"]);
 state = core.reduce(state, { type: "CREATE_WATCHLIST_GROUP", name: "半導體" });
@@ -80,6 +91,29 @@ state = core.reduce(state, { type: "RESET" });
 assert.equal(state.activeSection, "home");
 assert.equal(state.view.read_only, true);
 assert.deepEqual(state.watchlist.items, ["TWSE:2330", "TAIFEX:TX:202608", "TPEx:006201"]);
+
+const pickerView = {
+  kline: {
+    default_instrument_id: "TWSE:2330",
+    default_period: "1D",
+    instruments: [
+      { instrument_id: "TWSE:2330", market: "TWSE", symbol: "2330", display_name: "台積電", periods: ["1D"] }
+    ],
+    models: []
+  }
+};
+let pickerState = core.createInitialState(pickerView);
+pickerState = core.reduce(pickerState, { type: "SELECT_SECTION", section: "watchlist" });
+pickerState = core.reduce(pickerState, { type: "SELECT_KLINE_INSTRUMENT", instrumentId: "TWSE:2330" });
+assert.equal(pickerState.activeSection, "watchlist");
+pickerState = core.reduce(pickerState, { type: "SELECT_KLINE_INSTRUMENT", instrumentId: "TPEx:5289" });
+assert.equal(pickerState.activeSection, "watchlist");
+assert.equal(pickerState.selectedKlineInstrumentId, "TPEx:5289");
+pickerState = core.reduce(pickerState, { type: "SELECT_KLINE_INSTRUMENT", instrumentId: "TPEx:006201" });
+assert.equal(pickerState.selectedKlineInstrumentId, "TPEx:006201");
+pickerState = core.reduce(pickerState, { type: "SELECT_SECTION", section: "home" });
+pickerState = core.reduce(pickerState, { type: "SELECT_KLINE_INSTRUMENT", instrumentId: "TWSE:2330" });
+assert.equal(pickerState.activeSection, "company");
 
 // P6 in-app alerts: session-local definitions, flat store payload, in-app events only
 const alertDef = {
@@ -179,6 +213,18 @@ assert.equal(state.valuation.results[0].stage, "sweet");
 assert.equal(state.valuation.results[0].comparison.research_comparison_only, true);
 assert.equal(state.valuation.indicators.length, 1);
 assert.equal(state.valuation.indicators[0].std_convention, "population");
+assert.deepEqual(core.valuationRangeStatus(800, { bear: 450, base: 800, bull: 1250 }), { status: "inside", direction: null, position: 43.75 });
+assert.equal(core.valuationRangeStatus(2440, { bear: 450, base: 800, bull: 1250 }).direction, "above_bull");
+assert.equal(core.valuationRangeStatus(200, { bear: 450, base: 800, bull: 1250 }).direction, "below_bear");
+assert.equal(core.valuationRangeStatus(800, { bear: 1250, base: 800, bull: 450 }).status, "unknown");
+const editedWorksheet = Object.assign({}, worksheetDef, {
+  label: "2330 三情境合理價（編輯）",
+  scenarios: Object.assign({}, worksheetDef.scenarios, { base: { eps: 11, pe: 15 } })
+});
+state = core.reduce(state, { type: "UPDATE_VALUATION_WORKSHEET", worksheet: editedWorksheet });
+assert.equal(state.valuation.worksheets[0].label, "2330 三情境合理價（編輯）");
+assert.equal(state.valuation.worksheets[0].scenarios.base.eps, 11);
+assert.equal(state.valuation.results.length, 0);
 state = core.reduce(state, { type: "SET_VALUATION_INDICATOR_PERIOD", indicator: "zscore", period: "60" });
 assert.equal(state.valuationIndicatorPeriods.zscore, 60);
 state = core.reduce(state, { type: "SET_VALUATION_INDICATOR_PERIOD", indicator: "zscore", period: "0" });

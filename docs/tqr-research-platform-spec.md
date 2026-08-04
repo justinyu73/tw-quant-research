@@ -49,7 +49,7 @@ decision id.
 | --- | --- | --- |
 | Home | which companies are near my buy price today | derived from local valuation + local EOD |
 | Watchlist | main work surface: value, discount, buy stage per company | local watchlist + EOD + user valuation |
-| Company | one company: thesis, fundamentals, trend, price reference | local notes + EOD; fundamentals unavailable |
+| Company | one company: thesis, fundamentals, trend, price reference | local notes + EOD + explicitly captured fundamentals; uncaptured fields unavailable |
 | Valuation | Bear/Base/Bull EPS x PE, buy bands, valuation basis | user assumptions only |
 | Buy Plan | budget, staged prices, staged ratios, reached-price prompt | derived from valuation ladder |
 | Review | monthly/quarterly thesis review and outcome | local records |
@@ -72,11 +72,52 @@ quant scores are prohibited as ordering keys.
 | `draft` | local human setting | non-authoritative personal input, not an official datum |
 
 Monthly revenue, EPS, gross/operating/net margin, ROE, ROA, cash flow, TTM
-valuation, and percentile valuation are `unavailable` until their free-source,
-normalization, PIT, and quality contracts are admitted. Forward EPS/PE is
+valuation, and percentile valuation are `unavailable` for a company until the
+free-source, normalization, PIT, and quality contracts are admitted **and a
+matching local observation has been explicitly captured**. Forward EPS/PE is
 unavailable in this product phase. `Close` is the only current price basis;
 `Adjusted Close` remains disabled until the adjusted OHLCV and volume policy is
 approved.
+
+### Explicit fundamentals update
+
+Decision: `TQR-FUNDAMENTALS-UPDATE-001`
+Status: `active`
+Authority: `TQR-FUNDAMENTALS-SOURCE-001` in
+[`tqr-fundamentals-source-contract.md`](tqr-fundamentals-source-contract.md)
+
+The desktop app has a separate `更新財務指標` action. It is not part of
+`更新台股資料` and never turns a price-history request into a fundamentals
+request. The action is user-triggered, bounded to `目前個股` or `全部自選`,
+and accepts only selected TWSE/TPEx equity identities. It makes the three
+official endpoint requests for each market represented in that scope, keeps
+only observations whose `security_id` was explicitly requested, and atomically
+merges them into the local append-only series.
+
+Each endpoint contributes its latest published snapshot only. A successful run
+does not claim one year of financial history: the UI reports the captured
+period and honest `n / 8` or `n / 12` coverage. Missing company rows remain
+`unavailable`; the app never estimates from price, pads a series, carries a
+period forward, or runs this action in the background.
+
+### Explicit price-history update
+
+Decision: `TQR-KLINE-UPDATE-001`
+Status: `active`
+
+The desktop app's `更新台股資料` action is a separate, human-triggered local
+capture for the explicit `目前個股` or `全部自選` scope. It accepts one, two, or
+three trailing years and supports TWSE listed and TPEx listed-on-the-board
+equities. It never discovers the market universe, runs in the background, or
+turns a missing provider row into an estimated bar.
+
+TWSE history uses the selected-symbol monthly source. TPEx history uses the
+official date-scoped daily quote source, requests only weekdays in the bounded
+window, and filters the full-market response to the explicitly selected
+symbols before writing local raw captures and K6a snapshots. TPEx `Trading
+Shares` is the canonical share-count volume; transaction units and transaction
+amount are not substitutes. A no-row date remains an explicit no-data session,
+while a malformed or mismatched response is an update error.
 
 ## Valuation contract
 
@@ -117,6 +158,36 @@ reason a fair value changed:
 `eps_period`, `eps_kind` (`actual` | `estimate`), `pe_rationale`,
 `financial_data_date`, `valuation_date`, `change_reason`.
 
+### Valuation display semantics
+
+This extends `TQR-VALUATION-003` at the presentation layer only; it does not
+change any valuation calculation or stage threshold:
+
+- In the Fundamental Snapshot and Trend Table, monthly revenue (including its
+  YoY/MoM and accumulated-growth fields), EPS, and BVPS values are highlighted
+  red. Other fundamental fields such as gross margin, operating margin, net
+  margin, debt ratio, and current ratio remain neutral.
+- Technical indicator readings remain neutral; they do not use the valuation
+  colour semantics.
+- A current price below Base fair value is labelled `折價` and rendered green;
+  a current price above Base fair value is labelled `溢價` and rendered red.
+- Equality, missing data, and unavailable comparisons remain neutral.
+
+The same semantic rule is used by Watchlist, Home, Valuation, and Buy Plan so
+the colour never changes meaning between pages.
+
+#### Scenario range exception
+
+If the current price is below Bear or above Bull, the result is `range_outside`;
+it is not treated as an ordinary Base discount/premium state. The Valuation
+rail must show the current-price marker at the corresponding Bear/Bull boundary
+with an outward direction, keep it visually separate from the scenario price
+labels, and display a warning that the range needs investigation. The warning
+must state that a new event or fundamental change may have occurred, or that
+the valuation assumptions/calculation may no longer be reasonable. The user
+must review the cause and then edit/re-evaluate Bear/Base/Bull; the app must not
+silently mutate the worksheet or widen the range from the market price.
+
 ## Buy plan contract
 
 Decision: `TQR-BUYPLAN-003`
@@ -155,7 +226,8 @@ Every admitted free endpoint returns a **latest-period snapshot only** (one
 distinct period per response). "最近 8 季" and "最近 12 個月" therefore cannot be
 produced from one fetch. The table renders whatever periods have actually been
 captured, labelled `n of 8`; it must never pad, interpolate, or carry a period
-forward. Until a capture path is approved it keeps its `unavailable` empty state.
+forward. Until an explicit capture run has produced a matching observation it
+keeps its `unavailable` empty state.
 
 `available_at` for these sources is the exchange's batch export date (出表日期 /
 `Date`), which is later than the true filing date and therefore PIT-safe.
@@ -205,9 +277,11 @@ dark chrome carrying the six primary sections (there is no left rail), one page
 header, one card hierarchy, 34–40 px controls, and table overflow only inside a
 `.table-responsive` wrapper.
 
-The watchlist command area keeps four non-overlapping regions: group management;
-symbol search plus the primary add action; clear/save actions; persistence
-status. A search-result overlay must never intercept the primary add action.
+The watchlist command area keeps three non-overlapping regions: group
+management; clear/save actions; persistence status. Symbol search is owned by
+the shared instrument bar below the top navigation; while Watchlist is active,
+that bar also owns the primary add-to-current-group action. A search-result
+overlay must never intercept the shared picker or its contextual add action.
 
 Valuation, buy-plan, and review forms collapse from 3-column to 2-column at
 1100 px and to 1-column at 720 px. No input, select, label, or button may
@@ -225,6 +299,10 @@ document must never gain a horizontal scrollbar.
   confirmation and cannot delete the default group.
 - Before any valuation exists, 合理價值 / 折價 / 買進價 columns render `—`;
   after a Base worksheet is evaluated they render real numbers and a stage.
+- K-line history update and fundamentals update are separate explicit actions;
+  the former requests 1–3 trailing years of daily history, while the latter
+  requests only the latest admitted period for the selected equity scope and
+  reports missing observations as unavailable.
 - A valuation worksheet cannot be added without all three scenarios, a
   monotonic ratio ladder, an EPS period, an EPS kind, and a valuation date.
 - A buy plan cannot be saved unless allocations plus reserve total 100%, and

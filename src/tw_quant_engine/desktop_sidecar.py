@@ -5,11 +5,13 @@ import copy
 import gzip
 import hashlib
 import json
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from threading import Lock
 from typing import Any, Mapping
 from urllib.parse import parse_qs, urlsplit
 
@@ -44,6 +46,11 @@ from .data_update import (
     DataUpdateError,
     read_manifest,
     update_twse_watchlist,
+)
+from .fundamentals_update import (
+    FundamentalsUpdateError,
+    MAX_FUNDAMENTALS_INSTRUMENTS,
+    update_fundamentals_scope,
 )
 
 
@@ -409,6 +416,28 @@ def load_catalog(fixture_root: str | Path, data_dir: str | Path | None = None) -
     return KlineCatalog(tuple(instrument_rows), models, _digest(digest_payload), _load_fundamentals(local_root))
 
 
+def _update_instrument(catalog: KlineCatalog, instrument_id: str) -> dict[str, Any] | None:
+    """Resolve an update target even when it has no local K-line yet."""
+    existing = next((item for item in catalog.instruments if item["instrument_id"] == instrument_id), None)
+    if existing is not None:
+        return copy.deepcopy(existing)
+    match = re.fullmatch(r"(TWSE|TPEX):([0-9A-Z]{4,6})", str(instrument_id).strip().upper())
+    if not match:
+        return None
+    market = "TWSE" if match.group(1) == "TWSE" else "TPEx"
+    symbol = match.group(2)
+    return {
+        "instrument_id": f"{market}:{symbol}",
+        "market": market,
+        "symbol": symbol,
+        "display_name": symbol,
+        "asset_class": "equity",
+        "currency": "TWD",
+        "contract_month": None,
+        "expiry": None,
+    }
+
+
 def _load_fundamentals(data_dir: Path | None) -> dict[str, Any] | None:
     """Read the locally accumulated fundamentals series, if the human has ever
     captured one. Absence is a normal state, not an error."""
@@ -450,7 +479,7 @@ def _request_handler(runtime: dict[str, Any]) -> type[BaseHTTPRequestHandler]:
         def do_OPTIONS(self) -> None:  # noqa: N802
             """Complete the WebView CORS preflight for explicit JSON updates."""
             parsed = urlsplit(self.path)
-            if parsed.path not in {"/data/update", "/instruments", "/instrument", "/data/status", "/health", "/kline", "/fundamentals"}:
+            if parsed.path not in {"/data/update", "/fundamentals/update", "/instruments", "/instrument", "/data/status", "/health", "/kline", "/fundamentals"}:
                 _json_response(self, 404, {"error": "unknown_route"})
                 return
             self.send_response(204)
@@ -463,6 +492,9 @@ def _request_handler(runtime: dict[str, Any]) -> type[BaseHTTPRequestHandler]:
 
         def do_POST(self) -> None:  # noqa: N802
             parsed = urlsplit(self.path)
+            if parsed.path == "/fundamentals/update":
+                self._fundamentals_update()
+                return
             if parsed.path != "/data/update":
                 self._method_not_allowed()
                 return
@@ -496,7 +528,7 @@ def _request_handler(runtime: dict[str, Any]) -> type[BaseHTTPRequestHandler]:
                     raise DataUpdateError("data update instrument list must be non-empty and unique")
                 instruments = []
                 for instrument_id in instrument_ids:
-                    instrument = next((item for item in runtime["catalog"].instruments if item["instrument_id"] == instrument_id), None)
+                    instrument = _update_instrument(runtime["catalog"], instrument_id)
                     if instrument is None:
                         _json_response(self, 404, {"error": "instrument_not_found", "instrument_id": instrument_id})
                         return
@@ -505,6 +537,49 @@ def _request_handler(runtime: dict[str, Any]) -> type[BaseHTTPRequestHandler]:
                 runtime["catalog"] = load_catalog(fixture_root, data_dir=data_dir)
                 _json_response(self, 200, {"read_only": False, "data": result, "instruments": runtime["catalog"].instruments})
             except (DataUpdateError, ValueError, TypeError, json.JSONDecodeError) as exc:
+                _json_response(self, 400, {"error": str(exc)})
+
+        def _fundamentals_update(self) -> None:
+            data_dir = runtime.get("data_dir")
+            if data_dir is None:
+                _json_response(self, 409, {"error": "fundamentals_update_unavailable_in_preview"})
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or "0")
+                if length <= 0 or length > 65536:
+                    raise FundamentalsUpdateError("fundamentals update body size is invalid")
+                body = json.loads(self.rfile.read(length).decode("utf-8"))
+                if not isinstance(body, Mapping):
+                    raise FundamentalsUpdateError("fundamentals update body must be an object")
+                scope = str(body.get("scope") or "selected")
+                if scope == "selected":
+                    instrument_id = str(body.get("instrument_id") or "")
+                    instrument_ids = [instrument_id] if instrument_id else []
+                elif scope == "watchlist":
+                    requested_ids = body.get("instrument_ids")
+                    if not isinstance(requested_ids, list):
+                        raise FundamentalsUpdateError("fundamentals watchlist update requires instrument_ids")
+                    instrument_ids = [str(item) for item in requested_ids]
+                else:
+                    raise FundamentalsUpdateError("fundamentals update scope must be selected or watchlist")
+                if not instrument_ids or len(instrument_ids) > MAX_FUNDAMENTALS_INSTRUMENTS:
+                    raise FundamentalsUpdateError("fundamentals update instrument list is empty or too large")
+                if len(set(instrument_ids)) != len(instrument_ids):
+                    raise FundamentalsUpdateError("fundamentals update instrument list must be unique")
+                instruments = []
+                for instrument_id in instrument_ids:
+                    instrument = _update_instrument(runtime["catalog"], instrument_id)
+                    if instrument is None:
+                        _json_response(self, 404, {"error": "instrument_not_found", "instrument_id": instrument_id})
+                        return
+                    instruments.append(instrument)
+                with runtime["fundamentals_lock"]:
+                    result = update_fundamentals_scope(data_dir, instruments)
+                    fixture_root = runtime.get("fixture_root")
+                    if fixture_root is not None:
+                        runtime["catalog"] = load_catalog(fixture_root, data_dir=data_dir)
+                _json_response(self, 200, {"read_only": False, "data": result})
+            except (FundamentalsUpdateError, ValueError, TypeError, json.JSONDecodeError) as exc:
                 _json_response(self, 400, {"error": str(exc)})
 
         def do_PUT(self) -> None:  # noqa: N802
@@ -625,6 +700,7 @@ def create_server(
         "catalog": catalog,
         "fixture_root": Path(fixture_root).resolve() if fixture_root is not None else None,
         "data_dir": Path(data_dir).expanduser().resolve() if data_dir is not None else None,
+        "fundamentals_lock": Lock(),
     }
     handler = _request_handler(runtime)
     return ThreadingHTTPServer((host, int(port)), handler)

@@ -4,7 +4,7 @@
   "package_id": "tw-quant-engine-s5-s9-research-product-chain-001",
   "status": "pass",
   "capture_method": "offline evidence-chain audit, fixture replay, dependency matrices, and subprocess verification",
-  "captured_at": "2026-07-15T14:29:15Z",
+  "captured_at": "2026-08-04T08:43:26Z",
   "approval": {
     "approved": true,
     "approved_by": "user",
@@ -20,56 +20,42 @@
   },
   "evidence_chain": {
     "S1": {
-      "path": "/home/jy/repos/tw-quant-engine/workflow/evidence/s1-qlib-spike.acceptance.json",
+      "path": "/home/jy/worktrees/tw-quant-research/codex-watchlist-integrate-20260803-a7k2/workflow/evidence/s1-qlib-spike.acceptance.json",
       "stage_id": "S1",
       "status": "pass",
       "errors": [],
       "normalized_digest": "sha256:4c42e864dad8e05dce5893179b675346d6b316316a05fb978a6a6494df7aed4f"
     },
     "S2": {
-      "path": "/home/jy/repos/tw-quant-engine/workflow/evidence/s2-data-contract.acceptance.json",
+      "path": "/home/jy/worktrees/tw-quant-research/codex-watchlist-integrate-20260803-a7k2/workflow/evidence/s2-data-contract.acceptance.json",
       "stage_id": "S2",
       "status": "pass",
       "errors": [],
       "normalized_digest": "sha256:dd4c8a476ed2743eadbbd1cb096f5b85cf3846017c736dab4f194d9794a5ccd4"
     },
     "S3": {
-      "path": "/home/jy/repos/tw-quant-engine/workflow/evidence/s3-public-data.acceptance.json",
+      "path": "/home/jy/worktrees/tw-quant-research/codex-watchlist-integrate-20260803-a7k2/workflow/evidence/s3-public-data.acceptance.json",
       "stage_id": "S3",
       "status": "pass",
       "errors": [],
       "normalized_digest": "sha256:6d9674a1be144d917f31943e72713fe1c581dcf11af99085fc9248d2d6df5b3c"
     },
     "S4": {
-      "path": "/home/jy/repos/tw-quant-engine/workflow/evidence/s4-ingestion-product-alignment.acceptance.json",
+      "path": "/home/jy/worktrees/tw-quant-research/codex-watchlist-integrate-20260803-a7k2/workflow/evidence/s4-ingestion-product-alignment.acceptance.json",
       "stage_id": "S4",
       "status": "pass",
       "errors": [],
       "normalized_digest": "sha256:b646e366c0400a01dd6fdabb19adcac0039b1dda9a1d7cd2fbf92d63f449f682"
     },
     "S5": {
-      "path": "/home/jy/repos/tw-quant-engine/workflow/evidence/s5-quality-corporate-actions.acceptance.json",
+      "path": "/home/jy/worktrees/tw-quant-research/codex-watchlist-integrate-20260803-a7k2/workflow/evidence/s5-quality-corporate-actions.acceptance.json",
       "stage_id": "S5",
       "status": "pass",
       "errors": [],
       "normalized_digest": "sha256:6dd3d261b13f5678055fc2aa35eee700180ab828c8e7b2cfe2680217fac4eab2"
     },
-    "S6": {
-      "path": "/home/jy/repos/tw-quant-engine/workflow/evidence/s6-feature-pipeline.acceptance.json",
-      "stage_id": "S6",
-      "status": "pass",
-      "errors": [],
-      "normalized_digest": "sha256:5ecdd7dc236478a40701973c6634c86d20398f61173bc4bbcbf455c5b7cbdb90"
-    },
-    "S7": {
-      "path": "/home/jy/repos/tw-quant-engine/workflow/evidence/s7-backtest.acceptance.json",
-      "stage_id": "S7",
-      "status": "pass",
-      "errors": [],
-      "normalized_digest": "sha256:9b18332f9843d39fbd935bc6239942c6df6cf43e076bbfd639280711b9d53801"
-    },
     "S8": {
-      "path": "/home/jy/repos/tw-quant-engine/workflow/evidence/s8-read-only-product-view.acceptance.json",
+      "path": "/home/jy/worktrees/tw-quant-research/codex-watchlist-integrate-20260803-a7k2/workflow/evidence/s8-read-only-product-view.acceptance.json",
       "stage_id": "S8",
       "status": "pass",
       "errors": [],
@@ -84,17 +70,25 @@
     "checks": {
       "fixture_digests_match": true,
       "evidence_digests_match": true,
-      "backtest_digest_match": true,
       "product_view_digest_match": true
     },
     "fixture_digests": {
+      "tests/fixtures/k1/ohlcv.json": "sha256:72816043a59a94601d8d3a708a8989eee212a3c17bb9421ce626b533fbf3223b",
+      "tests/fixtures/p6/alerts.json": "sha256:f68552d06674d2b6ca7a5a30e6bbd982bf4da0c72746bef5816cc8bc11dcc394",
+      "tests/fixtures/p6/valuation.json": "sha256:cb163f0e2c024df5eea3ab7bdeecf92d5e5f4af7dfba0ca8cacbe8f76d805997",
       "tests/fixtures/s2/pit_fixture.json": "sha256:4c662e241983247ef75f71dbed744b8166407eabbcf20313c80bf35331a49a7b",
       "tests/fixtures/s3/source-admission.json": "sha256:3113c28e181186e6bc9490250887b98839df15b9a0dfda9f50cb6f97d432a676",
       "tests/fixtures/s4/synthetic-mapping.json": "sha256:a12f6505ac449c8eb0cac369a6de28d1f4a5c51b5af3e09fe36d57b25a0c0163",
       "tests/fixtures/s5/corporate-actions.json": "sha256:33be0287d129183a908386dd9afd6844ed93fb52829982e96a5cceb942c44e54",
-      "tests/fixtures/s6/features.json": "sha256:0ccb0e7f02355335a9e9910b6bd0af261842e115a509c9fc5a1362d0583da5c0",
-      "tests/fixtures/s7/backtest.json": "sha256:70a252d5b57324dbfe821214e68a3de1b8fe636f4dc1b5fd90ce700b93d040f5",
-      "tests/fixtures/s8/product-view.json": "sha256:ab0a3508d25d6d09a38b90046446a5c7ff923bef399abd99b731960a996dbdc8"
+      "tests/fixtures/s8/product-view.json": "sha256:ab0a3508d25d6d09a38b90046446a5c7ff923bef399abd99b731960a996dbdc8",
+      "tests/fixtures/tqr-fundamentals/replay.json": "sha256:2cc1023e5010ef3724b84b6b3be7d5e3cce3cc07d2b7abac61d7b1a501e19856",
+      "tests/fixtures/tqr-fundamentals/series.fixture.json": "sha256:ff28f6115dcc58e0e2a0bef9f2537b2a6e3d3566a56687fe15be769f84393b94",
+      "tests/fixtures/tqr-fundamentals/tpex_balance_sheet.sample.json": "sha256:dc0f1885c8170fa73401f03944576c96d18a692fc2abcde53ae8c3fe65372967",
+      "tests/fixtures/tqr-fundamentals/tpex_income_statement.sample.json": "sha256:c4780dc9f0f888c68fc1baa00abe4b6267394e310a51701186b24d621116f5b8",
+      "tests/fixtures/tqr-fundamentals/tpex_monthly_revenue.sample.json": "sha256:e7ecb71c7613b2c77f1f82e2682e7f1f677baa599569b7a13213a63c6b5a192b",
+      "tests/fixtures/tqr-fundamentals/twse_balance_sheet.sample.json": "sha256:baa454dc12bf702e81ab182ba353006aa90bf7c844b76f4f957a24f7bbf91f4e",
+      "tests/fixtures/tqr-fundamentals/twse_income_statement.sample.json": "sha256:bc3251e3f9ee17c11326467a1bcee190349f439933fc282bfa6429c71f9244dc",
+      "tests/fixtures/tqr-fundamentals/twse_monthly_revenue.sample.json": "sha256:1ec00aa2b78b5075a03077436b8bbb170e14f0170108d388edeb70b80b329c92"
     },
     "evidence_normalized_digests": {
       "S1": "sha256:4c42e864dad8e05dce5893179b675346d6b316316a05fb978a6a6494df7aed4f",
@@ -102,8 +96,6 @@
       "S3": "sha256:6d9674a1be144d917f31943e72713fe1c581dcf11af99085fc9248d2d6df5b3c",
       "S4": "sha256:b646e366c0400a01dd6fdabb19adcac0039b1dda9a1d7cd2fbf92d63f449f682",
       "S5": "sha256:6dd3d261b13f5678055fc2aa35eee700180ab828c8e7b2cfe2680217fac4eab2",
-      "S6": "sha256:5ecdd7dc236478a40701973c6634c86d20398f61173bc4bbcbf455c5b7cbdb90",
-      "S7": "sha256:9b18332f9843d39fbd935bc6239942c6df6cf43e076bbfd639280711b9d53801",
       "S8": "sha256:b063472b0acac7d57ceadc3feb145f9ecc4b3080bd61caef293854cf64cae80f"
     },
     "network_probe": {
@@ -140,8 +132,8 @@
         "-v"
       ],
       "exit_code": 0,
-      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
-      "stderr_digest": "sha256:2c46e99d007a19a7f98e7c38740d610299d99bc3444c810ac5a1a22995a7691c"
+      "stdout_digest": "sha256:427d590410dc2c1d930682af9a7252eb5030fe5f236bdca06388c34492858acb",
+      "stderr_digest": "sha256:b35e683ee2d02227204a876847aad8167af964658e11fa5f8fcd57c89f2d2920"
     },
     "qlib_matrix": {
       "available": true,
@@ -167,8 +159,8 @@
           "-v"
         ],
         "exit_code": 0,
-        "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
-        "stderr_digest": "sha256:3a80601411087cc307a4f5bf9f05b5bf07fd614c63430bad0fe0aef15cd96ffd"
+        "stdout_digest": "sha256:427d590410dc2c1d930682af9a7252eb5030fe5f236bdca06388c34492858acb",
+        "stderr_digest": "sha256:cf68d5ddfea4670a550d4ea59295ed998375f8492223414b03ec598fe078adbc"
       },
       "status": "pass"
     },
@@ -178,13 +170,13 @@
         "scripts/lh_preflight.py"
       ],
       "exit_code": 0,
-      "stdout_digest": "sha256:c348ddab5b842b5c66d290ded2139acb5a007685ac4a913da1ba76ee9d0c13a8",
+      "stdout_digest": "sha256:427d590410dc2c1d930682af9a7252eb5030fe5f236bdca06388c34492858acb",
       "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "parsed": {
         "driver": "loop-hybrid",
         "engine_id": "tw-quant-engine",
         "errors": [],
-        "phase": "s1_qlib_integration",
+        "phase": "p5_history_admission",
         "schema": "tw-quant-engine-preflight/v1",
         "status": "pass",
         "writes_repo": false

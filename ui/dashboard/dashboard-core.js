@@ -68,6 +68,12 @@
         message: "",
         results: []
       },
+      fundamentalsUpdate: {
+        scope: "watchlist",
+        status: "idle",
+        message: "",
+        results: []
+      },
       screenSpec: {
         schema: "tw-quant-engine-screen-spec/v1",
         universe: "s8.product_rows",
@@ -336,14 +342,20 @@
     }
     if (event.type === "SELECT_KLINE_INSTRUMENT") {
       var instrumentPeriods = klinePeriods(current.view, event.instrumentId);
-      if (instrumentPeriods.length) {
+      // A valid Taiwan equity watchlist entry may be newly added before its
+      // first local K-line snapshot exists. Keep it selectable so the bounded
+      // data-update command can classify/fetch it; missing bars are a data gap,
+      // not a navigation jump.
+      var updateableTaiwanEquity = /^(TWSE):[1-9][0-9]{3}$|^(TPEX):[0-9A-Z]{4,6}$/.test(String(event.instrumentId || "").trim().toUpperCase());
+      if (instrumentPeriods.length || updateableTaiwanEquity) {
         var periodExists = instrumentPeriods.indexOf(current.selectedKlinePeriod) >= 0;
         return Object.assign({}, current, {
-          // Changing instrument from the chart page must not throw the user off
-          // it; anywhere else lands on the company's numbers first.
-          activeSection: current.activeSection === "technical" ? "technical" : "company",
+          // Keep a stock selection inside the current work surface. The home
+          // page is the one intentional exception: its shared picker opens the
+          // company's numbers so the selection has an immediate read model.
+          activeSection: current.activeSection === "home" ? "company" : current.activeSection,
           selectedKlineInstrumentId: event.instrumentId,
-          selectedKlinePeriod: periodExists ? current.selectedKlinePeriod : instrumentPeriods[0],
+          selectedKlinePeriod: periodExists ? current.selectedKlinePeriod : (instrumentPeriods[0] || "1D"),
           klineSelectionMessage: null
         });
       }
@@ -431,6 +443,22 @@
       if (worksheetList.length === (current.valuation ? current.valuation.worksheets.length : 0)) return current;
       return Object.assign({}, current, {
         valuation: Object.assign({}, current.valuation, { worksheets: worksheetList, status: "ready", message: "" })
+      });
+    }
+    if (event.type === "UPDATE_VALUATION_WORKSHEET" && event.worksheet && typeof event.worksheet === "object" && typeof event.worksheet.worksheet_id === "string") {
+      var existingWorksheets = current.valuation && Array.isArray(current.valuation.worksheets) ? current.valuation.worksheets : [];
+      if (!existingWorksheets.some(function (definition) { return definition.worksheet_id === event.worksheet.worksheet_id; })) return current;
+      var updatedWorksheets = normalizeValuationWorksheets(existingWorksheets.map(function (definition) {
+        return definition.worksheet_id === event.worksheet.worksheet_id ? event.worksheet : definition;
+      }));
+      if (updatedWorksheets.length !== existingWorksheets.length) return current;
+      return Object.assign({}, current, {
+        valuation: Object.assign({}, current.valuation, {
+          worksheets: updatedWorksheets,
+          results: (current.valuation && Array.isArray(current.valuation.results) ? current.valuation.results : []).filter(function (result) { return result.worksheet_id !== event.worksheet.worksheet_id; }),
+          status: "ready",
+          message: ""
+        })
       });
     }
     if (event.type === "DELETE_VALUATION_WORKSHEET" && typeof event.worksheetId === "string") {
@@ -577,6 +605,18 @@
     }
     if (event.type === "DATA_UPDATE_ERROR") {
       return Object.assign({}, current, { dataUpdate: Object.assign({}, current.dataUpdate, { status: "error", message: event.message || "本機資料更新失敗", results: [] }) });
+    }
+    if (event.type === "SET_FUNDAMENTALS_UPDATE_SCOPE" && ["watchlist", "selected"].indexOf(event.scope) >= 0) {
+      return Object.assign({}, current, { fundamentalsUpdate: Object.assign({}, current.fundamentalsUpdate, { scope: event.scope }) });
+    }
+    if (event.type === "FUNDAMENTALS_UPDATE_START") {
+      return Object.assign({}, current, { fundamentalsUpdate: Object.assign({}, current.fundamentalsUpdate, { status: "loading", message: "正在擷取並驗證最新財務資料…" }) });
+    }
+    if (event.type === "FUNDAMENTALS_UPDATE_SUCCESS") {
+      return Object.assign({}, current, { fundamentalsUpdate: Object.assign({}, current.fundamentalsUpdate, { status: event.status || "success", message: event.message || "財務指標已更新", results: Array.isArray(event.results) ? clone(event.results) : [] }) });
+    }
+    if (event.type === "FUNDAMENTALS_UPDATE_ERROR") {
+      return Object.assign({}, current, { fundamentalsUpdate: Object.assign({}, current.fundamentalsUpdate, { status: "error", message: event.message || "財務指標更新失敗", results: [] }) });
     }
     if (event.type === "SET_SCREEN_SPEC" && ["quality", "market", "max_rows"].indexOf(event.field) >= 0) {
       var nextSpec = Object.assign({}, current.screenSpec);
@@ -894,6 +934,19 @@
 
   function isFiniteNumber(value) {
     return typeof value === "number" && isFinite(value);
+  }
+
+  function valuationRangeStatus(currentPrice, values) {
+    var range = values || {};
+    var low = range.bear;
+    var high = range.bull;
+    if (!isFiniteNumber(currentPrice) || !isFiniteNumber(low) || !isFiniteNumber(high) || high <= low) {
+      return { status: "unknown", direction: null, position: null };
+    }
+    var position = ((currentPrice - low) / (high - low)) * 100;
+    if (position < 0) return { status: "outside", direction: "below_bear", position: position };
+    if (position > 100) return { status: "outside", direction: "above_bull", position: position };
+    return { status: "inside", direction: null, position: position };
   }
 
   function valuationResults(state) {
@@ -1326,6 +1379,7 @@
     ALERT_STORE_SCHEMA: ALERT_STORE_SCHEMA,
     VALUATION_STORE_SCHEMA: VALUATION_STORE_SCHEMA,
     VALUATION_WORKSHEET_SCHEMA: VALUATION_WORKSHEET_SCHEMA,
+    valuationRangeStatus: valuationRangeStatus,
     createInitialState: createInitialState,
     reduce: reduce,
     selectedProduct: selectedProduct,
