@@ -918,6 +918,19 @@
     return typeof value === "number" && isFinite(value);
   }
 
+  function valuationRangeStatus(currentPrice, values) {
+    var range = values || {};
+    var low = range.bear;
+    var high = range.bull;
+    if (!isFiniteNumber(currentPrice) || !isFiniteNumber(low) || !isFiniteNumber(high) || high <= low) {
+      return { status: "unknown", direction: null, position: null };
+    }
+    var position = ((currentPrice - low) / (high - low)) * 100;
+    if (position < 0) return { status: "outside", direction: "below_bear", position: position };
+    if (position > 100) return { status: "outside", direction: "above_bull", position: position };
+    return { status: "inside", direction: null, position: position };
+  }
+
   function valuationResults(state) {
     var valuation = state && state.valuation;
     return valuation && Array.isArray(valuation.results) ? valuation.results : [];
@@ -1348,6 +1361,7 @@
     ALERT_STORE_SCHEMA: ALERT_STORE_SCHEMA,
     VALUATION_STORE_SCHEMA: VALUATION_STORE_SCHEMA,
     VALUATION_WORKSHEET_SCHEMA: VALUATION_WORKSHEET_SCHEMA,
+    valuationRangeStatus: valuationRangeStatus,
     createInitialState: createInitialState,
     reduce: reduce,
     selectedProduct: selectedProduct,

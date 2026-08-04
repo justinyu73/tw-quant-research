@@ -1826,25 +1826,21 @@
   }
 
   function valuationRailPercent(value, low, high) {
-    var raw = valuationRailRawPercent(value, low, high);
-    return raw === null ? null : Math.max(0, Math.min(100, raw));
-  }
-
-  function valuationRailRawPercent(value, low, high) {
     if (typeof value !== "number" || !isFinite(value) || typeof low !== "number" || !isFinite(low) || typeof high !== "number" || !isFinite(high) || high <= low) return null;
-    return ((value - low) / (high - low)) * 100;
+    return Math.max(0, Math.min(100, ((value - low) / (high - low)) * 100));
   }
 
   function valuationRailMarkup(values, zone, currentPrice, comparisonTone) {
     var low = values.bear;
     var high = values.bull;
     var basePosition = valuationRailPercent(values.base, low, high);
-    var currentRawPosition = valuationRailRawPercent(currentPrice, low, high);
+    var rangeStatus = core.valuationRangeStatus(currentPrice, values);
+    var currentRawPosition = rangeStatus.position;
     var currentPosition = currentRawPosition === null ? null : Math.max(0, Math.min(100, currentRawPosition));
-    var isCurrentOutside = currentRawPosition !== null && (currentRawPosition > 100 || currentRawPosition < 0);
+    var isCurrentOutside = rangeStatus.status === "outside";
     var markerPosition = currentPosition === null ? 50 : isCurrentOutside ? (currentRawPosition > 100 ? 100 : 0) : Math.max(4, Math.min(96, currentPosition));
-    var rangeHint = !isCurrentOutside ? "" : currentPrice > high ? "高於 Bull" : "低於 Bear";
-    var outsideClass = currentPrice > high ? "valuation-outside-high" : currentPrice < low ? "valuation-outside-low" : "";
+    var rangeHint = rangeStatus.direction === "above_bull" ? "高於 Bull" : rangeStatus.direction === "below_bear" ? "低於 Bear" : "";
+    var outsideClass = rangeStatus.direction === "above_bull" ? "valuation-outside-high" : rangeStatus.direction === "below_bear" ? "valuation-outside-low" : "";
     function node(kind, label, value, position, testid, extraClass) {
       var positionStyle = position === null ? "" : ' style="left:' + position.toFixed(2) + '%"';
       return '<div class="valuation-rail-node ' + extraClass + '"' + positionStyle + '><span class="valuation-rail-node-label">' + valuationRailIcon(kind) + '<span>' + text(label) + '</span></span><strong' + (testid ? ' data-testid="' + testid + '"' : '') + '>' + core.formatNumber(value) + '</strong></div>';

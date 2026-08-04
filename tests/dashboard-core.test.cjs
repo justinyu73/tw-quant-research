@@ -200,6 +200,10 @@ assert.equal(state.valuation.results[0].stage, "sweet");
 assert.equal(state.valuation.results[0].comparison.research_comparison_only, true);
 assert.equal(state.valuation.indicators.length, 1);
 assert.equal(state.valuation.indicators[0].std_convention, "population");
+assert.deepEqual(core.valuationRangeStatus(800, { bear: 450, base: 800, bull: 1250 }), { status: "inside", direction: null, position: 43.75 });
+assert.equal(core.valuationRangeStatus(2440, { bear: 450, base: 800, bull: 1250 }).direction, "above_bull");
+assert.equal(core.valuationRangeStatus(200, { bear: 450, base: 800, bull: 1250 }).direction, "below_bear");
+assert.equal(core.valuationRangeStatus(800, { bear: 1250, base: 800, bull: 450 }).status, "unknown");
 const editedWorksheet = Object.assign({}, worksheetDef, {
   label: "2330 三情境合理價（編輯）",
   scenarios: Object.assign({}, worksheetDef.scenarios, { base: { eps: 11, pe: 15 } })

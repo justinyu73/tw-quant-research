@@ -135,6 +135,18 @@ change any valuation calculation or stage threshold:
 The same semantic rule is used by Watchlist, Home, Valuation, and Buy Plan so
 the colour never changes meaning between pages.
 
+#### Scenario range exception
+
+If the current price is below Bear or above Bull, the result is `range_outside`;
+it is not treated as an ordinary Base discount/premium state. The Valuation
+rail must show the current-price marker at the corresponding Bear/Bull boundary
+with an outward direction, keep it visually separate from the scenario price
+labels, and display a warning that the range needs investigation. The warning
+must state that a new event or fundamental change may have occurred, or that
+the valuation assumptions/calculation may no longer be reasonable. The user
+must review the cause and then edit/re-evaluate Bear/Base/Bull; the app must not
+silently mutate the worksheet or widen the range from the market price.
+
 ## Buy plan contract
 
 Decision: `TQR-BUYPLAN-003`
