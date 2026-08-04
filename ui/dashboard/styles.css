@@ -241,11 +241,31 @@ td small { display: block; margin-top: 3px; color: var(--text-muted); font-size:
 .valuation-field-wide { grid-column: 1 / -1; }
 .valuation-field select { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--surface); }
 .valuation-form .btn { justify-self: start; }
+.valuation-editing-state { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid rgba(109, 90, 230, .35); border-radius: var(--radius); background: rgba(109, 90, 230, .08); }
+.valuation-editing-state > div { display: grid; gap: 2px; min-width: 0; }
+.valuation-editing-state > div > span { color: var(--primary-dk); font-size: var(--type-micro); font-weight: 800; }
+.valuation-editing-state strong { overflow-wrap: anywhere; }
 .valuation-worksheet-list { display: grid; gap: 8px; margin-top: 14px; }
+.valuation-worksheet-list-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 2px; }
+.valuation-worksheet-list-header > div { display: grid; gap: 2px; }
+.valuation-worksheet-list-header span, .valuation-worksheet-list-header > span { color: var(--text-muted); font-size: var(--type-helper); }
 .valuation-worksheet { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: 3px; background: var(--surface-secondary); }
+.valuation-worksheet.active { border-color: rgba(109, 90, 230, .5); box-shadow: 0 0 0 2px rgba(109, 90, 230, .08); }
 .valuation-worksheet > div { min-width: 0; }
 .valuation-worksheet strong { display: block; font-size: var(--type-helper); }
 .valuation-worksheet small { color: var(--text-muted); font-size: var(--type-helper); overflow-wrap: anywhere; }
+.valuation-value-ruler { position: relative; width: min(100%, 520px); height: 42px; margin-top: 7px; }
+.valuation-value-ruler-line { position: absolute; top: 8px; right: 5%; left: 5%; height: 4px; border-radius: 999px; background: linear-gradient(90deg, var(--red), var(--primary), var(--green)); opacity: .7; }
+.valuation-value-ruler-tick { position: absolute; top: 0; display: grid; justify-items: center; gap: 3px; width: 72px; color: var(--text); text-align: center; transform: translateX(-50%); }
+.valuation-value-ruler-tick-bear { transform: none; justify-items: start; text-align: left; }
+.valuation-value-ruler-tick-bull { transform: translateX(-100%); justify-items: end; text-align: right; }
+.valuation-value-ruler-tick i { z-index: 1; display: block; width: 12px; height: 12px; border: 3px solid var(--surface-secondary); border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+.valuation-value-ruler-tick-bear i { background: var(--red); box-shadow: 0 0 0 1px var(--red); }
+.valuation-value-ruler-tick-bull i { background: var(--green); box-shadow: 0 0 0 1px var(--green); }
+.valuation-value-ruler-tick span { display: grid; gap: 1px; }
+.valuation-value-ruler-tick small { color: var(--text-muted); font-size: var(--type-micro); }
+.valuation-value-ruler-tick strong { font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--type-helper); font-variant-numeric: tabular-nums; }
+.valuation-worksheet-actions { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
 .valuation-indicator-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
 .valuation-indicator { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--border-light); border-radius: 3px; background: var(--surface-secondary); }
 .valuation-indicator > span { color: var(--text-muted); font-size: var(--type-helper); font-weight: 700; }
@@ -931,9 +951,26 @@ input, select, textarea, button { font-family: inherit; }
 .valuation-form input, .valuation-form select { width: 100%; min-width: 0; height: 34px; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--surface); font-size: var(--type-helper); }
 .valuation-field { display: grid; gap: 4px; }
 
-.valuation-scenario-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.valuation-scenario { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border-light); border-radius: var(--radius); background: var(--surface-secondary); }
-.valuation-scenario h4 { margin: 0; font-size: var(--type-helper); font-weight: 700; }
+.valuation-scenario-row { display: grid; gap: 14px; padding: 14px; border: 1px solid var(--border-light); border-radius: var(--radius); background: var(--surface-secondary); }
+.valuation-scenario-row-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.valuation-scenario-row-header > div { display: grid; gap: 2px; }
+.valuation-scenario-row-header h4 { margin: 0; font-size: var(--type-helper); font-weight: 800; }
+.valuation-scenario-row-header > div > span, .valuation-scenario-row-hint { color: var(--text-muted); font-size: var(--type-helper); }
+.valuation-scenario-inputs { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+.valuation-scenario-inputs::before { content: ""; position: absolute; top: 22px; right: 16.666%; left: 16.666%; height: 4px; border-radius: 999px; background: linear-gradient(90deg, var(--red), var(--primary), var(--green)); opacity: .7; }
+.valuation-scenario { position: relative; z-index: 1; display: grid; align-content: start; gap: 10px; min-width: 0; padding: 0 14px; }
+.valuation-scenario + .valuation-scenario { border-left: 1px solid var(--border-light); }
+.valuation-scenario-node { display: grid; justify-items: center; gap: 4px; min-height: 58px; text-align: center; }
+.valuation-scenario-node .valuation-rail-icon { z-index: 1; width: 28px; height: 28px; padding: 4px; border: 1px solid var(--border); border-radius: 50%; background: var(--surface-secondary); }
+.valuation-scenario-node > span { display: grid; gap: 1px; }
+.valuation-scenario-node strong { font-size: var(--type-helper); font-weight: 800; }
+.valuation-scenario-node small { color: var(--text-muted); font-size: var(--type-micro); }
+.valuation-scenario-price { color: var(--text); font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--type-body); font-style: normal; font-weight: 850; font-variant-numeric: tabular-nums; }
+.valuation-scenario-price-label { letter-spacing: .04em; }
+.valuation-scenario-bear .valuation-rail-icon { color: var(--red); }
+.valuation-scenario-base .valuation-rail-icon { color: var(--primary-dk); }
+.valuation-scenario-bull .valuation-rail-icon { color: var(--green); }
+.valuation-scenario-fields { display: grid; gap: 8px; }
 .valuation-scenario label { display: grid; gap: 4px; }
 
 .valuation-ratio-row, .valuation-basis { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--border-light); border-radius: var(--radius); background: var(--surface-secondary); }
@@ -971,12 +1008,25 @@ input, select, textarea, button { font-family: inherit; }
 .valuation-price { font-size: 20px; }
 .valuation-zone-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
 .valuation-rail { display: grid; gap: 12px; margin-top: 14px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
-.valuation-rail-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.valuation-rail-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .valuation-rail-header > div { display: grid; gap: 2px; }
 .valuation-rail-header strong { font-size: var(--type-card); }
 .valuation-rail-hint { color: var(--text-muted); font-size: var(--type-helper); }
+.valuation-rail-current-summary { display: inline-flex; align-items: baseline; gap: 6px; max-width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-secondary); white-space: nowrap; }
+.valuation-rail-current-summary > span { color: var(--text-muted); font-size: var(--type-helper); }
+.valuation-rail-current-summary strong { font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--type-helper); font-weight: 850; }
+.valuation-rail-current-summary em { font-size: var(--type-helper); font-style: normal; font-weight: 800; }
+.valuation-rail-current-summary.valuation-discount { border-color: rgba(11, 143, 112, .35); color: var(--green); }
+.valuation-rail-current-summary.valuation-premium { border-color: rgba(217, 75, 75, .35); color: var(--red); }
+.valuation-rail-hint-outside { color: var(--red); font-weight: 800; }
 .valuation-rail-track { position: relative; height: 112px; margin: 2px 8px 0; }
-.valuation-rail-line { position: absolute; top: 67px; right: 4%; left: 4%; height: 6px; border-radius: 999px; background: linear-gradient(90deg, var(--text-muted), var(--primary), var(--text-muted)); opacity: .55; }
+.valuation-rail-line { position: absolute; top: 67px; right: 4%; left: 4%; height: 6px; border-radius: 999px; background: linear-gradient(90deg, var(--red), var(--primary), var(--green)); opacity: .72; }
+.valuation-rail-scale-tick { position: absolute; top: 62px; z-index: 1; display: block; width: 18px; height: 16px; transform: translateX(-50%); }
+.valuation-rail-scale-tick-bear { transform: none; }
+.valuation-rail-scale-tick-bull { transform: translateX(-100%); }
+.valuation-rail-scale-tick i { display: block; width: 12px; height: 12px; margin: 0 auto; border: 3px solid var(--surface); border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+.valuation-rail-scale-tick-bear i { margin-left: 0; background: var(--red); box-shadow: 0 0 0 1px var(--red); }
+.valuation-rail-scale-tick-bull i { margin-right: 0; background: var(--green); box-shadow: 0 0 0 1px var(--green); }
 .valuation-rail-node { position: absolute; top: 0; display: grid; width: 138px; gap: 4px; color: var(--text); text-align: center; transform: translateX(-50%); }
 .valuation-rail-node-bear { transform: none; text-align: left; }
 .valuation-rail-node-bull { transform: translateX(-100%); text-align: right; }
@@ -992,6 +1042,19 @@ input, select, textarea, button { font-family: inherit; }
 .valuation-rail-current-marker.valuation-discount i { background: var(--green); box-shadow: 0 0 0 2px var(--green); }
 .valuation-rail-current-marker.valuation-premium span { border-color: rgba(217, 75, 75, .35); color: var(--red); }
 .valuation-rail-current-marker.valuation-premium i { background: var(--red); box-shadow: 0 0 0 2px var(--red); }
+.valuation-rail-track-outside { height: 148px; }
+.valuation-rail-track-outside .valuation-rail-current-marker { top: 84px; }
+.valuation-rail-current-marker.valuation-outside-high { transform: translateX(-100%); }
+.valuation-rail-current-marker.valuation-outside-low { transform: none; }
+.valuation-rail-current-marker.valuation-outside span { border-style: dashed; }
+.valuation-rail-current-marker.valuation-outside-high::after, .valuation-rail-current-marker.valuation-outside-low::after { position: absolute; top: -20px; color: var(--red); font-size: 18px; font-weight: 900; line-height: 1; }
+.valuation-rail-current-marker.valuation-outside-high::after { right: 8px; content: "↗"; }
+.valuation-rail-current-marker.valuation-outside-low::after { left: 8px; content: "↖"; }
+.valuation-range-warning { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid rgba(217, 75, 75, .35); border-radius: var(--radius); background: rgba(217, 75, 75, .08); }
+.valuation-range-warning > span { flex: 0 0 auto; padding: 3px 7px; border: 1px solid rgba(217, 75, 75, .4); border-radius: 999px; color: var(--red); font-size: var(--type-micro); font-weight: 850; }
+.valuation-range-warning > div { display: grid; gap: 2px; min-width: 0; }
+.valuation-range-warning strong { color: var(--red); font-size: var(--type-helper); }
+.valuation-range-warning small { color: var(--text-muted); font-size: var(--type-helper); }
 .valuation-rail-bands { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; }
 .valuation-rail-band { display: grid; gap: 3px; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--surface-secondary); }
 .valuation-rail-band span { color: var(--text-muted); font-size: var(--type-micro); font-weight: 750; }
@@ -1045,10 +1108,18 @@ input, select, textarea, button { font-family: inherit; }
 
 @media (max-width: 720px) {
   .valuation-zone-grid, .valuation-ratio-row, .valuation-basis, .buyplan-form, .review-form, .valuation-compare-emphasis, .valuation-rail-bands { grid-template-columns: minmax(0, 1fr); }
+  .valuation-scenario-inputs { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .valuation-scenario-inputs::before { top: 16px; right: auto; bottom: 16px; left: 22px; width: 4px; height: auto; background: linear-gradient(180deg, var(--red), var(--primary), var(--green)); }
+  .valuation-scenario { grid-template-columns: 44px minmax(0, 1fr); align-items: start; gap: 10px; padding: 0; }
+  .valuation-scenario + .valuation-scenario { padding-top: 12px; border-top: 1px solid var(--border-light); border-left: 0; }
+  .valuation-scenario-node { min-height: 0; }
+  .valuation-scenario-node > span { text-align: center; }
   .valuation-rail { padding: 10px; }
+  .valuation-rail-current-summary { width: 100%; justify-content: flex-start; }
   .valuation-rail-track { height: 124px; margin-inline: 0; }
   .valuation-rail-node { width: 104px; }
   .valuation-rail-node strong { font-size: 17px; }
+  .valuation-range-warning { align-items: flex-start; }
   .watchlist-filter-bar label { min-width: 100%; }
 }
 

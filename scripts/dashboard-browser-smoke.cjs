@@ -20,14 +20,14 @@ const EXPECTED_SCREENSHOTS = {
   watchlist: "2ab44beae44c25ead3d6744a8dcfa2f3b71da386885fad66d3e80f1dcbd2f5bc",
   buyplan: "94915f62eaa13ed0b3c619dc314c13d68d13b2bd3db10a8f6292a8773dfd5a96",
   review: "abab9cb0446cb5a839252dd8cb7bd241c59e9cb97c63f5de3985a1867e0b99ce",
-  valuation: "e0b0f512f45614b18a2e45f9d8c6716ae9c776acd669c6ff10660fb73ce958df",
+  valuation: "918dadc022a43f7321bdb28614e88404c7d686cd55a27041be05dc070eaf60de",
   // Dark is the primary appearance and carries its own baselines; an empty
   // value here keeps the gate red until a human has looked at the capture.
   home_dark: "e674d860fbcefd6827a7fa5c571c8f44b41172147094c7bf4bb38631e152c6ba",
   watchlist_dark: "86d76ed915163e7a63c2ee32d05e13298598d872a19f37c370b1f90e72e13aa2",
   company_dark: "672af1d6df5350f72a4349d5a302f013150d21240d5869aa4a934fcb8a3b9d1d",
   technical_dark: "3a5289fb47fb132fe9212dc6db741f40c7d5f2babeb59f250b17dd3f6310c105",
-  valuation_dark: "5cdc6e49b3a16e645f4d7cf13092f25a192508746f90a2de6acb262b581715ab",
+  valuation_dark: "44ae0155faaec56973229d16468a67295f282ac4c1e220f5e7db694e56ad2927",
   buyplan_dark: "b7f9b5c23340f591af48dd0f34c9a5e2133d5cfaadea1c4b1d5e8e8213177aee",
   review_dark: "cfcc3c65ee3f11691316e0e784935e1e64e04f010522ca23da5294bf2e2f7fbb",
 };
@@ -583,6 +583,8 @@ async function main() {
     const blockedStatus = await page.locator('[data-testid="valuation-status"]').innerText();
     assert.match(blockedStatus, /加入估值工作表/, `evaluate-before-worksheet said: ${blockedStatus}`);
     assert.equal(await page.locator('[data-testid="valuation-result-card"]').count(), 0);
+    assert.equal(await page.locator('[data-testid="valuation-scenario-panel"]').count(), 1);
+    assert.deepEqual(await page.locator('[data-testid="valuation-scenario-panel"] .valuation-scenario-node strong').allInnerTexts(), ["保守", "最合理", "樂觀"]);
     await page.locator('[data-testid="valuation-ws-label"]').fill("2330 三情境合理價");
     await page.locator('[data-testid="valuation-ws-bear-eps"]').fill("30");
     await page.locator('[data-testid="valuation-ws-bear-pe"]').fill("15");
@@ -590,6 +592,9 @@ async function main() {
     await page.locator('[data-testid="valuation-ws-base-pe"]').fill("20");
     await page.locator('[data-testid="valuation-ws-bull-eps"]').fill("50");
     await page.locator('[data-testid="valuation-ws-bull-pe"]').fill("25");
+    assert.equal(await page.locator('[data-testid="valuation-draft-bear-value"]').innerText(), "450");
+    assert.equal(await page.locator('[data-testid="valuation-draft-base-value"]').innerText(), "800");
+    assert.equal(await page.locator('[data-testid="valuation-draft-bull-value"]').innerText(), "1,250");
     // The basis fields are required: a valuation with no recorded EPS period
     // must not be addable.
     assert.equal(await page.locator('[data-testid="valuation-add"]').isDisabled(), true);
@@ -598,11 +603,34 @@ async function main() {
     assert.equal(await page.locator('[data-testid="valuation-add"]').isDisabled(), false);
     await page.locator('[data-testid="valuation-add"]').click();
     assert.equal(await page.locator('[data-testid="valuation-worksheet"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="valuation-worksheet-ruler"]').count(), 1);
+    const worksheetRulerText = await page.locator('[data-testid="valuation-worksheet-ruler"]').innerText();
+    assert.match(worksheetRulerText, /Bear\s*450/);
+    assert.match(worksheetRulerText, /Base\s*800/);
+    assert.match(worksheetRulerText, /Bull\s*1,250/);
+    await page.locator('[data-testid="valuation-worksheet"] [data-action="valuation-edit"]').click();
+    assert.equal(await page.locator('[data-testid="valuation-editing-state"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="valuation-ws-label"]').inputValue(), "2330 三情境合理價");
+    assert.equal(await page.locator('[data-testid="valuation-ws-base-pe"]').inputValue(), "20");
+    assert.equal(await page.locator('[data-testid="valuation-add"]').innerText(), "更新估值範本");
+    await page.locator('[data-testid="valuation-add"]').click();
+    assert.equal(await page.locator('[data-testid="valuation-editing-state"]').count(), 0);
+    assert.equal(await page.locator('[data-testid="valuation-worksheet"]').count(), 1);
     await page.locator('[data-testid="valuation-evaluate"]').click();
     await page.locator('[data-testid="valuation-result-card"]').first().waitFor();
     assert.equal(await page.locator('[data-testid="valuation-rail"]').count(), 1);
     assert.equal(await page.locator('[data-testid="valuation-rail-bands"] .valuation-rail-band').count(), 5);
+    assert.equal(await page.locator('[data-testid^="valuation-rail-ruler-tick-"]').count(), 3);
     assert.match(await page.locator('[data-testid="valuation-current-marker"]').getAttribute("class"), /\bvaluation-premium\b/);
+    assert.equal(await page.locator('.valuation-rail-header [data-testid="valuation-current-marker"]').count(), 0);
+    assert.equal(await page.locator('.valuation-rail-track [data-testid="valuation-current-marker"]').count(), 1);
+    assert.match(await page.locator('.valuation-rail-track [data-testid="valuation-current-marker"]').innerText(), /現價\s*2,440\s*·\s*高於 Bull/);
+    assert.match(await page.locator('[data-testid="valuation-current-marker"]').getAttribute("class"), /\bvaluation-outside-high\b/);
+    assert.match(await page.locator('[data-testid="valuation-current-marker"]').getAttribute("style"), /left:100\.00%/);
+    assert.equal(await page.locator('[data-testid="valuation-range-warning"]').count(), 1);
+    const valuationRangeWarning = await page.locator('[data-testid="valuation-range-warning"]').innerText();
+    assert.match(valuationRangeWarning, /重估 Bear～Bull/);
+    assert.match(valuationRangeWarning, /事件|基本面|假設|計算方式/);
     assert.equal(await page.locator('[data-testid="valuation-base-value"]').first().innerText(), "800");
     assert.equal(await page.locator('[data-testid="valuation-current-price"]').first().innerText(), "2,440");
     // Buy ladder = Base x 85% / 75%, computed by the engine, not the browser.
@@ -730,7 +758,12 @@ async function main() {
 
     // Dark is the primary appearance, so it carries its own pixel baseline:
     // the contrast audit checks colour and cannot see layout breaking.
+    await page.locator('[data-action="section"][data-section="evidence"]').first().click();
+    assert.equal(await page.locator(".page-title").innerText(), "資料來源");
+    assert.equal(await page.locator(".lineage-grid").count(), 1);
     await page.locator('[data-action="section"][data-section="settings"]').first().click();
+    assert.equal(await page.locator(".page-title").innerText(), "設定");
+    assert.equal(await page.locator('[data-testid="theme-panel"]').count(), 1);
     await page.locator('[data-testid="theme-dark"]').click();
     assert.equal(await page.evaluate(() => document.documentElement.getAttribute("data-theme")), "dark");
     for (const section of ["home", "watchlist", "company", "technical", "valuation", "buyplan", "review"]) {

@@ -439,6 +439,22 @@
         valuation: Object.assign({}, current.valuation, { worksheets: worksheetList, status: "ready", message: "" })
       });
     }
+    if (event.type === "UPDATE_VALUATION_WORKSHEET" && event.worksheet && typeof event.worksheet === "object" && typeof event.worksheet.worksheet_id === "string") {
+      var existingWorksheets = current.valuation && Array.isArray(current.valuation.worksheets) ? current.valuation.worksheets : [];
+      if (!existingWorksheets.some(function (definition) { return definition.worksheet_id === event.worksheet.worksheet_id; })) return current;
+      var updatedWorksheets = normalizeValuationWorksheets(existingWorksheets.map(function (definition) {
+        return definition.worksheet_id === event.worksheet.worksheet_id ? event.worksheet : definition;
+      }));
+      if (updatedWorksheets.length !== existingWorksheets.length) return current;
+      return Object.assign({}, current, {
+        valuation: Object.assign({}, current.valuation, {
+          worksheets: updatedWorksheets,
+          results: (current.valuation && Array.isArray(current.valuation.results) ? current.valuation.results : []).filter(function (result) { return result.worksheet_id !== event.worksheet.worksheet_id; }),
+          status: "ready",
+          message: ""
+        })
+      });
+    }
     if (event.type === "DELETE_VALUATION_WORKSHEET" && typeof event.worksheetId === "string") {
       return Object.assign({}, current, {
         valuation: Object.assign({}, current.valuation, {

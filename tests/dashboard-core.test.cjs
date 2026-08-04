@@ -200,6 +200,14 @@ assert.equal(state.valuation.results[0].stage, "sweet");
 assert.equal(state.valuation.results[0].comparison.research_comparison_only, true);
 assert.equal(state.valuation.indicators.length, 1);
 assert.equal(state.valuation.indicators[0].std_convention, "population");
+const editedWorksheet = Object.assign({}, worksheetDef, {
+  label: "2330 三情境合理價（編輯）",
+  scenarios: Object.assign({}, worksheetDef.scenarios, { base: { eps: 11, pe: 15 } })
+});
+state = core.reduce(state, { type: "UPDATE_VALUATION_WORKSHEET", worksheet: editedWorksheet });
+assert.equal(state.valuation.worksheets[0].label, "2330 三情境合理價（編輯）");
+assert.equal(state.valuation.worksheets[0].scenarios.base.eps, 11);
+assert.equal(state.valuation.results.length, 0);
 state = core.reduce(state, { type: "SET_VALUATION_INDICATOR_PERIOD", indicator: "zscore", period: "60" });
 assert.equal(state.valuationIndicatorPeriods.zscore, 60);
 state = core.reduce(state, { type: "SET_VALUATION_INDICATOR_PERIOD", indicator: "zscore", period: "0" });

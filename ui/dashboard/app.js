@@ -113,6 +113,7 @@
   var valuationLoadStarted = false;
   var valuationEvaluateInFlight = false;
   var valuationDraft = defaultValuationDraft();
+  var valuationEditingWorksheetId = null;
   var BUY_PLAN_LOCAL_STORAGE_KEY = "tqr-buy-plans.v1";
   var buyPlanDraft = defaultBuyPlanDraft();
   var buyPlansLoaded = false;
@@ -224,6 +225,93 @@
       epsPeriod: "", epsKind: "estimate", peRationale: "",
       financialDataDate: "", valuationDate: todayIso(), changeReason: ""
     };
+  }
+
+  function valuationDraftNumber(value) {
+    return value === null || value === undefined || value === "" ? "" : String(value);
+  }
+
+  function valuationDraftPercentage(value) {
+    if (!(value > 0)) return "";
+    return String(Number((value * 100).toFixed(4)));
+  }
+
+  function valuationDraftFromWorksheet(definition) {
+    var scenarios = definition.scenarios || {};
+    var ratios = definition.buy_zone_ratios || {};
+    var basis = definition.basis || {};
+    return {
+      label: definition.label || "",
+      bearEps: valuationDraftNumber(scenarios.bear && scenarios.bear.eps),
+      bearPe: valuationDraftNumber(scenarios.bear && scenarios.bear.pe),
+      baseEps: valuationDraftNumber(scenarios.base && scenarios.base.eps),
+      basePe: valuationDraftNumber(scenarios.base && scenarios.base.pe),
+      bullEps: valuationDraftNumber(scenarios.bull && scenarios.bull.eps),
+      bullPe: valuationDraftNumber(scenarios.bull && scenarios.bull.pe),
+      ratioWatch: valuationDraftPercentage(ratios.watch),
+      ratioFirst: valuationDraftPercentage(ratios.first),
+      ratioSecond: valuationDraftPercentage(ratios.second),
+      ratioSweet: valuationDraftPercentage(ratios.sweet),
+      ratioExtreme: valuationDraftPercentage(ratios.extreme),
+      epsPeriod: basis.eps_period || "",
+      epsKind: basis.eps_kind === "actual" ? "actual" : "estimate",
+      peRationale: basis.pe_rationale || "",
+      financialDataDate: basis.financial_data_date || "",
+      valuationDate: basis.valuation_date || todayIso(),
+      changeReason: basis.change_reason || ""
+    };
+  }
+
+  function valuationDraftScenarioValue(prefix) {
+    var eps = Number(valuationDraft[prefix + "Eps"]);
+    var pe = Number(valuationDraft[prefix + "Pe"]);
+    if (!Number.isFinite(eps) || !Number.isFinite(pe) || !(eps > 0) || !(pe > 0)) return null;
+    return eps * pe;
+  }
+
+  function valuationDraftScenarioText(prefix) {
+    var value = valuationDraftScenarioValue(prefix);
+    return value === null ? "—" : core.formatNumber(value);
+  }
+
+  function valuationScenarioValuesFromDefinition(definition) {
+    var scenarios = definition && definition.scenarios ? definition.scenarios : {};
+    function valueFor(prefix) {
+      var entry = scenarios[prefix] || {};
+      var eps = Number(entry.eps);
+      var pe = Number(entry.pe);
+      return Number.isFinite(eps) && Number.isFinite(pe) && eps > 0 && pe > 0 ? eps * pe : null;
+    }
+    return { bear: valueFor("bear"), base: valueFor("base"), bull: valueFor("bull") };
+  }
+
+  function valuationValueText(value) {
+    return value === null || value === undefined ? "—" : core.formatNumber(value);
+  }
+
+  function valuationValueRulerMarkup(values, testid) {
+    var low = values && values.bear;
+    var high = values && values.bull;
+    var basePosition = valuationRailPercent(values && values.base, low, high);
+    function positionFor(kind) {
+      if (kind === "bear") return 0;
+      if (kind === "bull") return 100;
+      return basePosition === null ? 50 : basePosition;
+    }
+    function tick(kind, label, value) {
+      var position = positionFor(kind);
+      var extraClass = kind === "bear" ? " valuation-value-ruler-tick-bear" : kind === "bull" ? " valuation-value-ruler-tick-bull" : "";
+      return '<div class="valuation-value-ruler-tick' + extraClass + '" style="left:' + position.toFixed(2) + '%"><i aria-hidden="true"></i><span><small>' + text(label) + '</small><strong>' + valuationValueText(value) + '</strong></span></div>';
+    }
+    return '<div class="valuation-value-ruler" data-testid="' + testid + '" aria-label="Bear Base Bull 數值尺規"><div class="valuation-value-ruler-line" aria-hidden="true"></div>' +
+      tick("bear", "Bear", values && values.bear) + tick("base", "Base", values && values.base) + tick("bull", "Bull", values && values.bull) + '</div>';
+  }
+
+  function refreshValuationScenarioPreview() {
+    ["bear", "base", "bull"].forEach(function (prefix) {
+      var node = root.querySelector('[data-testid="valuation-draft-' + prefix + '-value"]');
+      if (node) node.textContent = valuationDraftScenarioText(prefix);
+    });
   }
 
   function todayIso() {
@@ -917,7 +1005,39 @@
     return saveLocalValuation(core.valuationStorePayload(state));
   }
 
-  function buildWorksheetFromDraft() {
+  function valuationWorksheetById(worksheetId) {
+    var worksheets = state.valuation && Array.isArray(state.valuation.worksheets) ? state.valuation.worksheets : [];
+    return worksheets.find(function (definition) { return definition.worksheet_id === worksheetId; }) || null;
+  }
+
+  function editValuationWorksheet(worksheetId) {
+    var definition = valuationWorksheetById(worksheetId);
+    if (!definition) return;
+    var targetId = definition.target && definition.target.security_id;
+    var targetInstrument = core.klineInstruments(state.view).find(function (instrument) {
+      return instrument.instrument_id === targetId || instrument.symbol === targetId;
+    });
+    if (!targetInstrument) {
+      state = core.reduce(state, { type: "VALUATION_ERROR", message: "此範本的標的目前不在本機資料目錄，無法載入編輯" });
+      render();
+      return;
+    }
+    valuationEditingWorksheetId = definition.worksheet_id;
+    valuationDraft = valuationDraftFromWorksheet(definition);
+    if (state.selectedKlineInstrumentId !== targetInstrument.instrument_id) {
+      selectKlineInstrument(targetInstrument.instrument_id, true);
+      return;
+    }
+    render();
+  }
+
+  function cancelValuationEdit() {
+    valuationEditingWorksheetId = null;
+    valuationDraft = defaultValuationDraft();
+    render();
+  }
+
+  function buildWorksheetFromDraft(existingDefinition) {
     var instrument = selectedKlineInstrument();
     var symbol = instrument && instrument.symbol;
     if (!symbol || !String(valuationDraft.label || "").trim()) return null;
@@ -942,7 +1062,7 @@
     if (Object.keys(ratios).some(function (key) { return ratios[key] === null; })) return null;
     return {
       schema: core.VALUATION_WORKSHEET_SCHEMA,
-      worksheet_id: "tqr-" + symbol + "-" + Date.now(),
+      worksheet_id: existingDefinition ? existingDefinition.worksheet_id : "tqr-" + symbol + "-" + Date.now(),
       label: String(valuationDraft.label).trim().slice(0, 120),
       target: { security_id: symbol },
       scenarios: { bear: bear, base: base, bull: bull },
@@ -955,14 +1075,20 @@
         valuation_date: String(valuationDraft.valuationDate || "").trim().slice(0, 200),
         change_reason: String(valuationDraft.changeReason || "").trim().slice(0, 200)
       },
-      created_at: new Date().toISOString()
+      created_at: existingDefinition && existingDefinition.created_at ? existingDefinition.created_at : new Date().toISOString()
     };
   }
 
-  function addWorksheetFromDraft() {
+  function saveWorksheetFromDraft() {
     var instrument = selectedKlineInstrument();
     var issues = core.valuationFormIssues(valuationDraft, { symbol: instrument && instrument.symbol });
-    var definition = issues.length ? null : buildWorksheetFromDraft();
+    var existingDefinition = valuationEditingWorksheetId ? valuationWorksheetById(valuationEditingWorksheetId) : null;
+    if (valuationEditingWorksheetId && !existingDefinition) {
+      state = core.reduce(state, { type: "VALUATION_ERROR", message: "找不到正在編輯的估值範本；請重新載入後再試" });
+      render();
+      return;
+    }
+    var definition = issues.length ? null : buildWorksheetFromDraft(existingDefinition);
     if (!definition) {
       state = core.reduce(state, {
         type: "VALUATION_ERROR",
@@ -971,7 +1097,8 @@
       render();
       return;
     }
-    state = core.reduce(state, { type: "ADD_VALUATION_WORKSHEET", worksheet: definition });
+    state = core.reduce(state, { type: existingDefinition ? "UPDATE_VALUATION_WORKSHEET" : "ADD_VALUATION_WORKSHEET", worksheet: definition });
+    valuationEditingWorksheetId = null;
     valuationDraft = defaultValuationDraft();
     persistValuation();
     render();
@@ -1663,11 +1790,13 @@
       '<small>' + text(note) + '</small></div>';
   }
 
-  function valuationScenarioField(prefix, label) {
-    return '<div class="valuation-scenario" data-testid="valuation-scenario-' + prefix + '"><h4>' + text(label) + '</h4>' +
+  function valuationScenarioField(prefix, label, englishLabel) {
+    return '<div class="valuation-scenario valuation-scenario-' + prefix + '" data-testid="valuation-scenario-' + prefix + '">' +
+      '<div class="valuation-scenario-node">' + valuationRailIcon(prefix) + '<span><strong>' + text(label) + '</strong><small>' + text(englishLabel) + '</small></span><em class="valuation-scenario-price" data-testid="valuation-draft-' + prefix + '-value">' + valuationDraftScenarioText(prefix) + '</em><small class="valuation-scenario-price-label">合理價</small></div>' +
+      '<div class="valuation-scenario-fields">' +
       '<label><span>EPS</span><input type="number" step="0.01" inputmode="decimal" value="' + escapeHtml(valuationDraft[prefix + "Eps"]) + '" data-action="valuation-ws-input" data-field="' + prefix + 'Eps" data-testid="valuation-ws-' + prefix + '-eps"></label>' +
       '<label><span>合理本益比</span><input type="number" step="0.1" inputmode="decimal" value="' + escapeHtml(valuationDraft[prefix + "Pe"]) + '" data-action="valuation-ws-input" data-field="' + prefix + 'Pe" data-testid="valuation-ws-' + prefix + '-pe"></label>' +
-      '</div>';
+      '</div></div>';
   }
 
   function valuationRatioField(field, label, testid) {
@@ -1697,17 +1826,25 @@
   }
 
   function valuationRailPercent(value, low, high) {
+    var raw = valuationRailRawPercent(value, low, high);
+    return raw === null ? null : Math.max(0, Math.min(100, raw));
+  }
+
+  function valuationRailRawPercent(value, low, high) {
     if (typeof value !== "number" || !isFinite(value) || typeof low !== "number" || !isFinite(low) || typeof high !== "number" || !isFinite(high) || high <= low) return null;
-    return Math.max(0, Math.min(100, ((value - low) / (high - low)) * 100));
+    return ((value - low) / (high - low)) * 100;
   }
 
   function valuationRailMarkup(values, zone, currentPrice, comparisonTone) {
     var low = values.bear;
     var high = values.bull;
     var basePosition = valuationRailPercent(values.base, low, high);
-    var currentPosition = valuationRailPercent(currentPrice, low, high);
-    var markerPosition = currentPosition === null ? 50 : Math.max(4, Math.min(96, currentPosition));
-    var rangeHint = currentPosition === null ? "" : currentPrice > high ? "（高於 Bull）" : currentPrice < low ? "（低於 Bear）" : "";
+    var currentRawPosition = valuationRailRawPercent(currentPrice, low, high);
+    var currentPosition = currentRawPosition === null ? null : Math.max(0, Math.min(100, currentRawPosition));
+    var isCurrentOutside = currentRawPosition !== null && (currentRawPosition > 100 || currentRawPosition < 0);
+    var markerPosition = currentPosition === null ? 50 : isCurrentOutside ? (currentRawPosition > 100 ? 100 : 0) : Math.max(4, Math.min(96, currentPosition));
+    var rangeHint = !isCurrentOutside ? "" : currentPrice > high ? "高於 Bull" : "低於 Bear";
+    var outsideClass = currentPrice > high ? "valuation-outside-high" : currentPrice < low ? "valuation-outside-low" : "";
     function node(kind, label, value, position, testid, extraClass) {
       var positionStyle = position === null ? "" : ' style="left:' + position.toFixed(2) + '%"';
       return '<div class="valuation-rail-node ' + extraClass + '"' + positionStyle + '><span class="valuation-rail-node-label">' + valuationRailIcon(kind) + '<span>' + text(label) + '</span></span><strong' + (testid ? ' data-testid="' + testid + '"' : '') + '>' + core.formatNumber(value) + '</strong></div>';
@@ -1715,15 +1852,35 @@
     function band(label, value, testid) {
       return '<div class="valuation-rail-band"><span>' + text(label) + '</span><strong' + (testid ? ' data-testid="' + testid + '"' : '') + '>' + core.formatNumber(value) + '</strong></div>';
     }
+    function currentHeader() {
+      if (!isCurrentOutside) return '<span class="valuation-rail-hint">現價落點 · 買進區間</span>';
+      return '<span class="valuation-rail-hint valuation-rail-hint-outside">區間外 · 需查明原因並重估</span>';
+    }
+    function currentMarker() {
+      var markerClass = 'valuation-rail-current-marker ' + comparisonTone + (isCurrentOutside ? ' valuation-outside ' + outsideClass : '');
+      return '<div class="' + markerClass + '" data-testid="valuation-current-marker" style="left:' + markerPosition.toFixed(2) + '%"><span>現價 ' + core.formatNumber(currentPrice) + (rangeHint ? ' · ' + text(rangeHint) : '') + '</span><i aria-hidden="true"></i></div>';
+    }
+    function rangeWarning() {
+      if (!isCurrentOutside) return '';
+      return '<aside class="valuation-range-warning ' + comparisonTone + '" data-testid="valuation-range-warning"><span>區間外</span><div><strong>現價 ' + core.formatNumber(currentPrice) + ' ' + text(rangeHint) + '</strong><small>可能發生新事件／基本面變化，或估值假設與計算方式已不合理；請查明原因後重估 Bear～Bull。</small></div></aside>';
+    }
+    function scaleTick(kind, position) {
+      if (position === null) return '';
+      var tickClass = kind === "bear" ? " valuation-rail-scale-tick-bear" : kind === "bull" ? " valuation-rail-scale-tick-bull" : "";
+      return '<span class="valuation-rail-scale-tick' + tickClass + '" style="left:' + position.toFixed(2) + '%" data-testid="valuation-rail-ruler-tick-' + kind + '" aria-hidden="true"><i></i></span>';
+    }
+    var trackClass = 'valuation-rail-track' + (isCurrentOutside ? ' valuation-rail-track-outside ' + outsideClass : '');
     return '<section class="valuation-rail" data-testid="valuation-rail">' +
-      '<header class="valuation-rail-header"><div><span class="detail-label">估值位置</span><strong>Bear → Bull</strong></div><span class="valuation-rail-hint">現價落點 · 買進區間</span></header>' +
-      '<div class="valuation-rail-track" style="--valuation-current-position:' + markerPosition.toFixed(2) + '%">' +
+      '<header class="valuation-rail-header"><div><span class="detail-label">估值位置 · 數值尺規</span><strong>Bear → Base → Bull</strong></div>' + currentHeader() + '</header>' +
+      '<div class="' + trackClass + '" style="--valuation-current-position:' + markerPosition.toFixed(2) + '%">' +
       '<div class="valuation-rail-line" aria-hidden="true"></div>' +
+      scaleTick("bear", 0) + scaleTick("base", basePosition) + scaleTick("bull", 100) +
       node("bear", "Bear", values.bear, 0, "valuation-bear-value", "valuation-rail-node-bear") +
       node("base", "Base 合理價值", values.base, basePosition, "valuation-base-value", "valuation-rail-node-base") +
       node("bull", "Bull", values.bull, 100, "valuation-bull-value", "valuation-rail-node-bull") +
-      '<div class="valuation-rail-current-marker ' + comparisonTone + '" data-testid="valuation-current-marker"><span>現價 ' + core.formatNumber(currentPrice) + rangeHint + '</span><i aria-hidden="true"></i></div>' +
+      currentMarker() +
       '</div>' +
+      rangeWarning() +
       '<div class="valuation-rail-bands" data-testid="valuation-rail-bands">' +
       band("極端錯價", zone.extreme) + band("甜蜜價", zone.sweet, "valuation-zone-sweet") + band("第二階段", zone.second) + band("第一階段", zone.first, "valuation-zone-first") + band("觀察區", zone.watch) +
       '</div></section>';
@@ -1758,15 +1915,22 @@
     var symbol = instrument && instrument.symbol;
     var issues = core.valuationFormIssues(valuationDraft, { symbol: symbol });
     var evaluateBlocker = valuationEvaluateBlocker();
+    var editingDefinition = valuationEditingWorksheetId ? valuationWorksheetById(valuationEditingWorksheetId) : null;
 
     var worksheetCards = worksheets.length ? worksheets.map(function (definition) {
       var scenarios = definition.scenarios || {};
       var base = scenarios.base || {};
-      return '<article class="valuation-worksheet" data-testid="valuation-worksheet"><div><strong>' + text(definition.label) +
+      var editing = definition.worksheet_id === valuationEditingWorksheetId;
+      return '<article class="valuation-worksheet' + (editing ? ' active' : '') + '" data-testid="valuation-worksheet" data-worksheet-id="' + escapeHtml(definition.worksheet_id) + '"><div><strong>' + text(definition.label) +
         '</strong><small>' + text(definition.target && definition.target.security_id) + ' · Base ' + core.formatNumber(base.eps) + ' × ' + core.formatNumber(base.pe) +
-        ' · ' + text((definition.basis || {}).eps_period) + '</small></div>' +
-        '<button class="icon-button" type="button" data-action="valuation-delete" data-worksheet-id="' + escapeHtml(definition.worksheet_id) + '" aria-label="刪除估值工作表">×</button></article>';
+        ' · ' + text((definition.basis || {}).eps_period) + '</small>' + valuationValueRulerMarkup(valuationScenarioValuesFromDefinition(definition), "valuation-worksheet-ruler") + '</div>' +
+        '<div class="valuation-worksheet-actions"><button class="btn btn-outline btn-sm" type="button" data-action="valuation-edit" data-worksheet-id="' + escapeHtml(definition.worksheet_id) + '" data-testid="valuation-edit">' + (editing ? '編輯中' : '載入編輯') + '</button>' +
+        '<button class="icon-button" type="button" data-action="valuation-delete" data-worksheet-id="' + escapeHtml(definition.worksheet_id) + '" aria-label="刪除估值工作表">×</button></div></article>';
     }).join("") : '<div class="alert-empty" data-testid="valuation-empty">尚未建立估值工作表。</div>';
+    var worksheetListHeader = worksheets.length ? '<div class="valuation-worksheet-list-header"><div><strong>已儲存範本</strong><span>可載入編輯，不必重新輸入 Bear～Bull 假設</span></div><span>' + worksheets.length + ' 個</span></div>' : '';
+    var editingMarkup = editingDefinition
+      ? '<div class="valuation-editing-state" data-testid="valuation-editing-state"><div><span>正在編輯範本</span><strong>' + text(editingDefinition.label) + '</strong></div><button class="btn btn-outline btn-sm" type="button" data-action="valuation-cancel-edit" data-testid="valuation-cancel-edit">取消編輯</button></div>'
+      : '';
 
     var statusMarkup = valuation.status === "error"
       ? '<p class="alert-status error" data-testid="valuation-status">' + text(valuation.message || "估值計算失敗") + '</p>'
@@ -1775,8 +1939,11 @@
     return '<section class="valuation-panel" data-testid="valuation-panel">' +
       '<header class="subsection-heading"><div><h2>Bear／Base／Bull 估值工作表</h2><span class="muted">合理價值 = 預估 EPS × 合理本益比；買進區間 = Base 合理價值 × 自訂比例</span></div><span class="status status-draft">' + text(core.VALUATION_WORKSHEET_SCHEMA) + '</span></header>' +
       '<div class="valuation-form" data-testid="valuation-form">' +
+      editingMarkup +
       '<label class="valuation-field"><span>工作表名稱</span><input type="text" maxlength="120" placeholder="例如：2330 三情境合理價" value="' + escapeHtml(valuationDraft.label) + '" data-action="valuation-ws-input" data-field="label" data-testid="valuation-ws-label"></label>' +
-      '<div class="valuation-scenario-row">' + valuationScenarioField("bear", "Bear 保守") + valuationScenarioField("base", "Base 最合理") + valuationScenarioField("bull", "Bull 樂觀") + '</div>' +
+      '<section class="valuation-scenario-row" data-testid="valuation-scenario-panel">' +
+      '<header class="valuation-scenario-row-header"><div><h4>三情境估值</h4><span>保守 → 最合理 → 樂觀</span></div><span class="valuation-scenario-row-hint">合理價尺規 · EPS × 合理本益比</span></header>' +
+      '<div class="valuation-scenario-inputs">' + valuationScenarioField("bear", "保守", "Bear") + valuationScenarioField("base", "最合理", "Base") + valuationScenarioField("bull", "樂觀", "Bull") + '</div></section>' +
       '<div class="valuation-ratio-row" data-testid="valuation-ratios"><h4>買進區間比例（相對 Base 合理價值）</h4>' +
       valuationRatioField("ratioWatch", "觀察區", "valuation-ratio-watch") +
       valuationRatioField("ratioFirst", "第一階段", "valuation-ratio-first") +
@@ -1784,9 +1951,9 @@
       valuationRatioField("ratioSweet", "甜蜜區", "valuation-ratio-sweet") +
       valuationRatioField("ratioExtreme", "極端錯價", "valuation-ratio-extreme") + '</div>' +
       valuationBasisMarkup() +
-      '<div class="valuation-actions"><button class="btn btn-primary" type="button" data-action="valuation-add" data-testid="valuation-add"' + (issues.length ? " disabled" : "") + '>加入估值工作表</button>' +
+      '<div class="valuation-actions"><button class="btn btn-primary" type="button" data-action="valuation-add" data-testid="valuation-add"' + (issues.length ? " disabled" : "") + '>' + (editingDefinition ? '更新估值範本' : '儲存估值範本') + '</button>' +
       formIssuesMarkup(issues, "valuation-form-issues") + '</div></div>' +
-      '<div class="valuation-worksheet-list" data-testid="valuation-worksheet-list">' + worksheetCards + '</div>' +
+      '<div class="valuation-worksheet-list" data-testid="valuation-worksheet-list">' + worksheetListHeader + worksheetCards + '</div>' +
       '<div class="alert-toolbar"><button class="btn btn-primary btn-sm" type="button" data-action="valuation-evaluate" data-testid="valuation-evaluate"' + (valuationEvaluateInFlight ? " disabled" : "") + '>' + (valuationEvaluateInFlight ? "計算中…" : "計算合理價值與買進區間") + '</button>' +
       (evaluateBlocker ? '<span class="muted" data-testid="valuation-evaluate-hint">' + text(evaluateBlocker) + '</span>' : "") + '</div>' +
       statusMarkup +
@@ -2417,9 +2584,16 @@
     }
     if (action === "alert-evaluate") evaluateAlerts();
     if (action === "alert-clear-events") state = core.reduce(state, { type: "CLEAR_ALERT_EVENTS" });
-    if (action === "valuation-add") addWorksheetFromDraft();
+    if (action === "valuation-add") saveWorksheetFromDraft();
+    if (action === "valuation-edit") editValuationWorksheet(target.getAttribute("data-worksheet-id"));
+    if (action === "valuation-cancel-edit") cancelValuationEdit();
     if (action === "valuation-delete") {
-      state = core.reduce(state, { type: "DELETE_VALUATION_WORKSHEET", worksheetId: target.getAttribute("data-worksheet-id") });
+      var deletedWorksheetId = target.getAttribute("data-worksheet-id");
+      state = core.reduce(state, { type: "DELETE_VALUATION_WORKSHEET", worksheetId: deletedWorksheetId });
+      if (valuationEditingWorksheetId === deletedWorksheetId) {
+        valuationEditingWorksheetId = null;
+        valuationDraft = defaultValuationDraft();
+      }
       persistValuation();
     }
     if (action === "valuation-evaluate") evaluateValuation();
@@ -2519,6 +2693,8 @@
         chartDrawings = [];
         chartDrawingModelKey = null;
         chartTemplateName = "default";
+        valuationEditingWorksheetId = null;
+        valuationDraft = defaultValuationDraft();
       }
     }
     render();
@@ -2640,6 +2816,7 @@
       var valuationAddButton = root.querySelector('[data-testid="valuation-add"]');
       if (valuationAddButton) valuationAddButton.disabled = valuationIssuesNow.length > 0;
       refreshFormIssues("valuation-form-issues", valuationIssuesNow);
+      refreshValuationScenarioPreview();
       return;
     }
     if (target.getAttribute("data-action") === "valuation-indicator-period") {
