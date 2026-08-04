@@ -146,7 +146,7 @@ class DesktopSidecarTests(unittest.TestCase):
                 base = f"http://127.0.0.1:{server.server_address[1]}"
                 body = json.dumps({
                     "scope": "watchlist",
-                    "instrument_ids": ["TWSE:2308", "TWSE:2330"],
+                    "instrument_ids": ["TWSE:2308", "TPEx:5289", "TWSE:2330"],
                     "years": 2,
                 }).encode("utf-8")
                 request = Request(
@@ -159,8 +159,8 @@ class DesktopSidecarTests(unittest.TestCase):
                     "scope": "watchlist",
                     "status": "success",
                     "years": 2,
-                    "requested_count": 2,
-                    "updated_count": 2,
+                    "requested_count": 3,
+                    "updated_count": 3,
                     "bars_downloaded": 20,
                     "results": [],
                 }
@@ -171,7 +171,8 @@ class DesktopSidecarTests(unittest.TestCase):
                 self.assertEqual(status, 200)
                 self.assertFalse(payload["read_only"])
                 self.assertEqual(payload["data"]["scope"], "watchlist")
-                self.assertEqual([item["instrument_id"] for item in updater.call_args.args[1]], ["TWSE:2308", "TWSE:2330"])
+                self.assertEqual([item["instrument_id"] for item in updater.call_args.args[1]], ["TWSE:2308", "TPEx:5289", "TWSE:2330"])
+                self.assertEqual(updater.call_args.args[1][1]["market"], "TPEx")
                 self.assertEqual(updater.call_args.args[2], 2)
             finally:
                 server.shutdown()

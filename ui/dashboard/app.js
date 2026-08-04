@@ -593,8 +593,9 @@
       return instrument.instrument_id === state.selectedKlineInstrumentId;
     });
     if (existing) return existing;
-    var match = /^(TWSE|TPEX):([1-9][0-9]{3})$/i.exec(String(state.selectedKlineInstrumentId || "").trim());
+    var match = /^(TWSE|TPEX):([0-9A-Z]{4,6})$/i.exec(String(state.selectedKlineInstrumentId || "").trim());
     if (!match) return null;
+    if (match[1].toUpperCase() === "TWSE" && !/^[1-9][0-9]{3}$/.test(match[2])) return null;
     var market = match[1].toUpperCase() === "TWSE" ? "TWSE" : "TPEx";
     return {
       instrument_id: market + ":" + match[2],
@@ -727,8 +728,8 @@
     if (message === "unsupported_period") {
       return "這個期間沒有可用的 K 線資料。";
     }
-    if (/^TWSE (returned|response)/i.test(message)) {
-      return "官方 TWSE 資料回應失敗：" + message;
+    if (/^(TWSE|TPEx) (returned|response)/i.test(message)) {
+      return "官方 " + (message.indexOf("TPEx") === 0 ? "TPEx" : "TWSE") + " 資料回應失敗：" + message;
     }
     return "本機資料更新失敗：" + message;
   }
@@ -1615,7 +1616,7 @@
       ? "瀏覽器預覽不下載；請使用桌面版"
       : targetIds.length === 0 ? (isWatchlist ? "請先加入自選標的" : "請先選取個股")
       : update.status === "idle" ? "尚未更新；只下載目前範圍的個股" : (update.message || STATUS_LABELS[update.status] || update.status);
-    return '<section class="data-update-panel" data-testid="data-update-panel"><div class="data-update-heading"><div><span class="eyebrow">官方免費來源 → 本機保存</span><h2>更新台股資料</h2><p>更新範圍：' + text(targetLabel) + '</p></div><span class="data-update-status status-' + escapeHtml(update.status) + '" data-testid="data-update-status">' + text(statusText) + '</span></div><div class="data-update-controls"><label><span>更新範圍</span><select data-action="data-update-scope" data-testid="data-update-scope"><option value="watchlist"' + (isWatchlist ? ' selected' : '') + '>全部自選（' + targetIds.length + ' 檔）</option><option value="selected"' + (isWatchlist ? '' : ' selected') + '>目前個股</option></select></label><label><span>歷史範圍</span><select data-action="data-update-years" data-testid="data-update-years"><option value="1"' + (update.years === 1 ? ' selected' : '') + '>近 1 年</option><option value="2"' + (update.years === 2 ? ' selected' : '') + '>近 2 年</option><option value="3"' + (update.years === 3 ? ' selected' : '') + '>近 3 年</option></select></label><button class="btn btn-primary" type="button" data-action="data-update" data-testid="data-update-button"' + (enabled ? '' : ' disabled') + '>' + (dataUpdateInFlight ? '更新中…' : (isWatchlist ? '下載並更新自選資料' : '下載並更新目前個股')) + '</button></div><small class="data-update-note">目前提供 TWSE 上市個股；只處理目前範圍，不下載全市場。資料保存於本機 raw 與 K 線快照，不是即時行情；瀏覽器預覽僅展示介面。</small>' + dataUpdateResultMarkup(update.results) + '</section>';
+    return '<section class="data-update-panel" data-testid="data-update-panel"><div class="data-update-heading"><div><span class="eyebrow">官方免費來源 → 本機保存</span><h2>更新台股資料</h2><p>更新範圍：' + text(targetLabel) + '</p></div><span class="data-update-status status-' + escapeHtml(update.status) + '" data-testid="data-update-status">' + text(statusText) + '</span></div><div class="data-update-controls"><label><span>更新範圍</span><select data-action="data-update-scope" data-testid="data-update-scope"><option value="watchlist"' + (isWatchlist ? ' selected' : '') + '>全部自選（' + targetIds.length + ' 檔）</option><option value="selected"' + (isWatchlist ? '' : ' selected') + '>目前個股</option></select></label><label><span>歷史範圍</span><select data-action="data-update-years" data-testid="data-update-years"><option value="1"' + (update.years === 1 ? ' selected' : '') + '>近 1 年</option><option value="2"' + (update.years === 2 ? ' selected' : '') + '>近 2 年</option><option value="3"' + (update.years === 3 ? ' selected' : '') + '>近 3 年</option></select></label><button class="btn btn-primary" type="button" data-action="data-update" data-testid="data-update-button"' + (enabled ? '' : ' disabled') + '>' + (dataUpdateInFlight ? '更新中…' : (isWatchlist ? '下載並更新自選資料' : '下載並更新目前個股')) + '</button></div><small class="data-update-note">目前提供 TWSE 上市與 TPEx 上櫃個股；只處理目前範圍，不下載全市場。資料保存於本機 raw 與 K 線快照，不是即時行情；瀏覽器預覽僅展示介面。</small>' + dataUpdateResultMarkup(update.results) + '</section>';
   }
 
   function fundamentalsUpdateMarkup() {

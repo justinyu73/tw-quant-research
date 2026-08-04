@@ -346,7 +346,7 @@
       // first local K-line snapshot exists. Keep it selectable so the bounded
       // data-update command can classify/fetch it; missing bars are a data gap,
       // not a navigation jump.
-      var updateableTaiwanEquity = /^(TWSE|TPEX):[1-9][0-9]{3}$/.test(String(event.instrumentId || "").trim().toUpperCase());
+      var updateableTaiwanEquity = /^(TWSE):[1-9][0-9]{3}$|^(TPEX):[0-9A-Z]{4,6}$/.test(String(event.instrumentId || "").trim().toUpperCase());
       if (instrumentPeriods.length || updateableTaiwanEquity) {
         var periodExists = instrumentPeriods.indexOf(current.selectedKlinePeriod) >= 0;
         return Object.assign({}, current, {

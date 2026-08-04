@@ -71,6 +71,12 @@ The mapping is explicit and provider-specific:
 | TWSE/TPEx revenue | `營業收入-當月營收` | revenue value | only after source unit is admitted |
 | TWSE/TPEx revenue | `出表日期` | publication-date candidate | date-only value is not an `available_at` timestamp |
 
+The explicit TPEx history capture uses the official date-scoped `dailyQuotes`
+response. Its `Code`, `Open`, `High`, `Low`, `Close`, and `Trading Shares`
+fields map to the same canonical fields above; the request date supplies the
+trading-date envelope. The existing `tpex_daily_close` OpenAPI adapter remains
+a separate latest-snapshot probe and is not used to backfill history.
+
 ## Formula contract
 
 Formula version: `s4-v1`.

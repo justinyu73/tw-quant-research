@@ -17,14 +17,14 @@ const EXPECTED_SCREENSHOTS = {
   home: "d12325a029de0038d22c0152efde557c5ace47561b757bd825d615d73bc4f407",
   company: "7847ca4f45738c0d4c92c042688aa1ec0fd9ea9907995bfd122a1764e94731ac",
   technical: "4f810a213fef4a463b3c47e63bb2ed1519ca859882f26b7ae071079b6927db82",
-  watchlist: "7cf72fedc000235afa71ba5fbfca0d942a2362f1755cc89350e3d8f971985c50",
+  watchlist: "acb11ea116dd9cfbebadd3174dc83e712e9683fdad64b722d3aca6c047b3b487",
   buyplan: "7aac161b9905ff5188409ca153e411668c00f60e12d7bd1549d9d2d4788a5c08",
   review: "abab9cb0446cb5a839252dd8cb7bd241c59e9cb97c63f5de3985a1867e0b99ce",
   valuation: "918dadc022a43f7321bdb28614e88404c7d686cd55a27041be05dc070eaf60de",
   // Dark is the primary appearance and carries its own baselines; an empty
   // value here keeps the gate red until a human has looked at the capture.
   home_dark: "e674d860fbcefd6827a7fa5c571c8f44b41172147094c7bf4bb38631e152c6ba",
-  watchlist_dark: "56ab00a9679568ba689392f22695e728e46bc4ea84f8bb33fdf9e6448394ec31",
+  watchlist_dark: "758dfe8de04e99ccbc0b1c9d0a851cff7ab7ea26996f2be8ed11ee7cdc83aae7",
   company_dark: "81f11e4c4bff197d1dbab72cc89b986acf09d0c96f0825358cefddd7aefbd640",
   technical_dark: "3a5289fb47fb132fe9212dc6db741f40c7d5f2babeb59f250b17dd3f6310c105",
   valuation_dark: "44ae0155faaec56973229d16468a67295f282ac4c1e220f5e7db694e56ad2927",

@@ -100,6 +100,25 @@ period and honest `n / 8` or `n / 12` coverage. Missing company rows remain
 `unavailable`; the app never estimates from price, pads a series, carries a
 period forward, or runs this action in the background.
 
+### Explicit price-history update
+
+Decision: `TQR-KLINE-UPDATE-001`
+Status: `active`
+
+The desktop app's `更新台股資料` action is a separate, human-triggered local
+capture for the explicit `目前個股` or `全部自選` scope. It accepts one, two, or
+three trailing years and supports TWSE listed and TPEx listed-on-the-board
+equities. It never discovers the market universe, runs in the background, or
+turns a missing provider row into an estimated bar.
+
+TWSE history uses the selected-symbol monthly source. TPEx history uses the
+official date-scoped daily quote source, requests only weekdays in the bounded
+window, and filters the full-market response to the explicitly selected
+symbols before writing local raw captures and K6a snapshots. TPEx `Trading
+Shares` is the canonical share-count volume; transaction units and transaction
+amount are not substitutes. A no-row date remains an explicit no-data session,
+while a malformed or mismatched response is an update error.
+
 ## Valuation contract
 
 Decision: `TQR-VALUATION-003`

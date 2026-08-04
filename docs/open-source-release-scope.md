@@ -9,9 +9,10 @@ and the human platform launch checks to pass.
 The public product is a local research application with a Tauri desktop shell,
 a Python sidecar, bundled local fixtures, a read-only loopback catalog, and a
 local watchlist file. The desktop sidecar also exposes one explicit user action:
-download the explicit watchlist scope, or one selected TWSE listed equity, for
-1, 2, or 3 trailing years into the user application-data directory. It also
-offers a separate explicit fundamentals capture for the selected equity scope;
+download the explicit watchlist scope, or one selected TWSE listed or TPEx
+listed-on-the-board equity, for 1, 2, or 3 trailing years into the user
+application-data directory. It also offers a separate explicit fundamentals
+capture for the selected equity scope;
 that action records only the latest admitted source periods and never runs in
 the background. The app does not provide live quotes, broker access, order
 placement, automatic execution, credentials, or background provider refresh.

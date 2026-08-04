@@ -109,6 +109,8 @@ assert.equal(pickerState.activeSection, "watchlist");
 pickerState = core.reduce(pickerState, { type: "SELECT_KLINE_INSTRUMENT", instrumentId: "TPEx:5289" });
 assert.equal(pickerState.activeSection, "watchlist");
 assert.equal(pickerState.selectedKlineInstrumentId, "TPEx:5289");
+pickerState = core.reduce(pickerState, { type: "SELECT_KLINE_INSTRUMENT", instrumentId: "TPEx:006201" });
+assert.equal(pickerState.selectedKlineInstrumentId, "TPEx:006201");
 pickerState = core.reduce(pickerState, { type: "SELECT_SECTION", section: "home" });
 pickerState = core.reduce(pickerState, { type: "SELECT_KLINE_INSTRUMENT", instrumentId: "TWSE:2330" });
 assert.equal(pickerState.activeSection, "company");
