@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -22,7 +23,13 @@ from release_hardening import REQUIRED_EVIDENCE, audit_forbidden_files, file_dig
 
 EVIDENCE_PATH = ROOT / "workflow/evidence/s9-release-hardening.acceptance.json"
 S8_PATH = ROOT / "tests/fixtures/s8/product-view.json"
-QLIB_PYTHON = Path("/tmp/tw-quant-engine-s1-venv/bin/python")
+QLIB_PYTHON = Path(
+    os.environ.get(
+        "TQR_QLIB_PYTHON",
+        "/tmp/tqr-qlib-0.9.7-replay/bin/python",
+    )
+)
+QLIB_LOCK_PATH = ROOT / "workflow/qlib-replay-python312.lock"
 
 
 def run_command(argv: Sequence[str], *, timeout: int) -> dict[str, Any]:
@@ -34,6 +41,39 @@ def file_digest_from_text(value: str) -> str:
     import hashlib
 
     return f"sha256:{hashlib.sha256(value.encode('utf-8')).hexdigest()}"
+
+
+def qlib_replay_environment() -> dict[str, Any]:
+    """Inspect the fixed interpreter without installing or contacting a provider."""
+    if not QLIB_PYTHON.is_file():
+        return {
+            "path": str(QLIB_PYTHON),
+            "status": "fail",
+            "reason": "required local Qlib replay environment is missing",
+        }
+    python_version = run_command([str(QLIB_PYTHON), "-VV"], timeout=60)
+    pip_check = run_command([str(QLIB_PYTHON), "-m", "pip", "check"], timeout=60)
+    pip_freeze = run_command(
+        [str(QLIB_PYTHON), "-m", "pip", "freeze", "--all"], timeout=60
+    )
+    lock_exists = QLIB_LOCK_PATH.is_file()
+    lock_digest = file_digest(QLIB_LOCK_PATH) if lock_exists else None
+    pip_freeze_matches_lock = lock_exists and pip_freeze["stdout_digest"] == lock_digest
+    status = "pass" if all(
+        command["exit_code"] == 0
+        for command in (python_version, pip_check, pip_freeze)
+    ) and pip_freeze_matches_lock else "fail"
+    return {
+        "path": str(QLIB_PYTHON),
+        "lock_path": str(QLIB_LOCK_PATH.relative_to(ROOT)),
+        "lock_digest": lock_digest,
+        "pip_freeze_matches_lock": pip_freeze_matches_lock,
+        "required_package": "pyqlib==0.9.7",
+        "status": status,
+        "python_version": python_version,
+        "pip_check": pip_check,
+        "pip_freeze": pip_freeze,
+    }
 
 
 def main() -> int:
@@ -60,11 +100,27 @@ def main() -> int:
 
     default_tests = run_command([sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-v"], timeout=240)
     if QLIB_PYTHON.is_file():
+        qlib_environment = qlib_replay_environment()
         qlib_version = run_command([str(QLIB_PYTHON), "-c", "import qlib; print(qlib.__version__)"], timeout=60)
         qlib_tests = run_command([str(QLIB_PYTHON), "-B", "-m", "unittest", "discover", "-s", "tests", "-v"], timeout=240)
-        qlib_matrix = {"available": True, "version": qlib_version, "tests": qlib_tests, "status": "pass" if qlib_version["exit_code"] == 0 and qlib_tests["exit_code"] == 0 else "fail"}
+        qlib_matrix = {
+            "available": True,
+            "environment": qlib_environment,
+            "version": qlib_version,
+            "tests": qlib_tests,
+            "status": "pass"
+            if qlib_environment["status"] == "pass"
+            and qlib_version["exit_code"] == 0
+            and qlib_tests["exit_code"] == 0
+            else "fail",
+        }
     else:
-        qlib_matrix = {"available": False, "status": "fail", "reason": "required local Qlib replay environment is missing"}
+        qlib_matrix = {
+            "available": False,
+            "status": "fail",
+            "reason": "required local Qlib replay environment is missing",
+            "environment": qlib_replay_environment(),
+        }
     preflight = run_command([sys.executable, "scripts/lh_preflight.py"], timeout=60)
     preflight_output = subprocess.run([sys.executable, "scripts/lh_preflight.py"], cwd=ROOT, text=True, capture_output=True, timeout=60, check=False)
     try:
@@ -73,7 +129,8 @@ def main() -> int:
         preflight_json = {"status": "fail", "parse": "fail"}
 
     documentation_checks = {
-        "readme_current_state": "S1–S8 已依批准包完成" in (ROOT / "README.md").read_text(encoding="utf-8"),
+        "readme_current_state": "S1–S9 release hardening 已由 evidence 驗證" in (ROOT / "README.md").read_text(encoding="utf-8"),
+        "readme_tpex_history_scope": "TWSE／TPEx" in (ROOT / "README.md").read_text(encoding="utf-8"),
         "workflow_sequential_gate": "status: pass" in (ROOT / "workflow/README.md").read_text(encoding="utf-8"),
         "s9_cannot_claim": "不啟用 live trading" in (ROOT / "README.md").read_text(encoding="utf-8"),
         "manifest_research_only": json.loads((ROOT / "workflow/engine-manifest.json").read_text(encoding="utf-8")).get("mode") == "research-only",
@@ -109,7 +166,7 @@ def main() -> int:
         "hardening_checks": hardening_checks,
         "documentation_checks": documentation_checks,
         "offline_verification": {"default_tests": default_tests, "qlib_matrix": qlib_matrix, "preflight": {**preflight, "parsed": preflight_json}},
-        "changed_files": ["README.md", "workflow/README.md", "scripts/release_hardening.py", "docs/s9-release-hardening.md", "tests/test_s9_release_hardening.py", "workflow/lh-work-unit.s9.example.json", "scripts/run_s9_acceptance.py", "workflow/evidence/s9-release-hardening.acceptance.json"],
+        "changed_files": ["README.md", "workflow/README.md", "scripts/release_hardening.py", "docs/s9-release-hardening.md", "tests/test_s9_release_hardening.py", "workflow/lh-work-unit.s9.example.json", "scripts/run_s9_acceptance.py", "workflow/qlib-replay-python312.lock", "docs/s1-qlib-integration.md", "docs/desktop-release.md", "workflow/evidence/s9-release-hardening.acceptance.json"],
         "acceptance_notes": [
             "S9 verifies S1-S8 evidence and reproducibility; it adds no product or trading scope.",
             "Normalized evidence digests exclude only captured_at and subprocess output digest fields documented in docs/s9-release-hardening.md.",

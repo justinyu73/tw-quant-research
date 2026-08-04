@@ -12,7 +12,10 @@ remaining research-only chain sequentially with `network=false`; each stage
 must generate `status: pass` evidence before the next stage may start:
 
 ```sh
-python3 scripts/run_qlib_spike.py
+PYTHONNOUSERSITE=1 PYTHONPATH=src \
+  /tmp/tqr-qlib-0.9.7-replay/bin/python scripts/run_qlib_spike.py
+TQR_QLIB_PYTHON=/tmp/tqr-qlib-0.9.7-replay/bin/python \
+  python3 scripts/run_s9_acceptance.py
 ```
 
 The normal repository preflight remains:

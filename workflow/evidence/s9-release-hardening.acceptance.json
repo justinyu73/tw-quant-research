@@ -4,7 +4,7 @@
   "package_id": "tw-quant-engine-s5-s9-research-product-chain-001",
   "status": "pass",
   "capture_method": "offline evidence-chain audit, fixture replay, dependency matrices, and subprocess verification",
-  "captured_at": "2026-08-04T08:43:26Z",
+  "captured_at": "2026-08-04T22:37:44Z",
   "approval": {
     "approved": true,
     "approved_by": "user",
@@ -20,42 +20,42 @@
   },
   "evidence_chain": {
     "S1": {
-      "path": "/home/jy/worktrees/tw-quant-research/codex-watchlist-integrate-20260803-a7k2/workflow/evidence/s1-qlib-spike.acceptance.json",
+      "path": "/home/jy/worktrees/tw-quant-research/codex-release-blockers-20260805-c3d4/workflow/evidence/s1-qlib-spike.acceptance.json",
       "stage_id": "S1",
       "status": "pass",
       "errors": [],
       "normalized_digest": "sha256:4c42e864dad8e05dce5893179b675346d6b316316a05fb978a6a6494df7aed4f"
     },
     "S2": {
-      "path": "/home/jy/worktrees/tw-quant-research/codex-watchlist-integrate-20260803-a7k2/workflow/evidence/s2-data-contract.acceptance.json",
+      "path": "/home/jy/worktrees/tw-quant-research/codex-release-blockers-20260805-c3d4/workflow/evidence/s2-data-contract.acceptance.json",
       "stage_id": "S2",
       "status": "pass",
       "errors": [],
       "normalized_digest": "sha256:dd4c8a476ed2743eadbbd1cb096f5b85cf3846017c736dab4f194d9794a5ccd4"
     },
     "S3": {
-      "path": "/home/jy/worktrees/tw-quant-research/codex-watchlist-integrate-20260803-a7k2/workflow/evidence/s3-public-data.acceptance.json",
+      "path": "/home/jy/worktrees/tw-quant-research/codex-release-blockers-20260805-c3d4/workflow/evidence/s3-public-data.acceptance.json",
       "stage_id": "S3",
       "status": "pass",
       "errors": [],
       "normalized_digest": "sha256:6d9674a1be144d917f31943e72713fe1c581dcf11af99085fc9248d2d6df5b3c"
     },
     "S4": {
-      "path": "/home/jy/worktrees/tw-quant-research/codex-watchlist-integrate-20260803-a7k2/workflow/evidence/s4-ingestion-product-alignment.acceptance.json",
+      "path": "/home/jy/worktrees/tw-quant-research/codex-release-blockers-20260805-c3d4/workflow/evidence/s4-ingestion-product-alignment.acceptance.json",
       "stage_id": "S4",
       "status": "pass",
       "errors": [],
       "normalized_digest": "sha256:b646e366c0400a01dd6fdabb19adcac0039b1dda9a1d7cd2fbf92d63f449f682"
     },
     "S5": {
-      "path": "/home/jy/worktrees/tw-quant-research/codex-watchlist-integrate-20260803-a7k2/workflow/evidence/s5-quality-corporate-actions.acceptance.json",
+      "path": "/home/jy/worktrees/tw-quant-research/codex-release-blockers-20260805-c3d4/workflow/evidence/s5-quality-corporate-actions.acceptance.json",
       "stage_id": "S5",
       "status": "pass",
       "errors": [],
       "normalized_digest": "sha256:6dd3d261b13f5678055fc2aa35eee700180ab828c8e7b2cfe2680217fac4eab2"
     },
     "S8": {
-      "path": "/home/jy/worktrees/tw-quant-research/codex-watchlist-integrate-20260803-a7k2/workflow/evidence/s8-read-only-product-view.acceptance.json",
+      "path": "/home/jy/worktrees/tw-quant-research/codex-release-blockers-20260805-c3d4/workflow/evidence/s8-read-only-product-view.acceptance.json",
       "stage_id": "S8",
       "status": "pass",
       "errors": [],
@@ -81,6 +81,7 @@
       "tests/fixtures/s4/synthetic-mapping.json": "sha256:a12f6505ac449c8eb0cac369a6de28d1f4a5c51b5af3e09fe36d57b25a0c0163",
       "tests/fixtures/s5/corporate-actions.json": "sha256:33be0287d129183a908386dd9afd6844ed93fb52829982e96a5cceb942c44e54",
       "tests/fixtures/s8/product-view.json": "sha256:ab0a3508d25d6d09a38b90046446a5c7ff923bef399abd99b731960a996dbdc8",
+      "tests/fixtures/tpex/daily_quotes.sample.json": "sha256:0f2e49e50f56e7571fac8f841b7e95da7c898a43e38ace5297a60cdbec2d9eb1",
       "tests/fixtures/tqr-fundamentals/replay.json": "sha256:2cc1023e5010ef3724b84b6b3be7d5e3cce3cc07d2b7abac61d7b1a501e19856",
       "tests/fixtures/tqr-fundamentals/series.fixture.json": "sha256:ff28f6115dcc58e0e2a0bef9f2537b2a6e3d3566a56687fe15be769f84393b94",
       "tests/fixtures/tqr-fundamentals/tpex_balance_sheet.sample.json": "sha256:dc0f1885c8170fa73401f03944576c96d18a692fc2abcde53ae8c3fe65372967",
@@ -115,6 +116,7 @@
   },
   "documentation_checks": {
     "readme_current_state": true,
+    "readme_tpex_history_scope": true,
     "workflow_sequential_gate": true,
     "s9_cannot_claim": true,
     "manifest_research_only": true
@@ -133,13 +135,53 @@
       ],
       "exit_code": 0,
       "stdout_digest": "sha256:427d590410dc2c1d930682af9a7252eb5030fe5f236bdca06388c34492858acb",
-      "stderr_digest": "sha256:b35e683ee2d02227204a876847aad8167af964658e11fa5f8fcd57c89f2d2920"
+      "stderr_digest": "sha256:b465600dc7bdeeaa4f795b789c5d9725603ed717feee8aeba8f3de52888115a1"
     },
     "qlib_matrix": {
       "available": true,
+      "environment": {
+        "path": "/tmp/tqr-qlib-0.9.7-replay/bin/python",
+        "lock_path": "workflow/qlib-replay-python312.lock",
+        "lock_digest": "sha256:3cfe4dc8ae5d38f6753eaf7b5f1c30f2f8c065b95f90390fcd468e918c97686d",
+        "pip_freeze_matches_lock": true,
+        "required_package": "pyqlib==0.9.7",
+        "status": "pass",
+        "python_version": {
+          "argv": [
+            "/tmp/tqr-qlib-0.9.7-replay/bin/python",
+            "-VV"
+          ],
+          "exit_code": 0,
+          "stdout_digest": "sha256:2e68a04ce911f21ed2dfba51575202b5e56425c20b8db84cac0f47119254975b",
+          "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "pip_check": {
+          "argv": [
+            "/tmp/tqr-qlib-0.9.7-replay/bin/python",
+            "-m",
+            "pip",
+            "check"
+          ],
+          "exit_code": 0,
+          "stdout_digest": "sha256:9261363b733079a641c2e4cc9bc46ffa1d8336945a87f807b6cf68847dbc9b09",
+          "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "pip_freeze": {
+          "argv": [
+            "/tmp/tqr-qlib-0.9.7-replay/bin/python",
+            "-m",
+            "pip",
+            "freeze",
+            "--all"
+          ],
+          "exit_code": 0,
+          "stdout_digest": "sha256:3cfe4dc8ae5d38f6753eaf7b5f1c30f2f8c065b95f90390fcd468e918c97686d",
+          "stderr_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
       "version": {
         "argv": [
-          "/tmp/tw-quant-engine-s1-venv/bin/python",
+          "/tmp/tqr-qlib-0.9.7-replay/bin/python",
           "-c",
           "import qlib; print(qlib.__version__)"
         ],
@@ -149,7 +191,7 @@
       },
       "tests": {
         "argv": [
-          "/tmp/tw-quant-engine-s1-venv/bin/python",
+          "/tmp/tqr-qlib-0.9.7-replay/bin/python",
           "-B",
           "-m",
           "unittest",
@@ -160,7 +202,7 @@
         ],
         "exit_code": 0,
         "stdout_digest": "sha256:427d590410dc2c1d930682af9a7252eb5030fe5f236bdca06388c34492858acb",
-        "stderr_digest": "sha256:cf68d5ddfea4670a550d4ea59295ed998375f8492223414b03ec598fe078adbc"
+        "stderr_digest": "sha256:df59ad456ed3341d7b1abb01a47dff1b10dd5d4cd1da1e4feb1a9f8a3d48bc62"
       },
       "status": "pass"
     },
@@ -191,6 +233,9 @@
     "tests/test_s9_release_hardening.py",
     "workflow/lh-work-unit.s9.example.json",
     "scripts/run_s9_acceptance.py",
+    "workflow/qlib-replay-python312.lock",
+    "docs/s1-qlib-integration.md",
+    "docs/desktop-release.md",
     "workflow/evidence/s9-release-hardening.acceptance.json"
   ],
   "acceptance_notes": [

@@ -6,14 +6,14 @@
 本專案先建立免費官方／公開資料抓取、原始與標準化資料本地保存、財報與
 公司故事追蹤，以及由人為啟動的可追溯評估計算。Dashboard 是唯讀研究
 介面，不是即時看盤、交易或自動量化執行終端；資料不足時明確顯示不可用。
-既有回測與指標程式僅作為人為選定資料後的研究元件，不代表自動策略服務。
+既有估值與指標程式僅作為人為選定資料後的研究元件，不代表自動策略服務。
 
 完整邊界見 [`docs/tqe-product-boundary.md`](docs/tqe-product-boundary.md)。
 
 桌面版可在人為加入自選後，按「更新台股資料」選擇「全部自選」或「目前
-個股」，再選近 1、2 或 3 年；系統只從免費官方 TWSE 來源下載指定標的，
-將 raw 回應與標準化 K 線保存到本機應用程式資料目錄。這不是即時更新、
-全市場下載或 TPEx 更新；瀏覽器預覽不會下載資料。公司財務指標另有
+個股」，再選近 1、2 或 3 年；系統只從免費官方 TWSE／TPEx 來源下載指定
+標的，將 raw 回應與標準化 K 線保存到本機應用程式資料目錄。這不是即時
+更新或全市場下載；瀏覽器預覽不會下載資料。公司財務指標另有
 「更新財務指標」按鈕，只有使用者明確按下才會擷取目前個股或全部自選的
 最新官方期別，並依 `TQR-FUNDAMENTALS-UPDATE-001` 保存到本機；它不會把一
 年 K 線下載誤當成一年的財報歷史。
@@ -83,13 +83,14 @@ LH 不保存本 repo 的檔案，也不取得產品接受或自動推進權限�
 
 ## 目前階段
 
-目前 S1–S8 已依批准包完成並留下可讀 evidence，S9 release hardening 正在
-進行；整體仍維持 research-only：
+目前 S1–S9 release hardening 已由 evidence 驗證；整體仍維持
+research-only：
 
 1. Qlib 作為可替換研究引擎，版本固定為 `pyqlib==0.9.7`。
 2. S1 只使用合成資料驗證 Qlib evaluation API；Qlib 不擁有台股資料契約。
 3. S2–S4 的公開來源只以已批准、可追溯的資料邊界接入；S5–S8 使用
-   offline fixture，`network=false`。
+   offline fixture，`network=false`；Qlib replay 使用固定 Python 3.12
+   environment 與 `pyqlib==0.9.7`。
 4. S9 只做離線 release hardening；不啟用 live trading、下單、部署或
    自動 promotion。
 
@@ -97,8 +98,8 @@ LH 不保存本 repo 的檔案，也不取得產品接受或自動推進權限�
 抓取 TWSE／TPEx EOD、交易日曆、財報或事件資料，保存 bounded raw/normalized
 fixture，讓人為進行財報、估值與故事追蹤評估。付費訂閱、即時 feed、下單與
 自動策略執行不在此階段；目前已落地的資料更新只允許人為按下按鈕後，
-對自選清單或目前選取的 TWSE 上市個股抓取近 1～3 年，並保留 `as_of`、
-provenance 與來源 digest。TPEx、全市場與背景自動抓取仍未啟用。
+對自選清單或目前選取的 TWSE／TPEx 上市個股抓取近 1～3 年，並保留
+`as_of`、provenance 與來源 digest。全市場與背景自動抓取仍未啟用。
 
 ## 本地預檢
 
