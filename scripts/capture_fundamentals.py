@@ -38,15 +38,9 @@ from tw_quant_engine.fundamentals import (  # noqa: E402
     merge_observations,
     normalize_rows,
 )
+from tw_quant_engine.fundamentals_update import FUNDAMENTALS_ENDPOINTS  # noqa: E402
 
-ENDPOINTS = {
-    (TWSE, MONTHLY_REVENUE): "https://openapi.twse.com.tw/v1/opendata/t187ap05_L",
-    (TWSE, INCOME_STATEMENT): "https://openapi.twse.com.tw/v1/opendata/t187ap06_L_ci",
-    (TWSE, BALANCE_SHEET): "https://openapi.twse.com.tw/v1/opendata/t187ap07_L_ci",
-    (TPEX, MONTHLY_REVENUE): "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap05_O",
-    (TPEX, INCOME_STATEMENT): "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap06_O_ci",
-    (TPEX, BALANCE_SHEET): "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap07_O_ci",
-}
+ENDPOINTS = FUNDAMENTALS_ENDPOINTS
 USER_AGENT = "tqr-fundamentals-capture"
 TIMEOUT = 60
 DEFAULT_SERIES = Path.home() / ".local/share/io.github.justinyu73.twquantengine/fundamentals-series.json"

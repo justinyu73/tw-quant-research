@@ -43,9 +43,12 @@ cannot be produced from these sources in one fetch. Two admissible paths:
 2. **A separately admitted historical source** — not yet found among free
    official endpoints; would need its own contract.
 
-Until one is chosen, the Trend Table must keep rendering its explicit
-`unavailable` empty state, and must show a partial series honestly (n of 8
-quarters) rather than padding.
+The product chooses path 1 through the separate, explicit
+`TQR-FUNDAMENTALS-UPDATE-001` action: the desktop app or the human-run capture
+script may capture the latest snapshot and append it locally. A separate
+historical source remains unadmitted. The Trend Table must show a partial
+series honestly (n of 8 quarters) rather than padding, and remains `unavailable`
+until a matching local observation exists.
 
 ## Finding 2 — 出表日期 is a batch export date, not a filing date
 
@@ -131,9 +134,10 @@ keeps the `forward_eps` prohibition intact.
 
 ## What this contract does not authorize
 
-Enabling any `unavailable` field in the UI; background or scheduled fetching;
-treating 出表日期 as a company publication time; estimating a missing period from
-price or from an adjacent period.
+Treating an `unavailable` field as available without a matching local
+observation; background or scheduled fetching; treating 出表日期 as a company
+publication time; estimating a missing period from price or from an adjacent
+period.
 
 ## Reproduce
 
@@ -142,11 +146,13 @@ python3 scripts/probe_fundamentals_sources.py --write-samples
 ```
 
 Writes `workflow/tqr-fundamentals-source-contract.json` and one bounded sample
-row per source under `tests/fixtures/tqr-fundamentals/`. This is the only code
-path in the repo that contacts these endpoints; the sidecar and dashboard never
-do.
+row per source under `tests/fixtures/tqr-fundamentals/`. The source probe CLI,
+human capture CLI, and desktop's explicit `POST /fundamentals/update` action
+are the only code paths that contact these endpoints; none runs in the
+background. The sidecar route shares the endpoint map and bounded fetch
+implementation in `src/tw_quant_engine/fundamentals_update.py`.
 
-## Implementation status (2026-07-31)
+## Implementation status (source measured 2026-07-31; desktop update 2026-08-04)
 
 Both exchanges are mapped and both are now proven by live capture.
 
@@ -156,6 +162,7 @@ Both exchanges are mapped and both are now proven by live capture.
 | Families implemented | monthly_revenue, income_statement, balance_sheet |
 | Markets implemented | TWSE (live-proven), TPEx (live-proven) |
 | Human-run capture | `scripts/capture_fundamentals.py` (`--market`, `--family`) |
+| Desktop explicit capture | `POST /fundamentals/update` via `src/tw_quant_engine/fundamentals_update.py` |
 | Read model route | `GET /fundamentals?security_id=` |
 | Offline tests | `tests/test_tqr_fundamentals.py` (28 cases) |
 

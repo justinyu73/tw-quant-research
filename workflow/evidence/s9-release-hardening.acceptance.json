@@ -4,7 +4,7 @@
   "package_id": "tw-quant-engine-s5-s9-research-product-chain-001",
   "status": "pass",
   "capture_method": "offline evidence-chain audit, fixture replay, dependency matrices, and subprocess verification",
-  "captured_at": "2026-08-04T07:32:33Z",
+  "captured_at": "2026-08-04T08:43:26Z",
   "approval": {
     "approved": true,
     "approved_by": "user",
@@ -133,7 +133,7 @@
       ],
       "exit_code": 0,
       "stdout_digest": "sha256:427d590410dc2c1d930682af9a7252eb5030fe5f236bdca06388c34492858acb",
-      "stderr_digest": "sha256:0d42f9855aee63653904024dca4436a6bc84c0a0bf3491b71984853c2caf0b16"
+      "stderr_digest": "sha256:b35e683ee2d02227204a876847aad8167af964658e11fa5f8fcd57c89f2d2920"
     },
     "qlib_matrix": {
       "available": true,
@@ -160,7 +160,7 @@
         ],
         "exit_code": 0,
         "stdout_digest": "sha256:427d590410dc2c1d930682af9a7252eb5030fe5f236bdca06388c34492858acb",
-        "stderr_digest": "sha256:d72b04939b5c3ac20788f72bd51d11c54b00104e40545cdeab4daae7b86c36ef"
+        "stderr_digest": "sha256:cf68d5ddfea4670a550d4ea59295ed998375f8492223414b03ec598fe078adbc"
       },
       "status": "pass"
     },

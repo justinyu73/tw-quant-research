@@ -68,6 +68,12 @@
         message: "",
         results: []
       },
+      fundamentalsUpdate: {
+        scope: "watchlist",
+        status: "idle",
+        message: "",
+        results: []
+      },
       screenSpec: {
         schema: "tw-quant-engine-screen-spec/v1",
         universe: "s8.product_rows",
@@ -599,6 +605,18 @@
     }
     if (event.type === "DATA_UPDATE_ERROR") {
       return Object.assign({}, current, { dataUpdate: Object.assign({}, current.dataUpdate, { status: "error", message: event.message || "本機資料更新失敗", results: [] }) });
+    }
+    if (event.type === "SET_FUNDAMENTALS_UPDATE_SCOPE" && ["watchlist", "selected"].indexOf(event.scope) >= 0) {
+      return Object.assign({}, current, { fundamentalsUpdate: Object.assign({}, current.fundamentalsUpdate, { scope: event.scope }) });
+    }
+    if (event.type === "FUNDAMENTALS_UPDATE_START") {
+      return Object.assign({}, current, { fundamentalsUpdate: Object.assign({}, current.fundamentalsUpdate, { status: "loading", message: "正在擷取並驗證最新財務資料…" }) });
+    }
+    if (event.type === "FUNDAMENTALS_UPDATE_SUCCESS") {
+      return Object.assign({}, current, { fundamentalsUpdate: Object.assign({}, current.fundamentalsUpdate, { status: event.status || "success", message: event.message || "財務指標已更新", results: Array.isArray(event.results) ? clone(event.results) : [] }) });
+    }
+    if (event.type === "FUNDAMENTALS_UPDATE_ERROR") {
+      return Object.assign({}, current, { fundamentalsUpdate: Object.assign({}, current.fundamentalsUpdate, { status: "error", message: event.message || "財務指標更新失敗", results: [] }) });
     }
     if (event.type === "SET_SCREEN_SPEC" && ["quality", "market", "max_rows"].indexOf(event.field) >= 0) {
       var nextSpec = Object.assign({}, current.screenSpec);

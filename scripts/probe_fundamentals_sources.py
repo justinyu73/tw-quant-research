@@ -64,7 +64,11 @@ PERIOD_KEYS = ["資料年月", "年度", "季別", "Year", "Season"]
 # re-probe reproduces it instead of silently reverting the committed record.
 IMPLEMENTATION = {
     "normalization": "src/tw_quant_engine/fundamentals.py",
-    "capture": "scripts/capture_fundamentals.py",
+    "capture": [
+        "scripts/capture_fundamentals.py",
+        "src/tw_quant_engine/fundamentals_update.py",
+        "POST /fundamentals/update",
+    ],
     "markets": {"TWSE": "live_proven", "TPEx": "live_proven"},
     "families": ["monthly_revenue", "income_statement", "balance_sheet"],
     "column_mapping_is_per_family": True,

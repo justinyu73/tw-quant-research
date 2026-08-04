@@ -17,14 +17,14 @@ const EXPECTED_SCREENSHOTS = {
   home: "d12325a029de0038d22c0152efde557c5ace47561b757bd825d615d73bc4f407",
   company: "7847ca4f45738c0d4c92c042688aa1ec0fd9ea9907995bfd122a1764e94731ac",
   technical: "4f810a213fef4a463b3c47e63bb2ed1519ca859882f26b7ae071079b6927db82",
-  watchlist: "cf4e31bf40de1640a02ab8630942bc3d6fba0caeb09ed4cdf80d0b0fcef45d6d",
+  watchlist: "7cf72fedc000235afa71ba5fbfca0d942a2362f1755cc89350e3d8f971985c50",
   buyplan: "7aac161b9905ff5188409ca153e411668c00f60e12d7bd1549d9d2d4788a5c08",
   review: "abab9cb0446cb5a839252dd8cb7bd241c59e9cb97c63f5de3985a1867e0b99ce",
   valuation: "918dadc022a43f7321bdb28614e88404c7d686cd55a27041be05dc070eaf60de",
   // Dark is the primary appearance and carries its own baselines; an empty
   // value here keeps the gate red until a human has looked at the capture.
   home_dark: "e674d860fbcefd6827a7fa5c571c8f44b41172147094c7bf4bb38631e152c6ba",
-  watchlist_dark: "116601e44247c618094329d43af3714574731229fcda200ec600213ec710b8c4",
+  watchlist_dark: "56ab00a9679568ba689392f22695e728e46bc4ea84f8bb33fdf9e6448394ec31",
   company_dark: "81f11e4c4bff197d1dbab72cc89b986acf09d0c96f0825358cefddd7aefbd640",
   technical_dark: "3a5289fb47fb132fe9212dc6db741f40c7d5f2babeb59f250b17dd3f6310c105",
   valuation_dark: "44ae0155faaec56973229d16468a67295f282ac4c1e220f5e7db694e56ad2927",
@@ -475,6 +475,10 @@ async function main() {
     assert.equal(await page.locator('[data-testid="data-update-scope"]').inputValue(), "watchlist");
     assert.equal(await page.locator('[data-testid="data-update-button"]').isDisabled(), true);
     assert.match(await page.locator('[data-testid="data-update-status"]').innerText(), /瀏覽器預覽不下載/);
+    assert.equal(await page.locator('[data-testid="fundamentals-update-panel"]').count(), 1);
+    assert.equal(await page.locator('[data-testid="fundamentals-update-scope"]').inputValue(), "watchlist");
+    assert.equal(await page.locator('[data-testid="fundamentals-update-button"]').isDisabled(), true);
+    assert.match(await page.locator('[data-testid="fundamentals-update-status"]').innerText(), /瀏覽器預覽不擷取/);
 
     // Symbol search is owned by the shared instrument bar. Watchlist keeps
     // group/save controls and the bar supplies the contextual add action.
@@ -802,6 +806,8 @@ async function main() {
       };
     }, [sidecarBaseUrl]);
     let updateHeld = 0;
+    let fundamentalsUpdateIssued = 0;
+    let fundamentalsUpdateBody = null;
     await desktopPage.route(/\/data\/update/, async (route) => {
       updateHeld += 1;
       await new Promise((resolve) => setTimeout(resolve, 17000));
@@ -809,6 +815,23 @@ async function main() {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({ data: { status: "success", updated_count: 1, requested_count: 1, bars_downloaded: 0, results: [] } }),
+      });
+    });
+    await desktopPage.route(/\/fundamentals\/update/, async (route) => {
+      fundamentalsUpdateIssued += 1;
+      fundamentalsUpdateBody = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: {
+            status: "success",
+            updated_count: 1,
+            requested_count: 1,
+            unavailable_count: 0,
+            results: [{ instrument_id: "TWSE:2330", status: "success", message: "月營收、季報與財務品質資料已更新" }],
+          },
+        }),
       });
     });
     await desktopPage.goto(`${baseUrl}/index.html`, { waitUntil: "networkidle" });
@@ -831,6 +854,17 @@ async function main() {
     );
     assert.doesNotMatch(await desktopPage.locator('[data-testid="data-update-status"]').innerText(), /逾時/);
     assert.equal(updateHeld, 1, "the download request was never issued");
+    const desktopFundamentalsButton = desktopPage.locator('[data-testid="fundamentals-update-button"]');
+    assertOk(!(await desktopFundamentalsButton.isDisabled()), "fundamentals update button never enabled: the desktop stub did not take");
+    await desktopFundamentalsButton.click();
+    await desktopPage.waitForFunction(
+      () => !/正在擷取/.test(document.querySelector('[data-testid="fundamentals-update-status"]').textContent),
+      null,
+      { timeout: 10000 },
+    );
+    assert.match(await desktopPage.locator('[data-testid="fundamentals-update-status"]').innerText(), /財務更新：1\/1/);
+    assert.equal(fundamentalsUpdateIssued, 1, "the fundamentals update request was never issued");
+    assert.deepEqual(fundamentalsUpdateBody, { scope: "watchlist", instrument_ids: ["TWSE:2330"] });
     await desktopPage.close();
 
     const errorsBeforeDataGap = browserErrors.length;

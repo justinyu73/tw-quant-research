@@ -49,7 +49,7 @@ decision id.
 | --- | --- | --- |
 | Home | which companies are near my buy price today | derived from local valuation + local EOD |
 | Watchlist | main work surface: value, discount, buy stage per company | local watchlist + EOD + user valuation |
-| Company | one company: thesis, fundamentals, trend, price reference | local notes + EOD; fundamentals unavailable |
+| Company | one company: thesis, fundamentals, trend, price reference | local notes + EOD + explicitly captured fundamentals; uncaptured fields unavailable |
 | Valuation | Bear/Base/Bull EPS x PE, buy bands, valuation basis | user assumptions only |
 | Buy Plan | budget, staged prices, staged ratios, reached-price prompt | derived from valuation ladder |
 | Review | monthly/quarterly thesis review and outcome | local records |
@@ -72,11 +72,33 @@ quant scores are prohibited as ordering keys.
 | `draft` | local human setting | non-authoritative personal input, not an official datum |
 
 Monthly revenue, EPS, gross/operating/net margin, ROE, ROA, cash flow, TTM
-valuation, and percentile valuation are `unavailable` until their free-source,
-normalization, PIT, and quality contracts are admitted. Forward EPS/PE is
+valuation, and percentile valuation are `unavailable` for a company until the
+free-source, normalization, PIT, and quality contracts are admitted **and a
+matching local observation has been explicitly captured**. Forward EPS/PE is
 unavailable in this product phase. `Close` is the only current price basis;
 `Adjusted Close` remains disabled until the adjusted OHLCV and volume policy is
 approved.
+
+### Explicit fundamentals update
+
+Decision: `TQR-FUNDAMENTALS-UPDATE-001`
+Status: `active`
+Authority: `TQR-FUNDAMENTALS-SOURCE-001` in
+[`tqr-fundamentals-source-contract.md`](tqr-fundamentals-source-contract.md)
+
+The desktop app has a separate `更新財務指標` action. It is not part of
+`更新台股資料` and never turns a price-history request into a fundamentals
+request. The action is user-triggered, bounded to `目前個股` or `全部自選`,
+and accepts only selected TWSE/TPEx equity identities. It makes the three
+official endpoint requests for each market represented in that scope, keeps
+only observations whose `security_id` was explicitly requested, and atomically
+merges them into the local append-only series.
+
+Each endpoint contributes its latest published snapshot only. A successful run
+does not claim one year of financial history: the UI reports the captured
+period and honest `n / 8` or `n / 12` coverage. Missing company rows remain
+`unavailable`; the app never estimates from price, pads a series, carries a
+period forward, or runs this action in the background.
 
 ## Valuation contract
 
@@ -185,7 +207,8 @@ Every admitted free endpoint returns a **latest-period snapshot only** (one
 distinct period per response). "最近 8 季" and "最近 12 個月" therefore cannot be
 produced from one fetch. The table renders whatever periods have actually been
 captured, labelled `n of 8`; it must never pad, interpolate, or carry a period
-forward. Until a capture path is approved it keeps its `unavailable` empty state.
+forward. Until an explicit capture run has produced a matching observation it
+keeps its `unavailable` empty state.
 
 `available_at` for these sources is the exchange's batch export date (出表日期 /
 `Date`), which is later than the true filing date and therefore PIT-safe.
@@ -257,6 +280,10 @@ document must never gain a horizontal scrollbar.
   confirmation and cannot delete the default group.
 - Before any valuation exists, 合理價值 / 折價 / 買進價 columns render `—`;
   after a Base worksheet is evaluated they render real numbers and a stage.
+- K-line history update and fundamentals update are separate explicit actions;
+  the former requests 1–3 trailing years of daily history, while the latter
+  requests only the latest admitted period for the selected equity scope and
+  reports missing observations as unavailable.
 - A valuation worksheet cannot be added without all three scenarios, a
   monotonic ratio ladder, an EPS period, an EPS kind, and a valuation date.
 - A buy plan cannot be saved unless allocations plus reserve total 100%, and

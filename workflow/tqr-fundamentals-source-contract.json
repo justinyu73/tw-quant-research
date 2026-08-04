@@ -14,7 +14,11 @@
   },
   "implementation": {
     "normalization": "src/tw_quant_engine/fundamentals.py",
-    "capture": "scripts/capture_fundamentals.py",
+    "capture": [
+      "scripts/capture_fundamentals.py",
+      "src/tw_quant_engine/fundamentals_update.py",
+      "POST /fundamentals/update"
+    ],
     "markets": {
       "TWSE": "live_proven",
       "TPEx": "live_proven"

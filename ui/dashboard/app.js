@@ -33,6 +33,7 @@
   var chartDrawingModelKey = null;
   var chartTemplateName = "default";
   var dataUpdateInFlight = false;
+  var fundamentalsUpdateInFlight = false;
   var alertsLoadStarted = false;
   var alertsPersistenceAvailable = null;
   var alertEvaluateInFlight = false;
@@ -365,6 +366,7 @@
     valid: "有效",
     partial: "部分可用",
     invalid: "無效",
+    success: "完成",
     unavailable: "不可用",
     unsupported_period: "不支援期間",
     loading: "載入中",
@@ -679,6 +681,7 @@
   // work, not a hung call: the 15s read limit aborted it every time and then
   // blamed the service for not responding.
   var DATA_UPDATE_TIMEOUT_MS = 600000;
+  var FUNDAMENTALS_UPDATE_TIMEOUT_MS = 300000;
 
   function sidecarRequest(path, options) {
     var base = sidecarBaseUrl();
@@ -701,6 +704,9 @@
       if (timeoutMs === DATA_UPDATE_TIMEOUT_MS) {
         return "下載超過 " + (DATA_UPDATE_TIMEOUT_MS / 60000) + " 分鐘仍未完成；請縮小範圍（改成「目前個股」或減少年數）後重試。";
       }
+      if (timeoutMs === FUNDAMENTALS_UPDATE_TIMEOUT_MS) {
+        return "財務擷取超過 " + (FUNDAMENTALS_UPDATE_TIMEOUT_MS / 60000) + " 分鐘仍未完成；請縮小範圍（改成「目前個股」）後重試。";
+      }
       return "本機資料服務逾時未回應（" + ((timeoutMs || SIDECAR_TIMEOUT_MS) / 1000) + " 秒）；請確認 TQR 仍在執行後重試。";
     }
     if (!message || /load failed|failed to fetch|networkerror|network request failed/i.test(message)) {
@@ -708,6 +714,9 @@
     }
     if (message === "data_update_unavailable_in_preview") {
       return "瀏覽器預覽不提供下載；請使用桌面版 TQR。";
+    }
+    if (message === "fundamentals_update_unavailable_in_preview") {
+      return "瀏覽器預覽不提供財務擷取；請使用桌面版 TQR。";
     }
     if (message === "instrument_not_found") {
       return "找不到這個自選標的，請重新載入商品清單。";
@@ -1516,6 +1525,61 @@
     });
   }
 
+  function fundamentalsUpdateTargetIds() {
+    var update = state.fundamentalsUpdate || {};
+    if (update.scope === "selected") {
+      var selected = selectedKlineInstrument();
+      return selected ? [selected.instrument_id] : [];
+    }
+    return state.watchlist && Array.isArray(state.watchlist.items) ? state.watchlist.items.slice() : [];
+  }
+
+  function fundamentalsUpdateResultMarkup(results) {
+    if (!Array.isArray(results) || !results.length) return "";
+    var labels = { success: "3/3 類完成", partial: "部分完成", unavailable: "尚無資料", unsupported: "未支援", error: "失敗" };
+    return '<div class="data-update-results fundamentals-update-results" data-testid="fundamentals-update-results">' + results.map(function (result) {
+      var instrument = instrumentForId(result.instrument_id) || {};
+      var name = instrument.symbol || result.symbol || result.instrument_id || "未指定標的";
+      var detail = result.message || "未取得最新期別";
+      return '<div class="data-update-result"><span><strong>' + text(name) + '</strong><small>' + text(instrument.display_name || result.display_name || result.instrument_id) + '</small></span><span class="data-update-result-status status-' + escapeHtml(result.status || "error") + '">' + text(labels[result.status] || result.status || "失敗") + '</span><small class="data-update-result-detail">' + text(detail) + '</small></div>';
+    }).join("") + '</div>';
+  }
+
+  function requestFundamentalsUpdate() {
+    if (fundamentalsUpdateInFlight) return;
+    var update = state.fundamentalsUpdate || { scope: "watchlist" };
+    var instrumentIds = fundamentalsUpdateTargetIds();
+    if (!instrumentIds.length) {
+      state = core.reduce(state, { type: "FUNDAMENTALS_UPDATE_ERROR", message: update.scope === "selected" ? "請先選取一個個股" : "請先加入自選標的" });
+      render();
+      return;
+    }
+    fundamentalsUpdateInFlight = true;
+    state = core.reduce(state, { type: "FUNDAMENTALS_UPDATE_START" });
+    render();
+    var body = { scope: update.scope || "watchlist", instrument_ids: instrumentIds };
+    if (update.scope === "selected") body.instrument_id = instrumentIds[0];
+    sidecarRequest("/fundamentals/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      timeoutMs: FUNDAMENTALS_UPDATE_TIMEOUT_MS
+    }).then(function (payload) {
+      var result = payload && payload.data || {};
+      var updated = Number(result.updated_count || 0);
+      var unavailable = Number(result.unavailable_count || 0);
+      var message = "財務更新：" + updated + "/" + (result.requested_count || instrumentIds.length) + " 檔有最新資料" + (unavailable ? "，" + unavailable + " 檔尚無官方期別" : "");
+      state = core.reduce(state, { type: "FUNDAMENTALS_UPDATE_SUCCESS", status: result.status || "success", message: message, results: result.results || [] });
+      fundamentalsCache = {};
+      fundamentalsRequests = {};
+    }).catch(function (error) {
+      state = core.reduce(state, { type: "FUNDAMENTALS_UPDATE_ERROR", message: sidecarErrorMessage(error, FUNDAMENTALS_UPDATE_TIMEOUT_MS) });
+    }).then(function () {
+      fundamentalsUpdateInFlight = false;
+      render();
+    });
+  }
+
   function selectedQuoteSnapshot() {
     var model = core.selectedKline(state);
     var instrument = (model && model.instrument) || selectedKlineInstrument() || { instrument_id: state.selectedKlineInstrumentId || "TWSE:2330", symbol: "2330", display_name: "台積電", market: "TWSE" };
@@ -1552,6 +1616,23 @@
       : targetIds.length === 0 ? (isWatchlist ? "請先加入自選標的" : "請先選取個股")
       : update.status === "idle" ? "尚未更新；只下載目前範圍的個股" : (update.message || STATUS_LABELS[update.status] || update.status);
     return '<section class="data-update-panel" data-testid="data-update-panel"><div class="data-update-heading"><div><span class="eyebrow">官方免費來源 → 本機保存</span><h2>更新台股資料</h2><p>更新範圍：' + text(targetLabel) + '</p></div><span class="data-update-status status-' + escapeHtml(update.status) + '" data-testid="data-update-status">' + text(statusText) + '</span></div><div class="data-update-controls"><label><span>更新範圍</span><select data-action="data-update-scope" data-testid="data-update-scope"><option value="watchlist"' + (isWatchlist ? ' selected' : '') + '>全部自選（' + targetIds.length + ' 檔）</option><option value="selected"' + (isWatchlist ? '' : ' selected') + '>目前個股</option></select></label><label><span>歷史範圍</span><select data-action="data-update-years" data-testid="data-update-years"><option value="1"' + (update.years === 1 ? ' selected' : '') + '>近 1 年</option><option value="2"' + (update.years === 2 ? ' selected' : '') + '>近 2 年</option><option value="3"' + (update.years === 3 ? ' selected' : '') + '>近 3 年</option></select></label><button class="btn btn-primary" type="button" data-action="data-update" data-testid="data-update-button"' + (enabled ? '' : ' disabled') + '>' + (dataUpdateInFlight ? '更新中…' : (isWatchlist ? '下載並更新自選資料' : '下載並更新目前個股')) + '</button></div><small class="data-update-note">目前提供 TWSE 上市個股；只處理目前範圍，不下載全市場。資料保存於本機 raw 與 K 線快照，不是即時行情；瀏覽器預覽僅展示介面。</small>' + dataUpdateResultMarkup(update.results) + '</section>';
+  }
+
+  function fundamentalsUpdateMarkup() {
+    var update = state.fundamentalsUpdate || { scope: "watchlist", status: "idle", message: "", results: [] };
+    var instrument = selectedKlineInstrument();
+    var targetIds = fundamentalsUpdateTargetIds();
+    var isWatchlist = update.scope !== "selected";
+    var desktopAvailable = desktopDataUpdateAvailable();
+    var enabled = targetIds.length > 0 && desktopAvailable && !fundamentalsUpdateInFlight;
+    var targetLabel = isWatchlist
+      ? "全部自選（" + targetIds.length + " 檔）"
+      : instrument ? (instrument.market + ":" + instrument.symbol + " · " + instrument.display_name) : "尚未選取個股";
+    var statusText = !desktopAvailable
+      ? "瀏覽器預覽不擷取；請使用桌面版"
+      : targetIds.length === 0 ? (isWatchlist ? "請先加入自選標的" : "請先選取個股")
+      : update.status === "idle" ? "尚未擷取；每次只取得官方最新一期" : (update.message || STATUS_LABELS[update.status] || update.status);
+    return '<section class="data-update-panel fundamentals-update-panel" data-testid="fundamentals-update-panel"><div class="data-update-heading"><div><span class="eyebrow">官方財報來源 → 本機保存</span><h2>更新財務指標</h2><p>更新範圍：' + text(targetLabel) + '</p></div><span class="data-update-status status-' + escapeHtml(update.status) + '" data-testid="fundamentals-update-status">' + text(statusText) + '</span></div><div class="data-update-controls"><label><span>更新範圍</span><select data-action="fundamentals-update-scope" data-testid="fundamentals-update-scope"><option value="watchlist"' + (isWatchlist ? ' selected' : '') + '>全部自選（' + targetIds.length + ' 檔）</option><option value="selected"' + (isWatchlist ? '' : ' selected') + '>目前個股</option></select></label><button class="btn btn-primary" type="button" data-action="fundamentals-update" data-testid="fundamentals-update-button"' + (enabled ? '' : ' disabled') + '>' + (fundamentalsUpdateInFlight ? '擷取中…' : (isWatchlist ? '擷取並更新自選財務' : '擷取目前個股財務')) + '</button></div><small class="data-update-note">只在按下後擷取 TWSE／TPEx 最新月營收、季報與財務品質期別；不會把近 1 年 K 線當成財報歷史，也不會背景更新。</small>' + fundamentalsUpdateResultMarkup(update.results) + '</section>';
   }
 
   // Price above fair value is a premium, not a discount. Rendering +205% under a
@@ -2225,7 +2306,7 @@
   function watchlistPageMarkup() {
     return pageHeader("自選清單", "追蹤清單 · 合理價值 · 折價幅度 · 買進階段") +
       '<div class="data-source-banner"><strong>免費資料本地保存</strong><span>目前顯示已核准的本機資料；未接入付費訂閱、即時行情或券商。</span></div>' +
-      dataUpdateMarkup() + watchlistMarkup();
+      dataUpdateMarkup() + fundamentalsUpdateMarkup() + watchlistMarkup();
   }
 
   // Reading order: the company's own numbers first, then the judgements built
@@ -2302,7 +2383,7 @@
     var income = data && data.income_statement.observations[0];
     var balance = data && data.balance_sheet && data.balance_sheet.observations[0];
     if (!revenue && !income && !balance) {
-      return '<div class="empty-state" data-testid="fundamental-snapshot-empty"><strong>此標的尚無已擷取的基本面期別。</strong><span>執行 <code>scripts/capture_fundamentals.py</code> 擷取一期後才會顯示；不以價格推估，也不補 0。</span></div>';
+      return '<div class="empty-state" data-testid="fundamental-snapshot-empty"><strong>此標的尚無已擷取的基本面期別。</strong><span>請回到自選清單按「更新財務指標」擷取官方最新一期；不以價格推估，也不補 0。</span></div>';
     }
     function tile(label, value, hint, testid, series, keyMetric) {
       return '<article class="fundamental-metric" data-testid="' + testid + '"><span>' + text(label) + '</span><strong class="' + (keyMetric ? "fundamental-key" : "fundamental-neutral") + '">' + text(value) + '</strong>' +
@@ -2639,6 +2720,10 @@
       requestDataUpdate();
       return;
     }
+    if (action === "fundamentals-update") {
+      requestFundamentalsUpdate();
+      return;
+    }
     if (action === "watchlist-group-create") {
       state = core.reduce(state, { type: "CREATE_WATCHLIST_GROUP", name: watchlistGroupNameQuery });
       watchlistGroupNameQuery = "";
@@ -2721,6 +2806,11 @@
     }
     if (target.getAttribute("data-action") === "data-update-scope") {
       state = core.reduce(state, { type: "SET_DATA_UPDATE_SCOPE", scope: target.value });
+      render();
+      return;
+    }
+    if (target.getAttribute("data-action") === "fundamentals-update-scope") {
+      state = core.reduce(state, { type: "SET_FUNDAMENTALS_UPDATE_SCOPE", scope: target.value });
       render();
       return;
     }
