@@ -281,6 +281,21 @@ applications」——不是 WebView2（JY 機器上 WebView2 已裝，`150.0.407
 父行程，模擬沒有機會跑 handler 的結束。兩個測試：**沒有旗標必須產生孤兒**（守住這個閘
 本身，否則哪天不再孤兒了它會對任何 build 都綠）、有旗標必須跟著死。
 
+### 安裝程式自己要清孤兒（v0.3.2 仍被卡死之後才補）
+
+v0.3.2 裝起來一樣卡死。原因是 app 端的修正**只保證新版不再產生孤兒，救不了舊版已經
+留下的孤兒**——而安裝程式面對的正是那些。
+
+zibaldone 早就解過同一題：`frontend/src-tauri/installer-hooks.nsh` 裡的
+`NSIS_HOOK_PREINSTALL` 用 `taskkill` 先殺 sidecar，註解寫著「Windows 更新老毛病根治」。
+TQR 從來沒補這一層。照抄過來，並且多補 `NSIS_HOOK_PREUNINSTALL`（JY 的解安裝也被卡過）。
+
+閘：`tests/test_sidecar_exits_with_parent.py` 多一個測試，斷言 tauri.conf.json 指到 hook
+檔、而且 hook 檔裡有兩個 macro 並指名 `tqe-sidecar.exe`。
+
+**教訓**：同一個技術棧的另一個 repo 已經踩過並修好的坑，這裡重新踩了一次。開新的
+Tauri＋sidecar 專案時先去看 zibaldone 的 `src-tauri` 設定。
+
 ### NSIS `.exe` 安裝到一半失敗（原始診斷，已被上面推翻）
 
 JY 回報 `TQR-Windows-x64-setup.exe` 安裝到一半失敗，並指出做 zibaldone 時也一樣。

@@ -47,6 +47,11 @@
     "category": "DeveloperTool",
     "shortDescription": "Taiwan quantitative research viewer",
     "longDescription": "Local EOD K-line research viewer with explicit user-triggered TWSE local data capture.",
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": true,
+    "windows": {
+      "nsis": {
+        "installerHooks": "installer-hooks.nsh"
+      }
+    }
   }
 }
