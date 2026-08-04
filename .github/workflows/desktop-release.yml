@@ -16,12 +16,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
       - name: Run open-source release audit
         run: python3 scripts/open_source_audit.py
+      - name: Prepare fixed Qlib replay environment
+        run: |
+          python3 -m venv /tmp/tqr-qlib-0.9.7-replay
+          /tmp/tqr-qlib-0.9.7-replay/bin/python -m pip install --disable-pip-version-check --no-input -r workflow/qlib-replay-python312.lock
+          /tmp/tqr-qlib-0.9.7-replay/bin/python -m pip check
+          PYTHONNOUSERSITE=1 PYTHONPATH=src /tmp/tqr-qlib-0.9.7-replay/bin/python scripts/run_qlib_spike.py
       - name: Run unit, contract, and preview gates
         run: |
           python3 -B -m unittest discover -s tests -v
+          TQR_QLIB_PYTHON=/tmp/tqr-qlib-0.9.7-replay/bin/python PYTHONNOUSERSITE=1 python3 scripts/run_s9_acceptance.py
           python3 scripts/lh_preflight.py
           python3 scripts/run_dashboard_preview.py
       - name: Enforce strict audit for version tags

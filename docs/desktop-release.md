@@ -2,7 +2,7 @@
 
 TW Quant Research is distributed as a local research desktop application. Its
 market and research views are read-only; the only write-capable data action is
-the explicit, bounded TWSE local-history update described below.
+the explicit, bounded TWSE/TPEx local-history update described below.
 The public download surface is the GitHub Release for the matching `vX.Y.Z`
 tag; the repository source remains the authority for the app and its evidence.
 
@@ -10,8 +10,9 @@ tag; the repository source remains the authority for the app and its evidence.
 
 1. Keep `frontend/src-tauri/tauri.conf.json` and the release tag on the same
    version, for example `0.2.0` and `v0.2.0`.
-2. Push the version tag. `desktop-release.yml` runs the source audit, unit
-   tests, deterministic preflight, and dashboard preview first.
+2. Push the version tag. `desktop-release.yml` runs the source audit, fixed
+   Python 3.12 / Qlib 0.9.7 replay environment, S9 evidence gate, unit tests,
+   deterministic preflight, and dashboard preview first.
 3. The build matrix creates target-specific sidecars and bundles for:
    `x86_64-pc-windows-msvc`, `x86_64-apple-darwin`, and
    `aarch64-apple-darwin`. Bundles are minisign-signed when the
@@ -155,11 +156,11 @@ After launching the desktop app:
 4. Review the per-stock result list, then return to `行情` to confirm the K-line
    history and technical indicators use the updated local snapshot.
 
-This action is manual and limited to the explicit watchlist or selected TWSE
-listed equity. Raw responses are kept under the app data directory's
-`raw/twse/<symbol>/`, while normalized daily snapshots are kept under `k6a/`;
-browser preview has no download capability. TPEx, full-market, real-time, and
-background refresh are not enabled by this button.
+This action is manual and limited to the explicit watchlist or selected TWSE or
+TPEx listed equity. Raw responses are kept under the app data directory's
+`raw/twse/<symbol>/` or `raw/tpex/<symbol>/`, while normalized daily snapshots
+are kept under `k6a/`; browser preview has no download capability. Full-market,
+real-time, and background refresh are not enabled by this button.
 
 The separate `更新財務指標` action follows
 `docs/tqr-research-platform-spec.md#explicit-fundamentals-update` and decision
@@ -178,10 +179,10 @@ local app cannot break the desktop build (dev/preview flows still pin the port
 via `TQE_SIDECAR_URL`). It
 does not refresh providers in the background, place orders, connect to a broker,
 or execute an automatic strategy. In the desktop app, a human can explicitly
-download the selected TWSE listed equity for 1, 2, or 3 trailing years; raw
-responses and normalized K6a snapshots are saved in the app data directory.
-Browser preview remains fixture-only, and TPEx/full-market download is not
-enabled. The release workflow does not add signing credentials or private data.
+download the selected TWSE or TPEx listed equity for 1, 2, or 3 trailing years;
+raw responses and normalized K6a snapshots are saved in the app data directory.
+Browser preview remains fixture-only, and full-market download is not enabled.
+The release workflow does not add signing credentials or private data.
 Code signing and notarization are separate release decisions; unsigned builds
 may show platform security warnings until those decisions are approved and
 configured.

@@ -43,6 +43,15 @@ class S9ReleaseHardeningTests(unittest.TestCase):
         self.assertEqual(package["execution_order"], ["S5", "S6", "S7", "S8", "S9"])
         self.assertTrue(all(stage["failure_budget"]["consecutive_failures"] == 3 for stage in package["stages"]))
 
+    def test_qlib_replay_lock_pins_required_version(self) -> None:
+        lock_path = ROOT / "workflow/qlib-replay-python312.lock"
+        lock_lines = {
+            line.strip()
+            for line in lock_path.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.startswith("#")
+        }
+        self.assertIn("pyqlib==0.9.7", lock_lines)
+
 
 if __name__ == "__main__":
     unittest.main()

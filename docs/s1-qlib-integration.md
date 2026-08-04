@@ -21,10 +21,17 @@ environment decision, not permission to follow future floating releases.
 ## Reproduction
 
 ```sh
-python3 -m venv /tmp/tw-quant-engine-s1-venv
-/tmp/tw-quant-engine-s1-venv/bin/python -m pip install -e '.[qlib]'
-/tmp/tw-quant-engine-s1-venv/bin/python scripts/run_qlib_spike.py
+python3.12 -m venv /tmp/tqr-qlib-0.9.7-replay
+/tmp/tqr-qlib-0.9.7-replay/bin/python -m pip install --disable-pip-version-check --no-input -r workflow/qlib-replay-python312.lock
+/tmp/tqr-qlib-0.9.7-replay/bin/python -m pip check
+PYTHONNOUSERSITE=1 PYTHONPATH=src /tmp/tqr-qlib-0.9.7-replay/bin/python scripts/run_qlib_spike.py
 ```
+
+The replay interpreter is fixed by the explicit Python 3.12 environment path
+and the exact `pyqlib==0.9.7` requirement. The S9 runner accepts
+`TQR_QLIB_PYTHON` for an equivalent isolated path and records `python -VV`,
+`pip check`, and the complete `pip freeze --all` digest in its evidence. It
+does not install dependencies or contact a provider during S9.
 
 The command must emit one JSON object with:
 
